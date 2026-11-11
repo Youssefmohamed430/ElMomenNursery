@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\ElMomenNursery.Domain\ElMomenNursery.Domain.csproj" />
+    <ProjectReference Include="..\ElMomenNursery.Application\ElMomenNursery.Application.csproj" />
+  </ItemGroup>
+</Project>
