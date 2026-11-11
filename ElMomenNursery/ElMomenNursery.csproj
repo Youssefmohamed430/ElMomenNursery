@@ -10,5 +10,11 @@
     <UseWindowsForms>true</UseWindowsForms>
   </PropertyGroup>
 
+  <ItemGroup>
+    <None Update="Resources\Branding\AlMoumenNurseryLogo.jpeg" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
+
+
+
 

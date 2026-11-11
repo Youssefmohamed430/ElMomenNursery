@@ -4,7 +4,7 @@ This roadmap breaks the approved product scope into an ordered, end-to-end task 
 
 **Product rule:** deliver comprehensive day-to-day functionality through an extremely simple Arabic RTL experience for non-technical nursery staff.
 
-**Project baseline:** one Windows PC and one independent local database per branch; Windows Forms desktop UI with Domain, Application, and Infrastructure projects in one .NET solution; currently targeting .NET 10. No central database/server, cross-branch synchronization, Reports page, or Branch Management page.
+**Project baseline:** one Windows PC and one independent local database per branch; Windows Forms desktop UI with Domain, Application, and Infrastructure projects in one .NET solution; currently targeting .NET 9 to match the installed Visual Studio 2022 17.14 and .NET SDK 9.0.306. .NET 9 reached end of support on November 10, 2026. No central database/server, cross-branch synchronization, Reports page, or Branch Management page.
 
 **Source of truth:** [Project specification](../SPECIFICATION.md), [AI agent instructions](../AGENT.md), and [solution architecture](ARCHITECTURE.md).
 
@@ -35,28 +35,28 @@ This roadmap breaks the approved product scope into an ordered, end-to-end task 
 
 - [x] Keep the existing desktop UI project and the Domain, Application, and Infrastructure projects in the same solution.
 - [x] Confirm project reference direction: Desktop UI → Application; Desktop UI composition root → Infrastructure; Application → Domain; Infrastructure → Application/Domain; Domain has no project dependencies.
-- [x] Add shared build conventions and document supported SDK/runtime versions. (The .NET 10 SDK still needs to be installed on the development machine.)
+- [x] Add shared build conventions and document supported SDK/runtime versions. (The installed .NET SDK 9.0.306 matches the selected target.)
 - [x] Add repository ignore rules for build output, IDE state, local database files, exports, backups, secrets, and user-specific settings.
 - [x] Establish naming, formatting, nullable-reference, exception, logging, and configuration conventions.
 - [x] Record initial architecture decisions and explicitly list unresolved database, migration, document-library, and installer choices.
 - [x] Define a separate ignored `dev-data/` location for synthetic development data; real nursery records must never be used as sample data.
 - [x] Define the location policy: user data stays outside program binaries; exact per-user vs machine-wide path remains open pending Windows account model.
 
-**Gate:** project responsibilities and dependency rules are documented and configured. Remaining setup item: install the .NET 10 SDK; this machine currently has .NET SDK 9.0.306. No nursery feature logic is embedded in the UI project.
+**Gate:** project responsibilities and dependency rules are documented and configured. Current target is .NET 9, matching the installed SDK and Visual Studio 2022 17.14. .NET 9 is out of support; revisit the target when Visual Studio is upgraded. No nursery feature logic is embedded in the UI project.
 
 ## Phase 2 — UI shell and brand system
 
-- [ ] Replace the starter form with the application shell and a clear Arabic RTL navigation structure.
-- [ ] Add a reusable page layout, form layout, dialog pattern, status/message pattern, and confirmation pattern.
-- [ ] Add the real logo and its approved palette; do not stretch or redraw it.
-- [ ] Choose Arabic-capable fonts and verify shaping, mixed Arabic/Latin text, numerals, dates, and right-to-left keyboard/focus order.
-- [ ] Establish readable sizes, spacing, click-target sizes, icons with text labels, and accessible status indicators.
-- [ ] Implement loading, empty, validation, success, failure, and device-unavailable presentation patterns in plain Arabic.
-- [ ] Define a compact navigation model that shows only pages the signed-in account may access.
-- [ ] Ensure the home screen is a task launcher, not a reports/dashboard page.
+- [x] Replace the starter form with the application shell and a clear Arabic RTL navigation structure.
+- [x] Add reusable page/section and form-field layouts, Arabic information/confirmation dialogs, and status/message patterns.
+- [x] Add the real logo and a restrained palette sampled/derived from its green (`#80B040`), red (`#E00000`), and blue (`#0040E0`), with a darker green for readable primary actions.
+- [x] Set Segoe UI as the Arabic-capable UI font and configure RTL layout, keyboard-accessible buttons, spacing, and readable control sizes.
+- [ ] Verify Arabic shaping, mixed Arabic/Latin text, numerals, dates, and focus order on the supported workstation before closing the phase.
+- [x] Add reusable loading, empty, validation-hint, success, warning, error, and device-unavailable message patterns in Arabic.
+- [ ] Wire navigation visibility to the signed-in account's permissions in the authentication/authorization phase. The Admin-only settings entry is hidden from the shell until that work exists.
+- [ ] Select and verify a consistent icon set with text labels after the supported Windows versions are confirmed; current navigation uses clear text labels to avoid unverified glyphs.
+- [x] Ensure the home screen is a task launcher, not a reports/dashboard page.
 
-**Gate:** the shell is understandable to nursery staff in Arabic RTL at the actual workstation size and uses the supplied identity.
-
+**Gate:** needs visual review on the supported workstation for Arabic shaping, actual font/spacing, contrast, and keyboard flow. The target now matches SDK 9.0.306; the UI still needs to be launched and visually reviewed on the supported workstation.
 ## Phase 3 — Local persistence and application startup
 
 - [ ] Choose and document the local database engine and its Windows deployment/licensing requirements.
@@ -265,4 +265,7 @@ Scope decisions
 ```
 
 Some work can proceed in parallel after its prerequisites, but device-specific implementation must wait for actual hardware decisions. The app's manual workflows, local storage, permissions, exports, and PDF documents do not need to wait for that hardware.
+
+
+
 

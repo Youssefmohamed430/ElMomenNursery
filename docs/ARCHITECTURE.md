@@ -43,8 +43,7 @@ Desktop UI  ->  Application  ->  Domain
 
 ## Initial technology target
 
-All projects target .NET 10; the desktop project targets `net10.0-windows` and keeps Windows Forms. .NET 10 is the current LTS target. Keep application and business logic in the non-UI projects so a future UI change would not require rewriting those layers.
-
+All projects currently target .NET 9: the desktop project uses `net9.0-windows` and the non-UI projects use `net9.0`. This target was restored to match the available Visual Studio 2022 17.14 and .NET SDK 9 development environment. .NET 9 reached end of support on November 10, 2026; this is a compatibility choice requested for the current workstation, and the project should move to a supported target together with a compatible Visual Studio update.
 ## Boundaries to keep
 
 - Do not place database queries or business rules in form event handlers.
@@ -53,3 +52,15 @@ All projects target .NET 10; the desktop project targets `net10.0-windows` and k
 - Detailed child and employee fields remain nursery-defined; do not add guessed fields to Domain.
 - Add a module folder under `Application/Features` and a corresponding UI form only when that feature is ready to be implemented.
 - The structure intentionally avoids separate microservices, a central database, a reports module, and branch management.
+
+## Desktop shell and brand foundation
+
+- `ElMomenNursery/Forms/MainForm.cs` is the current application shell. It provides a brand header, right-side Arabic navigation, a home task launcher, and neutral empty states for sections whose business features are not implemented yet.
+- `ElMomenNursery/Styling/BrandPalette.cs` centralizes colors sampled/derived from the supplied logo (green `#80B040`, red `#E00000`, and blue `#0040E0`). The logo's bright green is an accent; a darker derived green (`#376927`) is used for primary actions and readable text. Its white-text contrast is approximately 6.54:1. The bright logo green is reserved for decorative accents. Red and blue tones are reserved for status feedback.
+- The actual logo is kept at `ElMomenNursery/Resources/Branding/AlMoumenNurseryLogo.jpeg` and copied to the output directory for the app header.
+- `ElMomenNursery/Controls/` contains reusable navigation buttons, loading/empty/message states, validation hints, form sections/field rows, and Arabic confirmation/information dialogs.
+- The Admin-only settings entry is intentionally not shown until sign-in and permission enforcement are implemented. Role-based filtering remains a later task.
+- Current section pages are visual placeholders only; they do not read or write nursery data.
+
+
+

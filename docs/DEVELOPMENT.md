@@ -2,10 +2,10 @@
 
 ## Toolchain
 
-- Install the .NET 10 SDK (latest available 10.0.x servicing release) before building or running the solution.
-- The app targets `net10.0-windows`; the non-UI projects target `net10.0`.
-- Use a supported Windows development machine and Visual Studio/.NET tooling that supports .NET 10.
-- Do not add a `global.json` SDK pin until the required SDK is installed on the development machine.
+- Use the installed .NET 9 SDK (currently 9.0.306) to build or run the solution.
+- The app targets `net9.0-windows`; the non-UI projects target `net9.0`.
+- The selected target matches Visual Studio 2022 17.14 and the installed .NET 9 SDK. .NET 9 is out of support as of November 10, 2026; plan to update Visual Studio and the target framework together.
+- Do not add a `global.json` SDK pin unless the team explicitly needs to lock builds to a particular installed SDK.
 
 ## Code and project boundaries
 
@@ -41,4 +41,5 @@
 - Do not add a central database/server, cross-branch sync, Reports page, or Branch Management page.
 - Do not invent child/employee fields or hardware behavior while those decisions are TBD.
 - Keep Arabic RTL, short workflows, and usability for non-technical staff as acceptance requirements.
+
 
