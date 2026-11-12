@@ -64,3 +64,5 @@ All projects currently target .NET 9: the desktop project uses `net9.0-windows` 
 
 
 
+
+The foundational model uses EF Core 9 with SQLite. ElMomenNursery.Infrastructure/Persistence/NurseryDbContext.cs owns provider mappings and entity configurations; versioned migrations live beside it. Desktop startup applies pending migrations and stores the local database under %LOCALAPPDATA%\AlMoumenNursery by default. See ADR 0002 for implemented scope and remaining decisions.

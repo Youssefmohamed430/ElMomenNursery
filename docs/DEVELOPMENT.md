@@ -43,3 +43,5 @@
 - Keep Arabic RTL, short workflows, and usability for non-technical staff as acceptance requirements.
 
 
+
+- Persistence uses EF Core SQLite 9.0.10. Add schema changes as EF Core migrations in ElMomenNursery.Infrastructure/Persistence/Migrations; keep provider mappings and constraints in entity configuration classes.
