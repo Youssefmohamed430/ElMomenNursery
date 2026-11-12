@@ -55,3 +55,7 @@ dotnet tool restore
 dotnet ef migrations add <MigrationName> --project ElMomenNursery.Infrastructure --startup-project ElMomenNursery
 dotnet ef database update --project ElMomenNursery.Infrastructure --startup-project ElMomenNursery
 ```
+
+## Application logging
+
+The desktop composition root configures Serilog and exposes it through `Microsoft.Extensions.Logging`, so Application and Infrastructure services can receive `ILogger<T>`. Rolling log files are written under `<application install directory>\Logs` (for example, `Program Files (x86)\AlMoumenNursery\Logs`) with daily rollover and 31 retained files. The installer must grant the standard Windows Users group modify access to this `Logs` subdirectory; do not grant write access to the full application directory. Avoid logging passwords, secrets, or unnecessary child, employee, and payment details.

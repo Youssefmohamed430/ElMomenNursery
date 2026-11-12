@@ -2,4 +2,8 @@
   <ItemGroup>
     <ProjectReference Include="..\ElMomenNursery.Domain\ElMomenNursery.Domain.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Folder Include="IServices\" />
+    <Folder Include="Services\" />
+  </ItemGroup>
 </Project>

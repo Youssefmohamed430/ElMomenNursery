@@ -1,4 +1,5 @@
 using ElMomenNursery.Infrastructure.Configuration;
+using ElMomenNursery.Application.Abstractions.Persistence;
 using ElMomenNursery.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -29,6 +30,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddDbContext<NurseryDbContext>(db => db.UseSqlite(
             connectionString,
             sqlite => sqlite.MigrationsAssembly(typeof(NurseryDbContext).Assembly.FullName)));
+        services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         return services;
     }
 }

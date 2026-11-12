@@ -4,6 +4,7 @@ using ElMomenNursery.Forms;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Serilog;
 
 namespace ElMomenNursery;
 
@@ -12,24 +13,94 @@ internal static class Program
     [STAThread]
     private static void Main()
     {
-        ApplicationConfiguration.Initialize();
-
-        var configuration = new ConfigurationBuilder()
-            .SetBasePath(AppContext.BaseDirectory)
-            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
-            .Build();
-        var services = new ServiceCollection();
-        services.AddNurseryInfrastructure(configuration);
-        using var serviceProvider = services.BuildServiceProvider();
-        using (var scope = serviceProvider.CreateScope())
+        try
         {
-            scope.ServiceProvider.GetRequiredService<NurseryDbContext>().Database.Migrate();
-        }
+            var configuration = new ConfigurationBuilder()
+                .SetBasePath(AppContext.BaseDirectory)
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
+                .Build();
+            ConfigureLogging(configuration);
+            Log.Information("Application starting");
 
-        using var login = new LoginForm();
-        if (login.ShowDialog() == DialogResult.OK)
-        {
-            Application.Run(new MainForm());
+            ApplicationConfiguration.Initialize();
+            System.Windows.Forms.Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+            System.Windows.Forms.Application.ThreadException += (_, eventArgs) =>
+            {
+                Log.Error(eventArgs.Exception, "Unhandled Windows Forms exception");
+                ShowUnexpectedError();
+            };
+            AppDomain.CurrentDomain.UnhandledException += (_, eventArgs) =>
+            {
+                if (eventArgs.ExceptionObject is Exception exception)
+                {
+                    Log.Fatal(exception, "Unhandled application-domain exception");
+                }
+            };
+
+            var services = new ServiceCollection();
+            services.AddLogging(logging =>
+            {
+                logging.AddSerilog(Log.Logger, dispose: false);
+            });
+            services.AddNurseryInfrastructure(configuration);
+            using var serviceProvider = services.BuildServiceProvider();
+            using (var scope = serviceProvider.CreateScope())
+            {
+                scope.ServiceProvider.GetRequiredService<NurseryDbContext>().Database.Migrate();
+            }
+
+            using var login = new LoginForm();
+            if (login.ShowDialog() == DialogResult.OK)
+            {
+                System.Windows.Forms.Application.Run(new MainForm());
+            }
+
+            Log.Information("Application stopped normally");
         }
+        catch (Exception exception)
+        {
+            Log.Fatal(exception, "Application terminated during startup or execution");
+            ShowUnexpectedError();
+        }
+        finally
+        {
+            Log.CloseAndFlush();
+        }
+    }
+
+    private static void ConfigureLogging(IConfiguration configuration)
+    {
+        var configuredPath = configuration["Serilog:File:Path"] ?? "Logs/log-.txt";
+        var logPath = Path.IsPathRooted(configuredPath)
+            ? configuredPath
+            : Path.Combine(AppContext.BaseDirectory, configuredPath);
+        logPath = Path.GetFullPath(logPath);
+        Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
+
+        var retainedFileCount = configuration.GetValue("Serilog:File:RetainedFileCountLimit", 31);
+        var fileSizeLimitBytes = configuration.GetValue("Serilog:File:FileSizeLimitBytes", 10 * 1024 * 1024L);
+
+        Log.Logger = new LoggerConfiguration()
+            .ReadFrom.Configuration(configuration)
+            .WriteTo.File(
+                logPath,
+                rollingInterval: RollingInterval.Day,
+                retainedFileCountLimit: retainedFileCount,
+                fileSizeLimitBytes: fileSizeLimitBytes,
+                rollOnFileSizeLimit: true,
+                shared: true,
+                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}")
+            .CreateLogger();
+    }
+
+    private static void ShowUnexpectedError()
+    {
+        MessageBox.Show(
+            "حدث خطأ غير متوقع. أعد تشغيل التطبيق، وإذا استمرت المشكلة أرسل ملفات السجل للدعم الفني.",
+            "تعذر تشغيل التطبيق",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Error,
+            MessageBoxDefaultButton.Button1,
+            MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
     }
 }
