@@ -16,6 +16,96 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.10");
 
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.AppSetting", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("UpdatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("UpdatedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("AppSettings", (string)null);
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.AttendanceDevice", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ConnectionDetails")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DeviceType")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("AttendanceDevices", (string)null);
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.AuditLog", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ChangeSummary")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EntityId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("Timestamp")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("UserAccountId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Timestamp")
+                        .HasDatabaseName("IX_AuditLogs_Timestamp");
+
+                    b.HasIndex("UserAccountId");
+
+                    b.HasIndex("EntityType", "EntityId")
+                        .HasDatabaseName("IX_AuditLogs_EntityType_EntityId");
+
+                    b.ToTable("AuditLogs", (string)null);
+                });
+
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.Child", b =>
                 {
                     b.Property<string>("Id")
@@ -95,6 +185,59 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_Children_DateOrder", "\"DateOfBirth\" <= \"EnrollmentDate\"");
                         });
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.ChildAttendance", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AttendanceDate")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("CheckInTime")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("CheckOutTime")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ChildId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("EntryMethod")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RecordedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("UpdatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RecordedByUserId");
+
+                    b.HasIndex("ChildId", "AttendanceDate")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ChildAttendances_Child_Date");
+
+                    b.ToTable("ChildAttendances", (string)null);
                 });
 
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.ChildClassEnrollment", b =>
@@ -200,6 +343,54 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.ToTable("Classrooms", (string)null);
                 });
 
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.DeviceAttendanceEvent", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AttendanceDeviceId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ChildId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DeviceEventIdentifier")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EmployeeId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsProcessed")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("LinkedAttendanceId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("ObservedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChildId");
+
+                    b.HasIndex("EmployeeId");
+
+                    b.HasIndex("AttendanceDeviceId", "DeviceEventIdentifier")
+                        .IsUnique()
+                        .HasDatabaseName("UX_DeviceAttendanceEvents_Device_Identifier");
+
+                    b.ToTable("DeviceAttendanceEvents", (string)null);
+                });
+
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.Employee", b =>
                 {
                     b.Property<string>("Id")
@@ -236,6 +427,7 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("MaritalStatus")
                         .IsRequired()
+                        .HasMaxLength(32)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("NationalIdNumber")
@@ -271,6 +463,112 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.EmployeeAttendance", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AttendanceDate")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("CheckInTime")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("CheckOutTime")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("EmployeeId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EntryMethod")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RecordedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("UpdatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RecordedByUserId");
+
+                    b.HasIndex("EmployeeId", "AttendanceDate")
+                        .IsUnique()
+                        .HasDatabaseName("UX_EmployeeAttendances_Employee_Date");
+
+                    b.ToTable("EmployeeAttendances", (string)null);
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.Expense", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ExpenseDate")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsVoided")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PaymentReference")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RecordedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("UpdatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpenseDate")
+                        .HasDatabaseName("IX_Expenses_ExpenseDate");
+
+                    b.HasIndex("RecordedByUserId");
+
+                    b.ToTable("Expenses", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Expenses_AmountNonNegative", "\"Amount\" >= 0");
+                        });
+                });
+
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.FileAttachment", b =>
                 {
                     b.Property<string>("Id")
@@ -281,7 +579,6 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ChildId")
-                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ContentType")
@@ -289,6 +586,9 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.Property<long>("CreatedAt")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("EmployeeId")
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OriginalFileName")
                         .IsRequired()
@@ -306,10 +606,18 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("UploadedByUserId")
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("UploadedByUserId");
 
                     b.HasIndex("ChildId", "Type")
                         .HasDatabaseName("IX_FileAttachments_Child_Type");
+
+                    b.HasIndex("EmployeeId", "Type")
+                        .HasDatabaseName("IX_FileAttachments_Employee_Type");
 
                     b.ToTable("FileAttachments", null, t =>
                         {
@@ -374,6 +682,267 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.Invoice", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ChildId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CustomerName")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("InvoiceDate")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("InvoiceNumber")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("UpdatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChildId");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("InvoiceDate")
+                        .HasDatabaseName("IX_Invoices_InvoiceDate");
+
+                    b.HasIndex("InvoiceNumber")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Invoices_InvoiceNumber");
+
+                    b.ToTable("Invoices", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Invoices_TotalAmountNonNegative", "\"TotalAmount\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.InvoiceLine", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("InventoryItemId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("InvoiceId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ItemNameSnapshot")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("LineTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("UnitPriceSnapshot")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InventoryItemId");
+
+                    b.HasIndex("InvoiceId")
+                        .HasDatabaseName("IX_InvoiceLines_InvoiceId");
+
+                    b.ToTable("InvoiceLines", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_InvoiceLines_LineTotalNonNegative", "\"LineTotal\" >= 0");
+
+                            t.HasCheckConstraint("CK_InvoiceLines_QuantityPositive", "\"Quantity\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.Payment", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ChildId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("PaidAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("PaymentMethod")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReceivedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Reference")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SubscriptionId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChildId")
+                        .HasDatabaseName("IX_Payments_ChildId");
+
+                    b.HasIndex("PaidAt")
+                        .HasDatabaseName("IX_Payments_PaidAt");
+
+                    b.HasIndex("ReceivedByUserId");
+
+                    b.HasIndex("SubscriptionId");
+
+                    b.ToTable("Payments", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Payments_AmountNonNegative", "\"Amount\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.PaymentAllocation", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("AmountApplied")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("PaymentId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SubscriptionId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PaymentId")
+                        .HasDatabaseName("IX_PaymentAllocations_PaymentId");
+
+                    b.HasIndex("SubscriptionId")
+                        .HasDatabaseName("IX_PaymentAllocations_SubscriptionId");
+
+                    b.ToTable("PaymentAllocations", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_PaymentAllocations_AmountAppliedNonNegative", "\"AmountApplied\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.PayrollRecord", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Additions")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("AgreedSalary")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("AmountPaid")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("Deductions")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EmployeeId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsPaid")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PaymentDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PeriodEnd")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PeriodStart")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("UpdatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmployeeId", "PeriodStart")
+                        .HasDatabaseName("IX_PayrollRecords_Employee_PeriodStart");
+
+                    b.ToTable("PayrollRecords", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_PayrollRecords_PeriodRange", "\"PeriodEnd\" >= \"PeriodStart\"");
+
+                            t.HasCheckConstraint("CK_PayrollRecords_SalaryNonNegative", "\"AgreedSalary\" >= 0 AND \"AmountPaid\" >= 0");
+                        });
+                });
+
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.Role", b =>
                 {
                     b.Property<string>("Id")
@@ -394,6 +963,55 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("UX_Roles_Name");
 
                     b.ToTable("Roles", (string)null);
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.StockMovement", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("InventoryItemId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("InvoiceLineId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("MovementType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("OccurredAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("RecordedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("UnitCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvoiceLineId");
+
+                    b.HasIndex("RecordedByUserId");
+
+                    b.HasIndex("InventoryItemId", "OccurredAt")
+                        .HasDatabaseName("IX_StockMovements_Item_OccurredAt");
+
+                    b.ToTable("StockMovements", (string)null);
                 });
 
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.Subscription", b =>
@@ -426,6 +1044,7 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
+                        .HasMaxLength(32)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("SubscriptionPlanId")
@@ -526,6 +1145,34 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.ToTable("UserAccounts", (string)null);
                 });
 
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.AuditLog", b =>
+                {
+                    b.HasOne("ElMomenNursery.Domain.Entities.UserAccount", "UserAccount")
+                        .WithMany()
+                        .HasForeignKey("UserAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("UserAccount");
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.ChildAttendance", b =>
+                {
+                    b.HasOne("ElMomenNursery.Domain.Entities.Child", "Child")
+                        .WithMany("Attendances")
+                        .HasForeignKey("ChildId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ElMomenNursery.Domain.Entities.UserAccount", "RecordedByUser")
+                        .WithMany()
+                        .HasForeignKey("RecordedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Child");
+
+                    b.Navigation("RecordedByUser");
+                });
+
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.ChildClassEnrollment", b =>
                 {
                     b.HasOne("ElMomenNursery.Domain.Entities.Child", "Child")
@@ -564,15 +1211,81 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.Navigation("Employee");
                 });
 
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.DeviceAttendanceEvent", b =>
+                {
+                    b.HasOne("ElMomenNursery.Domain.Entities.AttendanceDevice", "AttendanceDevice")
+                        .WithMany("Events")
+                        .HasForeignKey("AttendanceDeviceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ElMomenNursery.Domain.Entities.Child", "Child")
+                        .WithMany()
+                        .HasForeignKey("ChildId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ElMomenNursery.Domain.Entities.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("AttendanceDevice");
+
+                    b.Navigation("Child");
+
+                    b.Navigation("Employee");
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.EmployeeAttendance", b =>
+                {
+                    b.HasOne("ElMomenNursery.Domain.Entities.Employee", "Employee")
+                        .WithMany("Attendances")
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ElMomenNursery.Domain.Entities.UserAccount", "RecordedByUser")
+                        .WithMany()
+                        .HasForeignKey("RecordedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Employee");
+
+                    b.Navigation("RecordedByUser");
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.Expense", b =>
+                {
+                    b.HasOne("ElMomenNursery.Domain.Entities.UserAccount", "RecordedByUser")
+                        .WithMany()
+                        .HasForeignKey("RecordedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("RecordedByUser");
+                });
+
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.FileAttachment", b =>
                 {
                     b.HasOne("ElMomenNursery.Domain.Entities.Child", "Child")
                         .WithMany("Attachments")
                         .HasForeignKey("ChildId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ElMomenNursery.Domain.Entities.Employee", "Employee")
+                        .WithMany("Attachments")
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ElMomenNursery.Domain.Entities.UserAccount", "UploadedByUser")
+                        .WithMany()
+                        .HasForeignKey("UploadedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Child");
+
+                    b.Navigation("Employee");
+
+                    b.Navigation("UploadedByUser");
                 });
 
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.InventoryItem", b =>
@@ -584,6 +1297,122 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Category");
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.Invoice", b =>
+                {
+                    b.HasOne("ElMomenNursery.Domain.Entities.Child", "Child")
+                        .WithMany()
+                        .HasForeignKey("ChildId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ElMomenNursery.Domain.Entities.UserAccount", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Child");
+
+                    b.Navigation("CreatedByUser");
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.InvoiceLine", b =>
+                {
+                    b.HasOne("ElMomenNursery.Domain.Entities.InventoryItem", "InventoryItem")
+                        .WithMany("InvoiceLines")
+                        .HasForeignKey("InventoryItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ElMomenNursery.Domain.Entities.Invoice", "Invoice")
+                        .WithMany("Lines")
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("InventoryItem");
+
+                    b.Navigation("Invoice");
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.Payment", b =>
+                {
+                    b.HasOne("ElMomenNursery.Domain.Entities.Child", "Child")
+                        .WithMany("Payments")
+                        .HasForeignKey("ChildId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ElMomenNursery.Domain.Entities.UserAccount", "ReceivedByUser")
+                        .WithMany()
+                        .HasForeignKey("ReceivedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ElMomenNursery.Domain.Entities.Subscription", "Subscription")
+                        .WithMany()
+                        .HasForeignKey("SubscriptionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Child");
+
+                    b.Navigation("ReceivedByUser");
+
+                    b.Navigation("Subscription");
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.PaymentAllocation", b =>
+                {
+                    b.HasOne("ElMomenNursery.Domain.Entities.Payment", "Payment")
+                        .WithMany("Allocations")
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ElMomenNursery.Domain.Entities.Subscription", "Subscription")
+                        .WithMany("PaymentAllocations")
+                        .HasForeignKey("SubscriptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Payment");
+
+                    b.Navigation("Subscription");
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.PayrollRecord", b =>
+                {
+                    b.HasOne("ElMomenNursery.Domain.Entities.Employee", "Employee")
+                        .WithMany("PayrollRecords")
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Employee");
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.StockMovement", b =>
+                {
+                    b.HasOne("ElMomenNursery.Domain.Entities.InventoryItem", "InventoryItem")
+                        .WithMany("StockMovements")
+                        .HasForeignKey("InventoryItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ElMomenNursery.Domain.Entities.InvoiceLine", "InvoiceLine")
+                        .WithMany()
+                        .HasForeignKey("InvoiceLineId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ElMomenNursery.Domain.Entities.UserAccount", "RecordedByUser")
+                        .WithMany()
+                        .HasForeignKey("RecordedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("InventoryItem");
+
+                    b.Navigation("InvoiceLine");
+
+                    b.Navigation("RecordedByUser");
                 });
 
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.Subscription", b =>
@@ -622,11 +1451,20 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.Navigation("Role");
                 });
 
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.AttendanceDevice", b =>
+                {
+                    b.Navigation("Events");
+                });
+
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.Child", b =>
                 {
                     b.Navigation("Attachments");
 
+                    b.Navigation("Attendances");
+
                     b.Navigation("ClassEnrollments");
+
+                    b.Navigation("Payments");
 
                     b.Navigation("Subscriptions");
                 });
@@ -640,6 +1478,12 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.Employee", b =>
                 {
+                    b.Navigation("Attachments");
+
+                    b.Navigation("Attendances");
+
+                    b.Navigation("PayrollRecords");
+
                     b.Navigation("TeachingAssignments");
 
                     b.Navigation("UserAccount");
@@ -650,9 +1494,31 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.Navigation("Items");
                 });
 
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.InventoryItem", b =>
+                {
+                    b.Navigation("InvoiceLines");
+
+                    b.Navigation("StockMovements");
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.Invoice", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.Payment", b =>
+                {
+                    b.Navigation("Allocations");
+                });
+
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.Role", b =>
                 {
                     b.Navigation("UserAccounts");
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.Subscription", b =>
+                {
+                    b.Navigation("PaymentAllocations");
                 });
 
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.SubscriptionPlan", b =>

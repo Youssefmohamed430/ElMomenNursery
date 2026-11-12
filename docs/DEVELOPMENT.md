@@ -45,3 +45,13 @@
 
 
 - Persistence uses EF Core SQLite 9.0.10. Add schema changes as EF Core migrations in ElMomenNursery.Infrastructure/Persistence/Migrations; keep provider mappings and constraints in entity configuration classes.
+
+## Database migrations
+
+Run these commands from the `ElMomenNursery` solution directory. The repository pins the local `dotnet-ef` tool to EF Core 9.0.10:
+
+```powershell
+dotnet tool restore
+dotnet ef migrations add <MigrationName> --project ElMomenNursery.Infrastructure --startup-project ElMomenNursery
+dotnet ef database update --project ElMomenNursery.Infrastructure --startup-project ElMomenNursery
+```

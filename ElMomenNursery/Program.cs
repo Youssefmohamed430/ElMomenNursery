@@ -26,6 +26,10 @@ internal static class Program
             scope.ServiceProvider.GetRequiredService<NurseryDbContext>().Database.Migrate();
         }
 
-        Application.Run(new MainForm());
+        using var login = new LoginForm();
+        if (login.ShowDialog() == DialogResult.OK)
+        {
+            Application.Run(new MainForm());
+        }
     }
 }

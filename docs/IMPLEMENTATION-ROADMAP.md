@@ -59,16 +59,16 @@ This roadmap breaks the approved product scope into an ordered, end-to-end task 
 **Gate:** needs visual review on the supported workstation for Arabic shaping, actual font/spacing, contrast, and keyboard flow. The target now matches SDK 9.0.306; the UI still needs to be launched and visually reviewed on the supported workstation.
 ## Phase 3 — Local persistence and application startup
 
-- [ ] Choose and document the local database engine and its Windows deployment/licensing requirements.
-- [ ] Define a versioned schema/migration strategy before domain data is added.
-- [ ] Define the database path under an appropriate Windows application-data location, outside replaceable program binaries.
-- [ ] Implement Infrastructure persistence behind Application interfaces; keep SQL/provider details out of UI and Domain.
-- [ ] Add startup initialization, schema migration, safe transaction handling, and clear recovery messages.
-- [ ] Add constraints and stable identifiers as entities are introduced; plan indexes for common child search and list filtering.
-- [ ] Ensure normal application operation has no internet dependency and creates no remote connection.
+- [x] Choose and document the local database engine and its Windows deployment/licensing requirements. SQLite with EF Core 9.0.10 is configured.
+- [x] Define a versioned schema/migration strategy before domain data is added. EF Core migrations are stored in Infrastructure; the local `dotnet-ef` tool is pinned to 9.0.10.
+- [x] Define the database path under an appropriate Windows application-data location, outside replaceable program binaries. The app and design-time factory use `%LOCALAPPDATA%\AlMoumenNursery\nursery.db`.
+- [x] Implement Infrastructure persistence behind Application interfaces; keep SQL/provider details out of UI and Domain. Persistence and EF mappings are in Infrastructure.
+- [ ] Add startup initialization, schema migration, safe transaction handling, and clear recovery messages. Startup migration is implemented; transaction handling and clear recovery UI remain incomplete.
+- [x] Add constraints and stable identifiers as entities are introduced; plan indexes for common child search and list filtering. The implemented foundational model includes stable IDs, constraints, and initial indexes.
+- [x] Ensure normal application operation has no internet dependency and creates no remote connection. SQLite is configured as a local file database.
 - [ ] Define local logging that supports troubleshooting without logging unnecessary child, employee, credential, or payment details.
 
-**Gate:** the app starts offline, initializes/migrates its local database safely, and can report recoverable data errors clearly.
+**Gate:** partially met. EF Core migrations were applied successfully to `%LOCALAPPDATA%\AlMoumenNursery\nursery.db`; the startup migration and error-recovery UX still need a full app-launch review.
 
 ## Phase 4 — Sign-in, accounts, roles, and authorization
 

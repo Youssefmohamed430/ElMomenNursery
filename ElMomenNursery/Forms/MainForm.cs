@@ -202,7 +202,14 @@ public sealed class MainForm : Form
             oldPage.Dispose();
         }
 
-        _pageHost.Controls.Add(section == "الرئيسية" ? BuildHomePage() : BuildSectionPage(section));
+        var page = section switch
+        {
+            "الرئيسية" => BuildHomePage(),
+            "الأطفال" => BuildChildrenPage(),
+            "الفصول" => BuildClassesPage(),
+            _ => BuildSectionPage(section)
+        };
+        _pageHost.Controls.Add(page);
         _pageHost.ResumeLayout(performLayout: true);
     }
 
@@ -318,6 +325,205 @@ public sealed class MainForm : Form
         page.Resize += (_, _) => LayoutSectionPage();
         LayoutSectionPage();
         return page;
+    }
+
+    private Control BuildChildrenPage()
+    {
+        var page = CreateDataPage("الأطفال", "ابحث عن طفل أو استعرض القائمة. بيانات الجدول للعرض التجريبي فقط.");
+        var search = CreateSearchBox("بحث باسم الطفل");
+        var classFilter = new ComboBox
+        {
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Font = new Font("Segoe UI", 10F),
+            RightToLeft = RightToLeft.Yes
+        };
+        classFilter.Items.AddRange(["كل الفصول", "فصل الفراشات", "فصل الزهور"]);
+        classFilter.SelectedIndex = 0;
+        var addButton = CreateActionButton("إضافة طفل", primary: true);
+        var editButton = CreateActionButton("تعديل البيانات");
+        var detailsButton = CreateActionButton("عرض الملف");
+        var exportButton = CreateActionButton("تصدير القائمة");
+        var grid = CreateGrid(["اسم الطفل", "الفصل", "تاريخ الالتحاق", "الحالة"]);
+        grid.Rows.Add("آدم محمد", "فصل الفراشات", "١٢/٠٩/٢٠٢٦", "نشط");
+        grid.Rows.Add("ليلى أحمد", "فصل الزهور", "١٥/٠٩/٢٠٢٦", "نشط");
+        grid.Rows.Add("يوسف محمود", "فصل الفراشات", "٠١/١٠/٢٠٢٦", "نشط");
+        search.TextChanged += (_, _) => FilterRows(grid, search.Text);
+        addButton.Click += (_, _) => ShowComingSoon("إضافة طفل");
+        editButton.Click += (_, _) => ShowComingSoon("تعديل بيانات الطفل");
+        detailsButton.Click += (_, _) => ShowComingSoon("ملف الطفل");
+        exportButton.Click += (_, _) => ShowComingSoon("تصدير القائمة");
+
+        page.Controls.AddRange([search, classFilter, addButton, editButton, detailsButton, exportButton, grid]);
+        page.Resize += (_, _) => LayoutChildrenPage();
+        LayoutChildrenPage();
+        return page;
+
+        void LayoutChildrenPage()
+        {
+            LayoutDataHeader(page);
+            var y = 190;
+            search.SetBounds(34, y, Math.Max(220, page.ClientSize.Width - 68 - 730), 42);
+            classFilter.SetBounds(search.Right + 10, y, 170, 42);
+            addButton.SetBounds(page.ClientSize.Width - 34 - 150, y, 150, 42);
+            editButton.SetBounds(addButton.Left - 150 - 8, y, 150, 42);
+            detailsButton.SetBounds(editButton.Left - 142 - 8, y, 142, 42);
+            exportButton.SetBounds(detailsButton.Left - 142 - 8, y, 142, 42);
+            grid.SetBounds(34, 248, page.ClientSize.Width - 68, Math.Max(220, page.ClientSize.Height - 282));
+        }
+    }
+
+    private Control BuildClassesPage()
+    {
+        var page = CreateDataPage("الفصول", "استعرض الفصول والقائمة الحالية. البيانات المعروضة تجريبية.");
+        var search = CreateSearchBox("بحث باسم الفصل");
+        var addButton = CreateActionButton("إضافة فصل", primary: true);
+        var editButton = CreateActionButton("تعديل الفصل");
+        var rosterButton = CreateActionButton("عرض قائمة الأطفال");
+        var printButton = CreateActionButton("طباعة القائمة");
+        var grid = CreateGrid(["اسم الفصل", "المعلمة", "عدد الأطفال", "الحالة"]);
+        grid.Rows.Add("فصل الفراشات", "—", "١٢", "متاح");
+        grid.Rows.Add("فصل الزهور", "—", "١٠", "متاح");
+        grid.Rows.Add("فصل النجوم", "—", "٨", "متاح");
+        search.TextChanged += (_, _) => FilterRows(grid, search.Text);
+        addButton.Click += (_, _) => ShowComingSoon("إضافة فصل");
+        editButton.Click += (_, _) => ShowComingSoon("تعديل بيانات الفصل");
+        rosterButton.Click += (_, _) => ShowComingSoon("قائمة الأطفال بالفصل");
+        printButton.Click += (_, _) => ShowComingSoon("طباعة قائمة الفصل");
+
+        page.Controls.AddRange([search, addButton, editButton, rosterButton, printButton, grid]);
+        page.Resize += (_, _) => LayoutClassesPage();
+        LayoutClassesPage();
+        return page;
+
+        void LayoutClassesPage()
+        {
+            LayoutDataHeader(page);
+            var y = 190;
+            search.SetBounds(34, y, Math.Max(230, page.ClientSize.Width - 68 - 650), 42);
+            addButton.SetBounds(page.ClientSize.Width - 34 - 145, y, 145, 42);
+            editButton.SetBounds(addButton.Left - 140 - 8, y, 140, 42);
+            rosterButton.SetBounds(editButton.Left - 180 - 8, y, 180, 42);
+            printButton.SetBounds(rosterButton.Left - 145 - 8, y, 145, 42);
+            grid.SetBounds(34, 248, page.ClientSize.Width - 68, Math.Max(220, page.ClientSize.Height - 282));
+        }
+    }
+
+    private static Panel CreateDataPage(string titleText, string subtitleText)
+    {
+        var page = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = BrandPalette.AppBackground,
+            Padding = new Padding(34, 28, 34, 28),
+            RightToLeft = RightToLeft.Yes
+        };
+        page.Controls.Add(CreateHeading(titleText, 21F));
+        page.Controls.Add(new Label
+        {
+            Text = subtitleText,
+            ForeColor = BrandPalette.MutedText,
+            Font = new Font("Segoe UI", 10F),
+            TextAlign = ContentAlignment.MiddleLeft,
+            RightToLeft = RightToLeft.Yes
+        });
+        page.Controls.Add(new FeedbackBanner("نسخة تجريبية", "الأزرار للعرض فقط، ولا يتم حفظ أو تعديل أي بيانات حاليًا.", MessageTone.Information));
+        page.Resize += (_, _) => LayoutDataHeader(page);
+        return page;
+    }
+
+    private static void LayoutDataHeader(Panel page)
+    {
+        if (page.Controls.Count < 3) return;
+        page.Controls[0].SetBounds(34, 28, page.ClientSize.Width - 68, 46);
+        page.Controls[1].SetBounds(34, 78, page.ClientSize.Width - 68, 30);
+        page.Controls[2].SetBounds(34, 116, page.ClientSize.Width - 68, 62);
+    }
+
+    private static TextBox CreateSearchBox(string placeholder) => new()
+    {
+        PlaceholderText = placeholder,
+        BorderStyle = BorderStyle.FixedSingle,
+        Font = new Font("Segoe UI", 10F),
+        RightToLeft = RightToLeft.Yes
+    };
+
+    private static Button CreateActionButton(string text, bool primary = false)
+    {
+        var button = new Button
+        {
+            Text = text,
+            Height = 42,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = primary ? BrandPalette.PrimaryGreen : BrandPalette.Surface,
+            ForeColor = primary ? Color.White : BrandPalette.Text,
+            Font = new Font("Segoe UI", 9.5F, primary ? FontStyle.Bold : FontStyle.Regular),
+            Cursor = Cursors.Hand,
+            RightToLeft = RightToLeft.Yes,
+            UseVisualStyleBackColor = false
+        };
+        button.FlatAppearance.BorderColor = primary ? BrandPalette.PrimaryGreen : BrandPalette.Border;
+        button.FlatAppearance.BorderSize = 1;
+        button.FlatAppearance.MouseOverBackColor = primary ? BrandPalette.PrimaryGreenHover : BrandPalette.SoftGreen;
+        return button;
+    }
+
+    private static DataGridView CreateGrid(string[] columns)
+    {
+        var grid = new DataGridView
+        {
+            BackgroundColor = BrandPalette.Surface,
+            BorderStyle = BorderStyle.FixedSingle,
+            GridColor = BrandPalette.Border,
+            RightToLeft = RightToLeft.Yes,
+            ReadOnly = true,
+            AllowUserToAddRows = false,
+            AllowUserToDeleteRows = false,
+            AllowUserToResizeRows = false,
+            RowHeadersVisible = false,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            MultiSelect = false,
+            EnableHeadersVisualStyles = false,
+            Font = new Font("Segoe UI", 10F),
+            ColumnHeadersHeight = 46,
+            RowTemplate = { Height = 42 }
+        };
+        grid.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
+        {
+            BackColor = BrandPalette.SoftGreen,
+            ForeColor = BrandPalette.Text,
+            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+            Alignment = DataGridViewContentAlignment.MiddleRight
+        };
+        grid.DefaultCellStyle = new DataGridViewCellStyle
+        {
+            BackColor = BrandPalette.Surface,
+            ForeColor = BrandPalette.Text,
+            SelectionBackColor = BrandPalette.SoftGreen,
+            SelectionForeColor = BrandPalette.Text,
+            Alignment = DataGridViewContentAlignment.MiddleRight,
+            Padding = new Padding(10, 0, 10, 0)
+        };
+        foreach (var column in columns)
+        {
+            grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = column, SortMode = DataGridViewColumnSortMode.Automatic });
+        }
+        return grid;
+    }
+
+    private static void FilterRows(DataGridView grid, string query)
+    {
+        foreach (DataGridViewRow row in grid.Rows)
+        {
+            row.Visible = string.IsNullOrWhiteSpace(query)
+                || row.Cells.Cast<DataGridViewCell>().Any(cell => cell.Value?.ToString()?.Contains(query, StringComparison.CurrentCultureIgnoreCase) == true);
+        }
+    }
+
+    private void ShowComingSoon(string action)
+    {
+        MessageBox.Show($"زر «{action}» للعرض فقط في هذه المرحلة، وسيتم تفعيله لاحقًا.", "قريبًا", MessageBoxButtons.OK, MessageBoxIcon.Information,
+            MessageBoxDefaultButton.Button1, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
     }
 
     private Button CreateShortcut(string title, string description, string section)

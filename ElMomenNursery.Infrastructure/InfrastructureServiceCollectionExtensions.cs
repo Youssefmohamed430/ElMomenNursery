@@ -15,10 +15,19 @@ public static class InfrastructureServiceCollectionExtensions
             ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AlMoumenNursery")
             : Path.GetFullPath(Environment.ExpandEnvironmentVariables(options.DirectoryPath));
         Directory.CreateDirectory(dataDirectory);
-        var databasePath = Path.Combine(dataDirectory, "nursery.db");
+        var connectionString = configuration.GetConnectionString("Nursery");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            var databasePath = Path.Combine(dataDirectory, "nursery.db");
+            connectionString = $"Data Source={databasePath};Foreign Keys=True;Default Timeout=30";
+        }
+        else
+        {
+            connectionString = Environment.ExpandEnvironmentVariables(connectionString);
+        }
 
         services.AddDbContext<NurseryDbContext>(db => db.UseSqlite(
-            $"Data Source={databasePath};Foreign Keys=True;Default Timeout=30",
+            connectionString,
             sqlite => sqlite.MigrationsAssembly(typeof(NurseryDbContext).Assembly.FullName)));
         return services;
     }
