@@ -8,10 +8,12 @@ public interface IRepository<TEntity> where TEntity : class
     Task<TEntity?> FirstOrDefaultAsync(
         Expression<Func<TEntity, bool>> predicate,
         bool asNoTracking = true,
+        string[]? includeProperties = null,
         CancellationToken cancellationToken = default);
     Task<List<TEntity>> ListAsync(
         Expression<Func<TEntity, bool>>? predicate = null,
         bool asNoTracking = true,
+        string[]? includeProperties = null,
         CancellationToken cancellationToken = default);
     Task<bool> AnyAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken cancellationToken = default);
     ValueTask AddAsync(TEntity entity, CancellationToken cancellationToken = default);

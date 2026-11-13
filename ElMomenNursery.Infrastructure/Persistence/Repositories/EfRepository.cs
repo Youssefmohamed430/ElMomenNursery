@@ -18,22 +18,39 @@ internal sealed class EfRepository<TEntity>(NurseryDbContext dbContext) : IRepos
     public Task<TEntity?> FirstOrDefaultAsync(
         Expression<Func<TEntity, bool>> predicate,
         bool asNoTracking = true,
+        string[]? includeProperties = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(predicate);
-        return (asNoTracking ? Query() : Query(asNoTracking: false))
-            .FirstOrDefaultAsync(predicate, cancellationToken);
+        var query = asNoTracking ? Query() : Query(asNoTracking: false);
+        if (includeProperties is not null)
+        {
+            foreach (var includeProperty in includeProperties)
+            {
+                query = query.Include(includeProperty);
+            }
+        }
+        return query.FirstOrDefaultAsync(predicate, cancellationToken);
     }
 
     public Task<List<TEntity>> ListAsync(
         Expression<Func<TEntity, bool>>? predicate = null,
         bool asNoTracking = true,
+        string[] includeProperties = null,
         CancellationToken cancellationToken = default)
     {
         var query = asNoTracking ? Query() : Query(asNoTracking: false);
         if (predicate is not null)
         {
             query = query.Where(predicate);
+        }
+
+        if (includeProperties is not null)
+        {
+            foreach (var includeProperty in includeProperties)
+            {
+                query = query.Include(includeProperty);
+            }
         }
 
         return query.ToListAsync(cancellationToken);

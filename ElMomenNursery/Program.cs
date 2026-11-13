@@ -3,6 +3,7 @@ using ElMomenNursery.Infrastructure.Persistence;
 using ElMomenNursery.Forms;
 using ElMomenNursery.Infrastructure.Security;
 using ElMomenNursery.Application.IServices;
+using ElMomenNursery.Application.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -44,6 +45,7 @@ internal static class Program
             {
                 logging.AddSerilog(Log.Logger, dispose: false);
             });
+            services.AddScoped<IChildService, ChildService>();
             services.AddNurseryInfrastructure(configuration);
             using var serviceProvider = services.BuildServiceProvider();
             using (var scope = serviceProvider.CreateScope())
@@ -63,7 +65,8 @@ internal static class Program
                 using var appScope = serviceProvider.CreateScope();
                 var auth = appScope.ServiceProvider.GetRequiredService<IAuthService>();
                 System.Windows.Forms.Application.Run(new MainForm(session.CurrentUser!, () => auth.LogoutAsync(),
-                    appScope.ServiceProvider.GetRequiredService<IAccountManagementService>()));
+                    appScope.ServiceProvider.GetRequiredService<IAccountManagementService>(),
+                    appScope.ServiceProvider.GetRequiredService<IChildService>()));
                 if (session.IsAuthenticated) auth.LogoutAsync().GetAwaiter().GetResult();
             }
 

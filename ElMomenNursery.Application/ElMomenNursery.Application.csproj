@@ -1,10 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <PackageReference Include="Mapster" Version="7.4.0" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="9.0.10" />
     <ProjectReference Include="..\ElMomenNursery.Domain\ElMomenNursery.Domain.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="IServices\" />
-    <Folder Include="Services\" />
   </ItemGroup>
 </Project>

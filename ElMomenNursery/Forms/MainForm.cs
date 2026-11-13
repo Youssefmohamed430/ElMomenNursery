@@ -1,6 +1,8 @@
 using System.Drawing;
+using ElMomenNursery.Application.DTOs;
 using ElMomenNursery.Controls;
 using ElMomenNursery.Application.IServices;
+using ElMomenNursery.Domain.Enums;
 using ElMomenNursery.Styling;
 
 namespace ElMomenNursery.Forms;
@@ -15,12 +17,14 @@ public sealed class MainForm : Form
     private readonly UserSession _session;
     private readonly Func<Task> _logout;
     private readonly IAccountManagementService _accountManagement;
+    private readonly IChildService _childService;
 
-    public MainForm(UserSession session, Func<Task> logout, IAccountManagementService accountManagement)
+    public MainForm(UserSession session, Func<Task> logout, IAccountManagementService accountManagement, IChildService childService)
     {
         _session = session;
         _logout = logout;
         _accountManagement = accountManagement;
+        _childService = childService;
         Text = "نظام إدارة حضانة المؤمن";
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(1024, 700);
@@ -369,16 +373,7 @@ public sealed class MainForm : Form
 
     private Control BuildChildrenPage()
     {
-        var page = CreateDataPage("الأطفال", "ابحث عن طفل أو استعرض القائمة. بيانات الجدول للعرض التجريبي فقط.");
-        var search = CreateSearchBox("بحث باسم الطفل");
-        var classFilter = new ComboBox
-        {
-            DropDownStyle = ComboBoxStyle.DropDownList,
-            Font = new Font("Segoe UI", 10F),
-            RightToLeft = RightToLeft.Yes
-        };
-        classFilter.Items.AddRange(["كل الفصول", "فصل الفراشات", "فصل الزهور"]);
-        classFilter.SelectedIndex = 0;
+        var page = CreateDataPage("الأطفال", "استعرض الأطفال وادمج أكثر من فلتر للوصول إلى المجموعة المطلوبة.", includePrototypeBanner: false);
         var addButton = CreateActionButton("إضافة طفل", primary: true);
         var editButton = CreateActionButton("تعديل البيانات");
         var detailsButton = CreateActionButton("عرض الملف");
@@ -387,32 +382,255 @@ public sealed class MainForm : Form
         editButton.Visible = _session.HasPermission("Students.Edit");
         detailsButton.Visible = _session.HasPermission("Students.View");
         exportButton.Visible = _session.HasPermission("Students.View");
-        var grid = CreateGrid(["اسم الطفل", "الفصل", "تاريخ الالتحاق", "الحالة"]);
-        grid.Rows.Add("آدم محمد", "فصل الفراشات", "١٢/٠٩/٢٠٢٦", "نشط");
-        grid.Rows.Add("ليلى أحمد", "فصل الزهور", "١٥/٠٩/٢٠٢٦", "نشط");
-        grid.Rows.Add("يوسف محمود", "فصل الفراشات", "٠١/١٠/٢٠٢٦", "نشط");
-        search.TextChanged += (_, _) => FilterRows(grid, search.Text);
+        var actions = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.RightToLeft,
+            WrapContents = false,
+            RightToLeft = RightToLeft.No,
+            BackColor = Color.Transparent,
+            Padding = Padding.Empty
+        };
+        actions.Controls.AddRange([addButton, editButton, detailsButton, exportButton]);
+
+        var filterPanel = new Panel
+        {
+            BackColor = BrandPalette.Surface,
+            Padding = new Padding(12),
+            RightToLeft = RightToLeft.Yes,
+            BorderStyle = BorderStyle.FixedSingle,
+            AutoScroll = true
+        };
+        var filterHeading = new Label
+        {
+            Text = "الفلاتر",
+            Dock = DockStyle.Top,
+            Height = 34,
+            Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+            ForeColor = BrandPalette.PrimaryGreen,
+            TextAlign = ContentAlignment.MiddleRight,
+            RightToLeft = RightToLeft.Yes
+        };
+        var filterFields = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            AutoScroll = true,
+            RightToLeft = RightToLeft.Yes,
+            BackColor = Color.Transparent,
+            Padding = new Padding(0, 4, 0, 0)
+        };
+        filterPanel.Controls.Add(filterFields);
+        filterPanel.Controls.Add(filterHeading);
+
+        var search = CreateSearchBox("اسم الطفل");
+        var genderFilter = CreateFilterCombo(["كل الأنواع", "ولد", "بنت"]);
+        var dateOfBirthFrom = CreateOptionalDatePicker();
+        var dateOfBirthTo = CreateOptionalDatePicker();
+        var enrollmentFrom = CreateOptionalDatePicker();
+        var enrollmentTo = CreateOptionalDatePicker();
+        var classroomFilter = new ComboBox
+        {
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Font = new Font("Segoe UI", 9.5F),
+            RightToLeft = RightToLeft.Yes,
+            Width = 228,
+            Height = 34
+        };
+        classroomFilter.Items.Add("كل الفصول");
+        classroomFilter.SelectedIndex = 0;
+        var paymentFilter = CreateFilterCombo(["كل حالات الدفع", "دفعوا", "مدفعوش"]);
+        var resultCount = new Label
+        {
+            AutoSize = false,
+            Width = 228,
+            Height = 28,
+            ForeColor = BrandPalette.MutedText,
+            TextAlign = ContentAlignment.MiddleRight,
+            RightToLeft = RightToLeft.Yes
+        };
+
+        AddFilterField("بحث بالاسم", search);
+        AddFilterField("النوع", genderFilter);
+        AddFilterField("تاريخ الميلاد من / إلى", CreateDateRange(dateOfBirthFrom, dateOfBirthTo));
+        AddFilterField("تاريخ الالتحاق من / إلى", CreateDateRange(enrollmentFrom, enrollmentTo));
+        AddFilterField("الفصل الحالي", classroomFilter);
+        AddFilterField("حالة سداد الاشتراك الساري اليوم", paymentFilter);
+
+        var applyButton = CreateActionButton("تطبيق الفلاتر", primary: true);
+        applyButton.Width = 228;
+        var clearButton = CreateActionButton("مسح الفلاتر");
+        clearButton.Width = 228;
+        filterFields.Controls.Add(applyButton);
+        filterFields.Controls.Add(clearButton);
+        filterFields.Controls.Add(resultCount);
+
+        var grid = CreateGrid(["اسم الطفل", "النوع", "تاريخ الميلاد", "تاريخ الالتحاق", "هاتف ولي الأمر"]);
+        grid.AutoGenerateColumns = false;
         addButton.Click += (_, _) => ShowComingSoon("إضافة طفل");
         editButton.Click += (_, _) => ShowComingSoon("تعديل بيانات الطفل");
         detailsButton.Click += (_, _) => ShowComingSoon("ملف الطفل");
         exportButton.Click += (_, _) => ShowComingSoon("تصدير القائمة");
 
-        page.Controls.AddRange([search, classFilter, addButton, editButton, detailsButton, exportButton, grid]);
+        applyButton.Click += async (_, _) => await LoadChildrenAsync();
+        clearButton.Click += async (_, _) =>
+        {
+            search.Clear();
+            genderFilter.SelectedIndex = 0;
+            dateOfBirthFrom.Checked = false;
+            dateOfBirthTo.Checked = false;
+            enrollmentFrom.Checked = false;
+            enrollmentTo.Checked = false;
+            classroomFilter.SelectedIndex = 0;
+            paymentFilter.SelectedIndex = 0;
+            await LoadChildrenAsync();
+        };
+
+        page.Controls.AddRange([actions, filterPanel, grid]);
         page.Resize += (_, _) => LayoutChildrenPage();
         LayoutChildrenPage();
+        _ = LoadChildrenAsync();
         return page;
+
+        void AddFilterField(string labelText, Control control)
+        {
+            var group = new Panel { Width = 228, Height = control.Height + 24, BackColor = Color.Transparent, Margin = new Padding(0, 2, 0, 6) };
+            var label = new Label
+            {
+                Text = labelText,
+                Dock = DockStyle.Top,
+                Height = 22,
+                ForeColor = BrandPalette.Text,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                TextAlign = ContentAlignment.MiddleRight,
+                RightToLeft = RightToLeft.Yes
+            };
+            control.Dock = DockStyle.Bottom;
+            control.Width = group.Width;
+            group.Controls.Add(control);
+            group.Controls.Add(label);
+            filterFields.Controls.Add(group);
+        }
+
+        async Task LoadChildrenAsync()
+        {
+            applyButton.Enabled = false;
+            clearButton.Enabled = false;
+            resultCount.Text = "جارٍ تحميل الأطفال...";
+            try
+            {
+                if (classroomFilter.Items.Count == 1)
+                {
+                    var classrooms = await _childService.GetClassroomsForFilterAsync();
+                    foreach (var classroom in classrooms)
+                        classroomFilter.Items.Add(classroom);
+                }
+
+                var gender = genderFilter.SelectedIndex switch
+                {
+                    1 => ChildGender.Boy,
+                    2 => ChildGender.Girl,
+                    _ => (ChildGender?)null
+                };
+                var classroomId = (classroomFilter.SelectedItem as ClassroomFilterOptionDto)?.Id;
+                var hasPaidSubscription = paymentFilter.SelectedIndex switch
+                {
+                    1 => true,
+                    2 => false,
+                    _ => (bool?)null
+                };
+                var filter = new ChildFilter
+                {
+                    SearchText = search.Text,
+                    Gender = gender,
+                    DateOfBirthFrom = dateOfBirthFrom.Checked ? DateOnly.FromDateTime(dateOfBirthFrom.Value) : null,
+                    DateOfBirthTo = dateOfBirthTo.Checked ? DateOnly.FromDateTime(dateOfBirthTo.Value) : null,
+                    EnrollmentDateFrom = enrollmentFrom.Checked ? DateOnly.FromDateTime(enrollmentFrom.Value) : null,
+                    EnrollmentDateTo = enrollmentTo.Checked ? DateOnly.FromDateTime(enrollmentTo.Value) : null,
+                    ClassroomId = classroomId,
+                    HasPaidSubscription = hasPaidSubscription
+                };
+                var children = await _childService.GetChildrenAsync(filter);
+                grid.Rows.Clear();
+                foreach (var child in children)
+                {
+                    var index = grid.Rows.Add(
+                        child.FullName,
+                        child.Gender == ChildGender.Boy ? "ولد" : "بنت",
+                        child.DateOfBirth.ToString("dd/MM/yyyy"),
+                        child.EnrollmentDate.ToString("dd/MM/yyyy"),
+                        child.FatherPhone);
+                    grid.Rows[index].Tag = child.Id;
+                }
+                resultCount.Text = $"عدد الأطفال: {children.Count}";
+            }
+            catch (Exception exception)
+            {
+                resultCount.Text = "تعذر تحميل البيانات";
+                MessageBox.Show($"تعذر تحميل قائمة الأطفال.\n{exception.Message}", "خطأ في تحميل البيانات",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error, MessageBoxDefaultButton.Button1,
+                    MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+            }
+            finally
+            {
+                applyButton.Enabled = true;
+                clearButton.Enabled = true;
+            }
+        }
 
         void LayoutChildrenPage()
         {
             LayoutDataHeader(page);
-            var y = 190;
-            search.SetBounds(34, y, Math.Max(220, page.ClientSize.Width - 68 - 730), 42);
-            classFilter.SetBounds(search.Right + 10, y, 170, 42);
-            addButton.SetBounds(page.ClientSize.Width - 34 - 150, y, 150, 42);
-            editButton.SetBounds(addButton.Left - 150 - 8, y, 150, 42);
-            detailsButton.SetBounds(editButton.Left - 142 - 8, y, 142, 42);
-            exportButton.SetBounds(detailsButton.Left - 142 - 8, y, 142, 42);
-            grid.SetBounds(34, 248, page.ClientSize.Width - 68, Math.Max(220, page.ClientSize.Height - 282));
+            var contentTop = 190;
+            var leftMargin = 34;
+            var rightMargin = 34;
+            actions.SetBounds(leftMargin, contentTop, Math.Max(200, page.ClientSize.Width - leftMargin - rightMargin), 44);
+            var bodyTop = contentTop + 54;
+            var bodyHeight = Math.Max(220, page.ClientSize.Height - bodyTop - 24);
+            filterPanel.SetBounds(leftMargin, bodyTop, 252, bodyHeight);
+            grid.SetBounds(filterPanel.Right + 14, bodyTop, Math.Max(280, page.ClientSize.Width - filterPanel.Right - 14 - rightMargin), bodyHeight);
+        }
+
+        static ComboBox CreateFilterCombo(string[] options)
+        {
+            var combo = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Segoe UI", 9.5F),
+                RightToLeft = RightToLeft.Yes,
+                Width = 228,
+                Height = 34
+            };
+            combo.Items.AddRange(options);
+            combo.SelectedIndex = 0;
+            return combo;
+        }
+
+        static DateTimePicker CreateOptionalDatePicker() => new()
+        {
+            Format = DateTimePickerFormat.Custom,
+            CustomFormat = "dd/MM/yyyy",
+            ShowCheckBox = true,
+            Checked = false,
+            Font = new Font("Segoe UI", 8.5F),
+            Width = 108,
+            Height = 30
+        };
+
+        static Control CreateDateRange(DateTimePicker from, DateTimePicker to)
+        {
+            var row = new FlowLayoutPanel
+            {
+                Width = 228,
+                Height = 30,
+                FlowDirection = FlowDirection.RightToLeft,
+                WrapContents = false,
+                RightToLeft = RightToLeft.No,
+                BackColor = Color.Transparent
+            };
+            row.Controls.Add(to);
+            row.Controls.Add(from);
+            return row;
         }
     }
 
@@ -453,7 +671,7 @@ public sealed class MainForm : Form
         }
     }
 
-    private static Panel CreateDataPage(string titleText, string subtitleText)
+    private static Panel CreateDataPage(string titleText, string subtitleText, bool includePrototypeBanner = true)
     {
         var page = new Panel
         {
@@ -471,17 +689,23 @@ public sealed class MainForm : Form
             TextAlign = ContentAlignment.MiddleLeft,
             RightToLeft = RightToLeft.Yes
         });
-        page.Controls.Add(new FeedbackBanner("نسخة تجريبية", "الأزرار للعرض فقط، ولا يتم حفظ أو تعديل أي بيانات حاليًا.", MessageTone.Information));
+        if (includePrototypeBanner)
+        {
+            page.Controls.Add(new FeedbackBanner("نسخة تجريبية", "الأزرار للعرض فقط، ولا يتم حفظ أو تعديل أي بيانات حاليًا.", MessageTone.Information));
+        }
         page.Resize += (_, _) => LayoutDataHeader(page);
         return page;
     }
 
     private static void LayoutDataHeader(Panel page)
     {
-        if (page.Controls.Count < 3) return;
+        if (page.Controls.Count < 2) return;
         page.Controls[0].SetBounds(34, 28, page.ClientSize.Width - 68, 46);
         page.Controls[1].SetBounds(34, 78, page.ClientSize.Width - 68, 30);
-        page.Controls[2].SetBounds(34, 116, page.ClientSize.Width - 68, 62);
+        if (page.Controls.Count > 2 && page.Controls[2] is FeedbackBanner)
+        {
+            page.Controls[2].SetBounds(34, 116, page.ClientSize.Width - 68, 62);
+        }
     }
 
     private static TextBox CreateSearchBox(string placeholder) => new()
