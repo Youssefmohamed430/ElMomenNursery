@@ -21,4 +21,6 @@ public class ChildDto
     public string? Notes { get; set; }
     public bool HasMedicalConditions { get; set; }
     public bool PreviouslyAttendedNursery { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? UpdatedAt { get; set; }
 }

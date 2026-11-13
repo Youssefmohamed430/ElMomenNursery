@@ -12,10 +12,8 @@ public static class MapsterConfigForChild
         var config = new TypeAdapterConfig();
 
         config.NewConfig<UpdateChildDTO, Child>()
-            .IgnoreNullValues(true)
-            .IgnoreIf((source, _) => source.EnrollmentDate == default, destination => destination.EnrollmentDate)
-            .IgnoreIf((source, _) => source.DateOfBirth == default, destination => destination.DateOfBirth)
-            .IgnoreIf((source, _) => source.Gender == default, destination => destination.Gender);
+            .Map(destination => destination.FullName, source => source.FullName)
+            .Map(destination => destination.Address, source => source.Address);
 
         return config;
     }

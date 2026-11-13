@@ -392,39 +392,18 @@ public sealed class MainForm : Form
         };
         actions.Controls.AddRange([addButton, editButton, detailsButton, exportButton]);
 
-        var filterPanel = new Panel
+        var filterPanel = new FlowLayoutPanel
         {
-            BackColor = BrandPalette.Surface,
-            Padding = new Padding(12),
-            RightToLeft = RightToLeft.Yes,
-            BorderStyle = BorderStyle.FixedSingle,
-            AutoScroll = true
-        };
-        var filterHeading = new Label
-        {
-            Text = "الفلاتر",
-            Dock = DockStyle.Top,
-            Height = 34,
-            Font = new Font("Segoe UI", 12F, FontStyle.Bold),
-            ForeColor = BrandPalette.PrimaryGreen,
-            TextAlign = ContentAlignment.MiddleRight,
-            RightToLeft = RightToLeft.Yes
-        };
-        var filterFields = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            FlowDirection = FlowDirection.TopDown,
+            FlowDirection = FlowDirection.RightToLeft,
             WrapContents = false,
             AutoScroll = true,
             RightToLeft = RightToLeft.Yes,
-            BackColor = Color.Transparent,
-            Padding = new Padding(0, 4, 0, 0)
+            BackColor = BrandPalette.Surface,
+            Padding = new Padding(10, 6, 10, 6),
+            BorderStyle = BorderStyle.FixedSingle
         };
-        filterPanel.Controls.Add(filterFields);
-        filterPanel.Controls.Add(filterHeading);
-
         var search = CreateSearchBox("اسم الطفل");
-        var genderFilter = CreateFilterCombo(["كل الأنواع", "ولد", "بنت"]);
+        var genderFilter = CreateFilterCombo(["الكل", "ولد", "بنت"], 116);
         var dateOfBirthFrom = CreateOptionalDatePicker();
         var dateOfBirthTo = CreateOptionalDatePicker();
         var enrollmentFrom = CreateOptionalDatePicker();
@@ -434,41 +413,70 @@ public sealed class MainForm : Form
             DropDownStyle = ComboBoxStyle.DropDownList,
             Font = new Font("Segoe UI", 9.5F),
             RightToLeft = RightToLeft.Yes,
-            Width = 228,
+            Width = 150,
             Height = 34
         };
         classroomFilter.Items.Add("كل الفصول");
         classroomFilter.SelectedIndex = 0;
-        var paymentFilter = CreateFilterCombo(["كل حالات الدفع", "دفعوا", "مدفعوش"]);
+        var paymentFilter = CreateFilterCombo(["كل الحالات", "دفعوا", "مدفعوش"], 142);
         var resultCount = new Label
         {
             AutoSize = false,
-            Width = 228,
+            Width = 280,
             Height = 28,
             ForeColor = BrandPalette.MutedText,
             TextAlign = ContentAlignment.MiddleRight,
             RightToLeft = RightToLeft.Yes
         };
 
-        AddFilterField("بحث بالاسم", search);
-        AddFilterField("النوع", genderFilter);
-        AddFilterField("تاريخ الميلاد من / إلى", CreateDateRange(dateOfBirthFrom, dateOfBirthTo));
-        AddFilterField("تاريخ الالتحاق من / إلى", CreateDateRange(enrollmentFrom, enrollmentTo));
-        AddFilterField("الفصل الحالي", classroomFilter);
-        AddFilterField("حالة سداد الاشتراك الساري اليوم", paymentFilter);
+        AddFilterField("اسم الطفل", search, 180);
+        AddFilterField("النوع", genderFilter, 128);
+        AddFilterField("الميلاد من", dateOfBirthFrom, 142);
+        AddFilterField("الميلاد إلى", dateOfBirthTo, 142);
+        AddFilterField("الالتحاق من", enrollmentFrom, 142);
+        AddFilterField("الالتحاق إلى", enrollmentTo, 142);
+        AddFilterField("الفصل الحالي", classroomFilter, 158);
+        AddFilterField("الاشتراك الساري", paymentFilter, 150);
 
-        var applyButton = CreateActionButton("تطبيق الفلاتر", primary: true);
-        applyButton.Width = 228;
+        var applyButton = CreateActionButton("تطبيق", primary: true);
+        applyButton.Width = 96;
         var clearButton = CreateActionButton("مسح الفلاتر");
-        clearButton.Width = 228;
-        filterFields.Controls.Add(applyButton);
-        filterFields.Controls.Add(clearButton);
-        filterFields.Controls.Add(resultCount);
+        clearButton.Width = 112;
+        AddFilterButton(applyButton);
+        AddFilterButton(clearButton);
 
-        var grid = CreateGrid(["اسم الطفل", "النوع", "تاريخ الميلاد", "تاريخ الالتحاق", "هاتف ولي الأمر"]);
-        grid.AutoGenerateColumns = false;
-        addButton.Click += (_, _) => ShowComingSoon("إضافة طفل");
-        editButton.Click += (_, _) => ShowComingSoon("تعديل بيانات الطفل");
+        var grid = CreateGrid([
+            "المعرف", "اسم الطفل", "العنوان", "تاريخ الالتحاق", "تاريخ الميلاد", "النوع",
+            "اسم الأب", "مهنة الأب", "هاتف الأب", "واتساب الأب", "اسم الأم", "مهنة الأم",
+            "هاتف الأم", "واتساب الأم", "ملاحظات", "حالة طبية", "سبق له الالتحاق",
+            "تاريخ الإضافة", "آخر تعديل"
+        ]);
+        grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
+        var columnWidths = new[] { 265, 170, 220, 140, 140, 90, 150, 140, 140, 140, 150, 140, 140, 140, 240, 120, 150, 160, 160 };
+        for (var columnIndex = 0; columnIndex < grid.Columns.Count; columnIndex++)
+            grid.Columns[columnIndex].Width = columnWidths[columnIndex];
+
+        addButton.Click += async (_, _) =>
+        {
+            using var editor = new ChildEditorForm(_childService);
+            if (editor.ShowDialog(this) == DialogResult.OK)
+                await LoadChildrenAsync();
+        };
+        editButton.Click += async (_, _) =>
+        {
+            if (grid.SelectedRows.Count == 0 || grid.SelectedRows[0].Tag is not Guid childId)
+            {
+                MessageBox.Show("اختر طفلًا من الجدول أولًا.", "تعديل بيانات طفل", MessageBoxButtons.OK,
+                    MessageBoxIcon.Information, MessageBoxDefaultButton.Button1,
+                    MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+                return;
+            }
+
+            var child = await _childService.GetChildByIdAsync(childId);
+            using var editor = new ChildEditorForm(_childService, child);
+            if (editor.ShowDialog(this) == DialogResult.OK)
+                await LoadChildrenAsync();
+        };
         detailsButton.Click += (_, _) => ShowComingSoon("ملف الطفل");
         exportButton.Click += (_, _) => ShowComingSoon("تصدير القائمة");
 
@@ -486,30 +494,39 @@ public sealed class MainForm : Form
             await LoadChildrenAsync();
         };
 
-        page.Controls.AddRange([actions, filterPanel, grid]);
+        page.Controls.AddRange([filterPanel, actions, resultCount, grid]);
         page.Resize += (_, _) => LayoutChildrenPage();
         LayoutChildrenPage();
         _ = LoadChildrenAsync();
         return page;
 
-        void AddFilterField(string labelText, Control control)
+        void AddFilterField(string labelText, Control control, int width)
         {
-            var group = new Panel { Width = 228, Height = control.Height + 24, BackColor = Color.Transparent, Margin = new Padding(0, 2, 0, 6) };
+            var group = new Panel { Width = width, Height = 56, BackColor = Color.Transparent, Margin = new Padding(3, 0, 3, 0) };
             var label = new Label
             {
                 Text = labelText,
-                Dock = DockStyle.Top,
-                Height = 22,
+                Location = new Point(0, 0),
+                Width = width,
+                Height = 20,
                 ForeColor = BrandPalette.Text,
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 TextAlign = ContentAlignment.MiddleRight,
                 RightToLeft = RightToLeft.Yes
             };
-            control.Dock = DockStyle.Bottom;
-            control.Width = group.Width;
+            control.Location = new Point(0, 21);
+            control.Width = width;
+            control.Height = 32;
             group.Controls.Add(control);
             group.Controls.Add(label);
-            filterFields.Controls.Add(group);
+            filterPanel.Controls.Add(group);
+        }
+
+        void AddFilterButton(Button button)
+        {
+            button.Height = 40;
+            button.Margin = new Padding(5, 18, 5, 0);
+            filterPanel.Controls.Add(button);
         }
 
         async Task LoadChildrenAsync()
@@ -555,11 +572,25 @@ public sealed class MainForm : Form
                 foreach (var child in children)
                 {
                     var index = grid.Rows.Add(
+                        child.Id,
                         child.FullName,
-                        child.Gender == ChildGender.Boy ? "ولد" : "بنت",
-                        child.DateOfBirth.ToString("dd/MM/yyyy"),
+                        child.Address,
                         child.EnrollmentDate.ToString("dd/MM/yyyy"),
-                        child.FatherPhone);
+                        child.DateOfBirth.ToString("dd/MM/yyyy"),
+                        child.Gender == ChildGender.Boy ? "ولد" : "بنت",
+                        child.FatherName,
+                        child.FatherOccupation ?? string.Empty,
+                        child.FatherPhone,
+                        child.FatherWhatsApp ?? string.Empty,
+                        child.MotherName,
+                        child.MotherOccupation ?? string.Empty,
+                        child.MotherPhone,
+                        child.MotherWhatsApp ?? string.Empty,
+                        child.Notes ?? string.Empty,
+                        child.HasMedicalConditions ? "نعم" : "لا",
+                        child.PreviouslyAttendedNursery ? "نعم" : "لا",
+                        child.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm"),
+                        child.UpdatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? string.Empty);
                     grid.Rows[index].Tag = child.Id;
                 }
                 resultCount.Text = $"عدد الأطفال: {children.Count}";
@@ -581,24 +612,24 @@ public sealed class MainForm : Form
         void LayoutChildrenPage()
         {
             LayoutDataHeader(page);
-            var contentTop = 190;
+            var contentTop = 204;
             var leftMargin = 34;
             var rightMargin = 34;
+            filterPanel.SetBounds(leftMargin, 120, Math.Max(300, page.ClientSize.Width - leftMargin - rightMargin), 72);
             actions.SetBounds(leftMargin, contentTop, Math.Max(200, page.ClientSize.Width - leftMargin - rightMargin), 44);
-            var bodyTop = contentTop + 54;
-            var bodyHeight = Math.Max(220, page.ClientSize.Height - bodyTop - 24);
-            filterPanel.SetBounds(leftMargin, bodyTop, 252, bodyHeight);
-            grid.SetBounds(filterPanel.Right + 14, bodyTop, Math.Max(280, page.ClientSize.Width - filterPanel.Right - 14 - rightMargin), bodyHeight);
+            resultCount.SetBounds(leftMargin, contentTop + 48, 280, 26);
+            var gridTop = contentTop + 78;
+            grid.SetBounds(leftMargin, gridTop, Math.Max(300, page.ClientSize.Width - leftMargin - rightMargin), Math.Max(220, page.ClientSize.Height - gridTop - 24));
         }
 
-        static ComboBox CreateFilterCombo(string[] options)
+        static ComboBox CreateFilterCombo(string[] options, int width)
         {
             var combo = new ComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = new Font("Segoe UI", 9.5F),
                 RightToLeft = RightToLeft.Yes,
-                Width = 228,
+                Width = width,
                 Height = 34
             };
             combo.Items.AddRange(options);
@@ -613,25 +644,9 @@ public sealed class MainForm : Form
             ShowCheckBox = true,
             Checked = false,
             Font = new Font("Segoe UI", 8.5F),
-            Width = 108,
+            Width = 142,
             Height = 30
         };
-
-        static Control CreateDateRange(DateTimePicker from, DateTimePicker to)
-        {
-            var row = new FlowLayoutPanel
-            {
-                Width = 228,
-                Height = 30,
-                FlowDirection = FlowDirection.RightToLeft,
-                WrapContents = false,
-                RightToLeft = RightToLeft.No,
-                BackColor = Color.Transparent
-            };
-            row.Controls.Add(to);
-            row.Controls.Add(from);
-            return row;
-        }
     }
 
     private Control BuildClassesPage()

@@ -30,33 +30,26 @@ public class CreateChildDTO
     [Required(ErrorMessage = "FatherName is required.")]
     public required string FatherName { get; set; }
 
-    [Required(ErrorMessage = "FatherOccupation is required.")]
     public string? FatherOccupation { get; set; }
 
     [Required(ErrorMessage = "FatherPhone is required.")]
     public required string FatherPhone { get; set; }
 
-    [Required(ErrorMessage = "FatherWhatsApp is required.")]
     public string? FatherWhatsApp { get; set; }
 
     [Required(ErrorMessage = "MotherName is required.")]
     public required string MotherName { get; set; }
 
-    [Required(ErrorMessage = "MotherOccupation is required.")]
     public string? MotherOccupation { get; set; }
 
     [Required(ErrorMessage = "MotherPhone is required.")]   
     public required string MotherPhone { get; set; }
 
-    [Required(ErrorMessage = "MotherWhatsApp is required.")]
     public string? MotherWhatsApp { get; set; }
 
-    [Required(ErrorMessage = "Notes are required.")]
     public string? Notes { get; set; }
 
-    [Required(ErrorMessage = "HasMedicalConditions is required.")]
     public bool HasMedicalConditions { get; set; }
 
-    [Required(ErrorMessage = "PreviouslyAttendedNursery is required.")]
     public bool PreviouslyAttendedNursery { get; set; }
 }
