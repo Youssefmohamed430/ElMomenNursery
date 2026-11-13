@@ -13,4 +13,8 @@ public static class CommonErrors
     public static readonly Error Conflict = new(
         "Common.Conflict",
         "يتعارض هذا الإجراء مع بيانات موجودة.");
+
+    public static readonly Error InvalidCredentials = new(
+        "Common.InvalidCredentials",
+        "اسم المستخدم أو كلمة المرور غير صحيحة.");
 }

@@ -1,5 +1,6 @@
 using System.Drawing;
 using ElMomenNursery.Controls;
+using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Styling;
 
 namespace ElMomenNursery.Forms;
@@ -11,8 +12,15 @@ public sealed class MainForm : Form
     private readonly Panel _pageHost = new() { Dock = DockStyle.Fill, AutoScroll = true, BackColor = BrandPalette.AppBackground };
     private readonly Dictionary<string, NavigationButton> _navigationButtons = new(StringComparer.Ordinal);
 
-    public MainForm()
+    private readonly UserSession _session;
+    private readonly Func<Task> _logout;
+    private readonly IAccountManagementService _accountManagement;
+
+    public MainForm(UserSession session, Func<Task> logout, IAccountManagementService accountManagement)
     {
+        _session = session;
+        _logout = logout;
+        _accountManagement = accountManagement;
         Text = "نظام إدارة حضانة المؤمن";
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(1024, 700);
@@ -113,6 +121,16 @@ public sealed class MainForm : Form
         brandFlow.Controls.Add(brandText);
         header.Controls.Add(brandFlow);
 
+        var account = new FlowLayoutPanel { Dock = DockStyle.Left, Width = 320, FlowDirection = FlowDirection.RightToLeft,
+            WrapContents = false, BackColor = Color.Transparent, Padding = new Padding(0, 15, 0, 0) };
+        var who = new Label { AutoSize = false, Width = 175, Height = 54, Text = $"{_session.FullName}\n{string.Join("، ", _session.Roles)}",
+            TextAlign = ContentAlignment.MiddleRight, ForeColor = BrandPalette.Text, Font = new Font("Segoe UI", 9F, FontStyle.Bold), RightToLeft = RightToLeft.Yes };
+        var logout = CreateActionButton("تسجيل الخروج");
+        logout.Width = 120; logout.Height = 40;
+        logout.Click += async (_, _) => { logout.Enabled = false; await _logout(); Close(); };
+        account.Controls.Add(who); account.Controls.Add(logout);
+        header.Controls.Add(account);
+
         var divider = new Panel { Dock = DockStyle.Bottom, Height = 3, BackColor = BrandPalette.LogoGreen };
         header.Controls.Add(divider);
         return header;
@@ -159,11 +177,13 @@ public sealed class MainForm : Form
             "الفصول",
             "الحضور",
             "الاشتراكات والمدفوعات",
-            "المخزن"
+            "المخزن",
+            "إدارة المستخدمين"
         };
 
         foreach (var section in sections)
         {
+            if (!CanViewSection(section)) continue;
             var button = new NavigationButton(section) { Width = SidebarWidth - 30 };
             button.Click += (_, _) => Navigate(section);
             _navigationButtons.Add(section, button);
@@ -189,6 +209,12 @@ public sealed class MainForm : Form
 
     private void Navigate(string section)
     {
+        if (!CanViewSection(section))
+        {
+            MessageBox.Show("ليست لديك صلاحية لفتح هذا القسم.", "صلاحية غير متاحة", MessageBoxButtons.OK, MessageBoxIcon.Warning,
+                MessageBoxDefaultButton.Button1, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+            return;
+        }
         foreach (var (name, button) in _navigationButtons)
         {
             button.SetSelected(string.Equals(name, section, StringComparison.Ordinal));
@@ -207,11 +233,25 @@ public sealed class MainForm : Form
             "الرئيسية" => BuildHomePage(),
             "الأطفال" => BuildChildrenPage(),
             "الفصول" => BuildClassesPage(),
+            "إدارة المستخدمين" => new UserManagementForm(_accountManagement, _session),
             _ => BuildSectionPage(section)
         };
         _pageHost.Controls.Add(page);
         _pageHost.ResumeLayout(performLayout: true);
     }
+
+    private bool CanViewSection(string section) => section switch
+    {
+        "الرئيسية" => true,
+        "الأطفال" => _session.HasPermission("Students.View"),
+        "الفصول" => _session.HasPermission("Classes.View"),
+        "الحضور" => _session.HasPermission("Attendance.View"),
+        "الموظفون" => _session.HasPermission("Employees.View"),
+        "الاشتراكات والمدفوعات" => _session.HasPermission("Subscriptions.View") || _session.HasPermission("Payments.View"),
+        "المخزن" => _session.HasPermission("Inventory.View"),
+        "إدارة المستخدمين" => _session.HasPermission("Users.View"),
+        _ => true
+    };
 
     private Control BuildHomePage()
     {
@@ -343,6 +383,10 @@ public sealed class MainForm : Form
         var editButton = CreateActionButton("تعديل البيانات");
         var detailsButton = CreateActionButton("عرض الملف");
         var exportButton = CreateActionButton("تصدير القائمة");
+        addButton.Visible = _session.HasPermission("Students.Create");
+        editButton.Visible = _session.HasPermission("Students.Edit");
+        detailsButton.Visible = _session.HasPermission("Students.View");
+        exportButton.Visible = _session.HasPermission("Students.View");
         var grid = CreateGrid(["اسم الطفل", "الفصل", "تاريخ الالتحاق", "الحالة"]);
         grid.Rows.Add("آدم محمد", "فصل الفراشات", "١٢/٠٩/٢٠٢٦", "نشط");
         grid.Rows.Add("ليلى أحمد", "فصل الزهور", "١٥/٠٩/٢٠٢٦", "نشط");
@@ -378,6 +422,7 @@ public sealed class MainForm : Form
         var search = CreateSearchBox("بحث باسم الفصل");
         var addButton = CreateActionButton("إضافة فصل", primary: true);
         var editButton = CreateActionButton("تعديل الفصل");
+        addButton.Visible = editButton.Visible = _session.HasPermission("Classes.Manage");
         var rosterButton = CreateActionButton("عرض قائمة الأطفال");
         var printButton = CreateActionButton("طباعة القائمة");
         var grid = CreateGrid(["اسم الفصل", "المعلمة", "عدد الأطفال", "الحالة"]);

@@ -10,7 +10,11 @@ public sealed class NurseryDbContext(DbContextOptions<NurseryDbContext> options)
     public DbSet<Child> Children => Set<Child>();
     public DbSet<Employee> Employees => Set<Employee>();
     public DbSet<Role> Roles => Set<Role>();
+    public DbSet<Permission> Permissions => Set<Permission>();
+    public DbSet<UserRole> UserRoles => Set<UserRole>();
+    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<UserAccount> UserAccounts => Set<UserAccount>();
+    public DbSet<AuthenticationAuditLog> AuthenticationAuditLogs => Set<AuthenticationAuditLog>();
     public DbSet<Classroom> Classrooms => Set<Classroom>();
     public DbSet<ChildClassEnrollment> ChildClassEnrollments => Set<ChildClassEnrollment>();
     public DbSet<ClassTeacherAssignment> ClassTeacherAssignments => Set<ClassTeacherAssignment>();

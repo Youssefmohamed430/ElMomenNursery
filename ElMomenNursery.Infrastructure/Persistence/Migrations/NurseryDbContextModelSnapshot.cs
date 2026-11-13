@@ -106,6 +106,47 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.ToTable("AuditLogs", (string)null);
                 });
 
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.AuthenticationAuditLog", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(120)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Success")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("Timestamp")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Timestamp");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("AuthenticationAuditLogs", (string)null);
+                });
+
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.Child", b =>
                 {
                     b.Property<string>("Id")
@@ -943,6 +984,38 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.Permission", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Module")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("Permissions", (string)null);
+                });
+
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.Role", b =>
                 {
                     b.Property<string>("Id")
@@ -951,6 +1024,9 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Description")
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsSystemRole")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -963,6 +1039,21 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("UX_Roles_Name");
 
                     b.ToTable("Roles", (string)null);
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.RolePermission", b =>
+                {
+                    b.Property<string>("RoleId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PermissionId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("RoleId", "PermissionId");
+
+                    b.HasIndex("PermissionId");
+
+                    b.ToTable("RolePermissions", (string)null);
                 });
 
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.StockMovement", b =>
@@ -1104,13 +1195,27 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("EmployeeId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("FailedLoginAttempts")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
 
                     b.Property<long?>("LastLoginAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("LockoutEnd")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("PasswordHash")
@@ -1120,6 +1225,9 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.Property<string>("RoleId")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<long?>("UpdatedAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Username")
                         .IsRequired()
@@ -1145,6 +1253,21 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.ToTable("UserAccounts", (string)null);
                 });
 
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.UserRole", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RoleId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("UserId", "RoleId");
+
+                    b.HasIndex("RoleId");
+
+                    b.ToTable("UserRoles", (string)null);
+                });
+
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.AuditLog", b =>
                 {
                     b.HasOne("ElMomenNursery.Domain.Entities.UserAccount", "UserAccount")
@@ -1153,6 +1276,14 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("UserAccount");
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.AuthenticationAuditLog", b =>
+                {
+                    b.HasOne("ElMomenNursery.Domain.Entities.UserAccount", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.ChildAttendance", b =>
@@ -1390,6 +1521,25 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.Navigation("Employee");
                 });
 
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.RolePermission", b =>
+                {
+                    b.HasOne("ElMomenNursery.Domain.Entities.Permission", "Permission")
+                        .WithMany("RolePermissions")
+                        .HasForeignKey("PermissionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ElMomenNursery.Domain.Entities.Role", "Role")
+                        .WithMany("RolePermissions")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Permission");
+
+                    b.Navigation("Role");
+                });
+
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.StockMovement", b =>
                 {
                     b.HasOne("ElMomenNursery.Domain.Entities.InventoryItem", "InventoryItem")
@@ -1449,6 +1599,25 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.Navigation("Employee");
 
                     b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.UserRole", b =>
+                {
+                    b.HasOne("ElMomenNursery.Domain.Entities.Role", "Role")
+                        .WithMany("UserRoles")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ElMomenNursery.Domain.Entities.UserAccount", "User")
+                        .WithMany("UserRoles")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Role");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.AttendanceDevice", b =>
@@ -1511,9 +1680,18 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.Navigation("Allocations");
                 });
 
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.Permission", b =>
+                {
+                    b.Navigation("RolePermissions");
+                });
+
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.Role", b =>
                 {
+                    b.Navigation("RolePermissions");
+
                     b.Navigation("UserAccounts");
+
+                    b.Navigation("UserRoles");
                 });
 
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.Subscription", b =>
@@ -1524,6 +1702,11 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.SubscriptionPlan", b =>
                 {
                     b.Navigation("Subscriptions");
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.UserAccount", b =>
+                {
+                    b.Navigation("UserRoles");
                 });
 #pragma warning restore 612, 618
         }

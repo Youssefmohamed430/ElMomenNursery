@@ -1,6 +1,8 @@
 using ElMomenNursery.Infrastructure;
 using ElMomenNursery.Infrastructure.Persistence;
 using ElMomenNursery.Forms;
+using ElMomenNursery.Infrastructure.Security;
+using ElMomenNursery.Application.IServices;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -46,13 +48,23 @@ internal static class Program
             using var serviceProvider = services.BuildServiceProvider();
             using (var scope = serviceProvider.CreateScope())
             {
-                scope.ServiceProvider.GetRequiredService<NurseryDbContext>().Database.Migrate();
+                var db = scope.ServiceProvider.GetRequiredService<NurseryDbContext>();
+                db.Database.Migrate();
+                AuthSeed.InitializeAsync(db).GetAwaiter().GetResult();
             }
 
-            using var login = new LoginForm();
-            if (login.ShowDialog() == DialogResult.OK)
+            var session = serviceProvider.GetRequiredService<ISessionManager>();
+            while (true)
             {
-                System.Windows.Forms.Application.Run(new MainForm());
+                using (var loginScope = serviceProvider.CreateScope())
+                using (var login = new LoginForm(loginScope.ServiceProvider.GetRequiredService<IAuthService>()))
+                    if (login.ShowDialog() != DialogResult.OK) break;
+
+                using var appScope = serviceProvider.CreateScope();
+                var auth = appScope.ServiceProvider.GetRequiredService<IAuthService>();
+                System.Windows.Forms.Application.Run(new MainForm(session.CurrentUser!, () => auth.LogoutAsync(),
+                    appScope.ServiceProvider.GetRequiredService<IAccountManagementService>()));
+                if (session.IsAuthenticated) auth.LogoutAsync().GetAwaiter().GetResult();
             }
 
             Log.Information("Application stopped normally");

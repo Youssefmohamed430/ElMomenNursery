@@ -1,131 +1,92 @@
 using System.Drawing;
+using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Styling;
 
 namespace ElMomenNursery.Forms;
 
 public sealed class LoginForm : Form
 {
-    public LoginForm()
+    private readonly IAuthService auth;
+    private readonly TextBox _username = CreateTextBox("اسم المستخدم");
+    private readonly TextBox _fullName = CreateTextBox("الاسم الكامل");
+    private readonly TextBox _password = CreateTextBox("كلمة المرور");
+    private readonly Label _nameLabel = LabelFor("الاسم الكامل");
+    private readonly Label _note = new() { AutoSize = false, TextAlign = ContentAlignment.MiddleCenter };
+    private readonly Button _submit = new() { Text = "دخول", Height = 48, BackColor = BrandPalette.PrimaryGreen,
+        ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 11F, FontStyle.Bold), UseVisualStyleBackColor = false };
+    private bool _setupMode;
+
+    public LoginForm(IAuthService auth)
     {
+        this.auth = auth;
         Text = "تسجيل الدخول - حضانة المؤمن";
-        StartPosition = FormStartPosition.CenterScreen;
-        MinimumSize = new Size(520, 600);
-        Size = new Size(560, 650);
-        BackColor = BrandPalette.AppBackground;
-        Font = new Font("Segoe UI", 10F, FontStyle.Regular, GraphicsUnit.Point);
-        RightToLeft = RightToLeft.Yes;
-        RightToLeftLayout = true;
-
-        var card = new Panel
-        {
-            BackColor = BrandPalette.Surface,
-            Size = new Size(400, 440),
-            Padding = new Padding(32),
-            Anchor = AnchorStyles.None
-        };
-
-        var logo = new PictureBox
-        {
-            Size = new Size(92, 92),
-            SizeMode = PictureBoxSizeMode.Zoom,
-            BackColor = Color.Transparent
-        };
-        var logoPath = Path.Combine(AppContext.BaseDirectory, "Resources", "Branding", "AlMoumenNurseryLogo.jpeg");
-        if (File.Exists(logoPath))
-        {
-            using var image = Image.FromFile(logoPath);
-            logo.Image = new Bitmap(image);
-        }
-
-        var heading = new Label
-        {
-            Text = "تسجيل الدخول",
-            Font = new Font("Segoe UI", 21F, FontStyle.Bold, GraphicsUnit.Point),
-            ForeColor = BrandPalette.Text,
-            TextAlign = ContentAlignment.MiddleCenter
-        };
-        var subtitle = new Label
-        {
-            Text = "مرحبًا بك في نظام إدارة حضانة المؤمن",
-            Font = new Font("Segoe UI", 10F, FontStyle.Regular, GraphicsUnit.Point),
-            ForeColor = BrandPalette.MutedText,
-            TextAlign = ContentAlignment.MiddleCenter
-        };
-        var userLabel = CreateFieldLabel("اسم المستخدم");
-        var userName = CreateTextBox("اكتب اسم المستخدم");
-        var passwordLabel = CreateFieldLabel("كلمة المرور");
-        var password = CreateTextBox("اكتب كلمة المرور");
-        password.UseSystemPasswordChar = true;
-
-        var signIn = new Button
-        {
-            Text = "دخول",
-            Height = 48,
-            BackColor = BrandPalette.PrimaryGreen,
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 11F, FontStyle.Bold, GraphicsUnit.Point),
-            Cursor = Cursors.Hand,
-            UseVisualStyleBackColor = false
-        };
-        signIn.FlatAppearance.BorderSize = 0;
-        signIn.FlatAppearance.MouseOverBackColor = BrandPalette.PrimaryGreenHover;
-        signIn.Click += (_, _) => DialogResult = DialogResult.OK;
-
-        var note = new Label
-        {
-            Text = "الدخول مؤقت — لا يتم التحقق من البيانات حاليًا",
-            Height = 28,
-            ForeColor = BrandPalette.MutedText,
-            Font = new Font("Segoe UI", 8.5F, FontStyle.Regular, GraphicsUnit.Point),
-            TextAlign = ContentAlignment.MiddleCenter
-        };
-
-        card.Controls.AddRange([logo, heading, subtitle, userLabel, userName, passwordLabel, password, signIn, note]);
+        StartPosition = FormStartPosition.CenterScreen; MinimumSize = new Size(520, 610); Size = new Size(560, 650);
+        BackColor = BrandPalette.AppBackground; Font = new Font("Segoe UI", 10F); RightToLeft = RightToLeft.Yes; RightToLeftLayout = true;
+        var card = new Panel { BackColor = BrandPalette.Surface, Size = new Size(410, 500), Anchor = AnchorStyles.None };
+        var heading = new Label { Text = "تسجيل الدخول", Font = new Font("Segoe UI", 21F, FontStyle.Bold), ForeColor = BrandPalette.Text, TextAlign = ContentAlignment.MiddleCenter };
+        var subtitle = new Label { Text = "نظام إدارة حضانة المؤمن", ForeColor = BrandPalette.MutedText, TextAlign = ContentAlignment.MiddleCenter };
+        var userLabel = LabelFor("اسم المستخدم"); var passLabel = LabelFor("كلمة المرور");
+        _password.UseSystemPasswordChar = true;
+        _submit.FlatAppearance.BorderSize = 0; _submit.Click += Submit;
+        _note.Height = 48; _note.ForeColor = BrandPalette.MutedText; _note.Font = new Font("Segoe UI", 9F);
+        card.Controls.AddRange([heading, subtitle, userLabel, _username, _nameLabel, _fullName, passLabel, _password, _submit, _note]);
         Controls.Add(card);
-        LayoutCard();
-        Resize += (_, _) => LayoutCard();
-
+        Shown += async (_, _) =>
+        {
+            _setupMode = await auth.NeedsInitialAdministratorSetupAsync();
+            Text = _setupMode ? "إعداد المسؤول الأول - حضانة المؤمن" : "تسجيل الدخول - حضانة المؤمن";
+            heading.Text = _setupMode ? "إنشاء حساب المسؤول" : "تسجيل الدخول";
+            subtitle.Text = _setupMode ? "اختر اسم مستخدم وكلمة مرور قوية للمسؤول الأول" : "مرحبًا بك في نظام إدارة حضانة المؤمن";
+            _submit.Text = _setupMode ? "إنشاء الحساب" : "دخول";
+            _fullName.Visible = _nameLabel.Visible = _setupMode;
+            _note.Text = _setupMode ? "كلمة المرور 12 حرفًا على الأقل، وبها أحرف وأرقام." : "";
+        };
         void LayoutCard()
         {
             card.Location = new Point((ClientSize.Width - card.Width) / 2, (ClientSize.Height - card.Height) / 2);
-            var width = card.ClientSize.Width - 64;
-            logo.SetBounds((card.ClientSize.Width - 92) / 2, 25, 92, 92);
-            heading.SetBounds(32, 125, width, 40);
-            subtitle.SetBounds(32, 168, width, 30);
-            userLabel.SetBounds(32, 215, width, 24);
-            userName.SetBounds(32, 241, width, 42);
-            passwordLabel.SetBounds(32, 296, width, 24);
-            password.SetBounds(32, 322, width, 42);
-            signIn.SetBounds(32, 379, width, 48);
-            note.SetBounds(32, 433, width, 28);
+            var w = card.ClientSize.Width - 64;
+            heading.SetBounds(32, 36, w, 42); subtitle.SetBounds(32, 80, w, 32);
+            userLabel.SetBounds(32, 132, w, 24); _username.SetBounds(32, 158, w, 40);
+            _nameLabel.SetBounds(32, 206, w, 24); _fullName.SetBounds(32, 232, w, 40);
+            passLabel.SetBounds(32, _setupMode ? 280 : 212, w, 24); _password.SetBounds(32, _setupMode ? 306 : 238, w, 40);
+            _submit.SetBounds(32, _setupMode ? 365 : 300, w, 48); _note.SetBounds(32, _setupMode ? 417 : 355, w, 54);
         }
+        Resize += (_, _) => LayoutCard();
+        Shown += (_, _) => LayoutCard();
     }
 
-    private static Label CreateFieldLabel(string text) => new()
+    private async void Submit(object? sender, EventArgs e)
     {
-        Text = text,
-        ForeColor = BrandPalette.Text,
-        Font = new Font("Segoe UI", 9.5F, FontStyle.Bold, GraphicsUnit.Point),
-        TextAlign = ContentAlignment.MiddleLeft,
-        RightToLeft = RightToLeft.Yes
-    };
-
-    private static TextBox CreateTextBox(string placeholder) => new()
-    {
-        PlaceholderText = placeholder,
-        BorderStyle = BorderStyle.FixedSingle,
-        Font = new Font("Segoe UI", 10F, FontStyle.Regular, GraphicsUnit.Point),
-        RightToLeft = RightToLeft.Yes
-    };
-
-    protected override void Dispose(bool disposing)
-    {
-        if (disposing)
+        _submit.Enabled = false; _note.ForeColor = BrandPalette.MutedText;
+        try
         {
-            foreach (var picture in Controls.OfType<Panel>().SelectMany(panel => panel.Controls.OfType<PictureBox>()))
-                picture.Image?.Dispose();
+            var result = _setupMode
+                ? await auth.CreateInitialAdministratorAsync(_username.Text, _fullName.Text, _password.Text)
+                : await auth.LoginAsync(_username.Text, _password.Text);
+            if (result.IsSuccess)
+            {
+                if (_setupMode)
+                {
+                    _note.Text = "تم إنشاء المسؤول. سجّل الدخول باستخدام بياناتك.";
+                    _setupMode = false; _fullName.Visible = _nameLabel.Visible = false; _submit.Text = "دخول";
+                    _password.Clear(); _password.Focus();
+                    return;
+                }
+                DialogResult = DialogResult.OK; Close();
+            }
+            else
+            {
+                _note.Text = _setupMode ? "تعذر إنشاء الحساب. تحقق من البيانات أو أعد فتح التطبيق." : "اسم المستخدم أو كلمة المرور غير صحيحة، أو الحساب غير متاح مؤقتًا.";
+                _note.ForeColor = BrandPalette.DangerText;
+            }
         }
-        base.Dispose(disposing);
+        catch
+        {
+            _note.Text = "تعذر إكمال العملية. أعد المحاولة."; _note.ForeColor = BrandPalette.DangerText;
+        }
+        finally { _submit.Enabled = true; }
     }
+
+    private static Label LabelFor(string text) => new() { Text = text, ForeColor = BrandPalette.Text, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft };
+    private static TextBox CreateTextBox(string placeholder) => new() { PlaceholderText = placeholder, BorderStyle = BorderStyle.FixedSingle, Font = new Font("Segoe UI", 10F), RightToLeft = RightToLeft.Yes };
 }

@@ -4,6 +4,8 @@ using ElMomenNursery.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using ElMomenNursery.Application.IServices;
+using ElMomenNursery.Infrastructure.Security;
 
 namespace ElMomenNursery.Infrastructure;
 
@@ -31,6 +33,16 @@ public static class InfrastructureServiceCollectionExtensions
             connectionString,
             sqlite => sqlite.MigrationsAssembly(typeof(NurseryDbContext).Assembly.FullName)));
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
+        services.Configure<AuthSecurityOptions>(options =>
+        {
+            var auth = configuration.GetSection(AuthSecurityOptions.SectionName);
+            options.MaxFailedAttempts = auth.GetValue(nameof(AuthSecurityOptions.MaxFailedAttempts), options.MaxFailedAttempts);
+            options.LockoutMinutes = auth.GetValue(nameof(AuthSecurityOptions.LockoutMinutes), options.LockoutMinutes);
+        });
+        services.AddScoped<IAuthService, LocalAuthService>();
+        services.AddScoped<IPermissionService, LocalPermissionService>();
+        services.AddScoped<IAccountManagementService, LocalAccountManagementService>();
+        services.AddSingleton<ISessionManager, SessionManager>();
         return services;
     }
 }

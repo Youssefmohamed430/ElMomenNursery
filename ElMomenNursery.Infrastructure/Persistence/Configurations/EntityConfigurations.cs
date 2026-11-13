@@ -62,6 +62,51 @@ internal sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
     }
 }
 
+internal sealed class PermissionConfiguration : IEntityTypeConfiguration<Permission>
+{
+    public void Configure(EntityTypeBuilder<Permission> b)
+    {
+        b.ToTable("Permissions"); b.HasKey(x => x.Id);
+        b.Property(x => x.Code).IsRequired().HasMaxLength(120);
+        b.Property(x => x.Name).IsRequired().HasMaxLength(160);
+        b.Property(x => x.Module).IsRequired().HasMaxLength(80);
+        b.HasIndex(x => x.Code).IsUnique();
+    }
+}
+
+internal sealed class UserRoleConfiguration : IEntityTypeConfiguration<UserRole>
+{
+    public void Configure(EntityTypeBuilder<UserRole> b)
+    {
+        b.ToTable("UserRoles"); b.HasKey(x => new { x.UserId, x.RoleId });
+        b.HasOne(x => x.User).WithMany(x => x.UserRoles).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        b.HasOne(x => x.Role).WithMany(x => x.UserRoles).HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class RolePermissionConfiguration : IEntityTypeConfiguration<RolePermission>
+{
+    public void Configure(EntityTypeBuilder<RolePermission> b)
+    {
+        b.ToTable("RolePermissions"); b.HasKey(x => new { x.RoleId, x.PermissionId });
+        b.HasOne(x => x.Role).WithMany(x => x.RolePermissions).HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Cascade);
+        b.HasOne(x => x.Permission).WithMany(x => x.RolePermissions).HasForeignKey(x => x.PermissionId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class AuthenticationAuditLogConfiguration : IEntityTypeConfiguration<AuthenticationAuditLog>
+{
+    public void Configure(EntityTypeBuilder<AuthenticationAuditLog> b)
+    {
+        b.ToTable("AuthenticationAuditLogs"); b.HasKey(x => x.Id);
+        b.Property(x => x.Username).IsRequired().HasMaxLength(256);
+        b.Property(x => x.Action).IsRequired().HasMaxLength(64);
+        b.Property(x => x.FailureReason).HasMaxLength(120);
+        b.HasIndex(x => x.Timestamp);
+        b.HasOne<UserAccount>().WithMany().HasForeignKey(x => x.UserId).IsRequired(false).OnDelete(DeleteBehavior.SetNull);
+    }
+}
+
 internal sealed class UserAccountConfiguration : IEntityTypeConfiguration<UserAccount>
 {
     public void Configure(EntityTypeBuilder<UserAccount> b)
@@ -71,6 +116,7 @@ internal sealed class UserAccountConfiguration : IEntityTypeConfiguration<UserAc
         b.Property(x => x.Username).IsRequired();
         b.Property(x => x.UsernameNormalized).HasMaxLength(256).IsRequired();
         b.Property(x => x.PasswordHash).IsRequired();
+        b.Property(x => x.FullName).HasMaxLength(200).IsRequired();
         b.HasIndex(x => x.UsernameNormalized).IsUnique().HasDatabaseName("UX_UserAccounts_UsernameNormalized");
         b.HasIndex(x => x.EmployeeId).IsUnique().HasDatabaseName("UX_UserAccounts_EmployeeId");
         b.HasOne(x => x.Employee).WithOne(x => x.UserAccount).HasForeignKey<UserAccount>(x => x.EmployeeId).OnDelete(DeleteBehavior.Restrict);
