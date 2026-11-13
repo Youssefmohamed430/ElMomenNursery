@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <PackageReference Include="Mapster" Version="7.4.0" />
     <ProjectReference Include="..\ElMomenNursery.Domain\ElMomenNursery.Domain.csproj" />
   </ItemGroup>
   <ItemGroup>

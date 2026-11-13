@@ -1,6 +1,8 @@
 using ElMomenNursery.Application.IServices;
+using ElMomenNursery.Application.Mappings;
 using ElMomenNursery.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Mapster;
 
 namespace ElMomenNursery.Infrastructure.Security;
 
@@ -26,7 +28,8 @@ public sealed class LocalPermissionService(NurseryDbContext db, ISessionManager 
         var roleNames = roles.Select(x => x.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var permissions = roles.SelectMany(x => x.RolePermissions).Select(x => x.Permission.Code).ToHashSet(StringComparer.OrdinalIgnoreCase);
         if (roleNames.Contains("Admin")) permissions.UnionWith(AuthSeed.PermissionCodes);
-        sessions.Login(new UserSession(user.Id, user.Username, user.FullName,
-            user.EmployeeId, roleNames, permissions, current.LoginTime));
+        var sessionData = new UserSessionMapping(user.Id, user.Username, user.FullName,
+            user.EmployeeId, roleNames, permissions, current.LoginTime);
+        sessions.Login(sessionData.Adapt<UserSession>(AccountMappingConfig.Config));
     }
 }

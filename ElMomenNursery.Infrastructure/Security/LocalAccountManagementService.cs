@@ -1,9 +1,11 @@
 using ElMomenNursery.Application.IServices;
+using ElMomenNursery.Application.Mappings;
 using ElMomenNursery.Domain.Abstractions;
 using ElMomenNursery.Domain.Entities;
 using ElMomenNursery.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Mapster;
 
 namespace ElMomenNursery.Infrastructure.Security;
 
@@ -14,18 +16,18 @@ public sealed class LocalAccountManagementService(NurseryDbContext db, ISessionM
     public async Task<IReadOnlyList<AccountSummary>> GetAccountsAsync(CancellationToken cancellationToken = default)
     {
         permissions.EnsurePermission("Users.View");
-        return await db.UserAccounts.AsNoTracking().Include(x => x.Role).Include(x => x.UserRoles).ThenInclude(x => x.Role)
-            .OrderBy(x => x.Username).Select(x => new AccountSummary(x.Id, x.Username, x.FullName, x.IsActive,
-                x.UserRoles.Select(r => r.Role.Name).Append(x.Role.Name).Distinct().ToArray())).ToListAsync(cancellationToken);
+        var accounts = await db.UserAccounts.AsNoTracking().Include(x => x.Role).Include(x => x.UserRoles).ThenInclude(x => x.Role)
+            .OrderBy(x => x.Username).ToListAsync(cancellationToken);
+        return accounts.Adapt<List<AccountSummary>>(AccountMappingConfig.Config);
     }
 
     public async Task<IReadOnlyList<RoleSummary>> GetRolesAsync(CancellationToken cancellationToken = default)
     {
         if (!permissions.HasAnyPermission("Roles.Manage", "Users.Manage"))
             throw new UnauthorizedAccessException("الصلاحية المطلوبة غير متاحة: Roles.Manage");
-        return await db.Roles.AsNoTracking().Include(x => x.RolePermissions).ThenInclude(x => x.Permission)
-            .OrderBy(x => x.Name).Select(x => new RoleSummary(x.Id, x.Name, x.RolePermissions.Select(p => p.Permission.Code).ToArray()))
-            .ToListAsync(cancellationToken);
+        var roles = await db.Roles.AsNoTracking().Include(x => x.RolePermissions).ThenInclude(x => x.Permission)
+            .OrderBy(x => x.Name).ToListAsync(cancellationToken);
+        return roles.Adapt<List<RoleSummary>>(AccountMappingConfig.Config);
     }
 
     public async Task<Result> CreateAccountAsync(string username, string fullName, string password, Guid roleId, CancellationToken cancellationToken = default)
@@ -34,16 +36,16 @@ public sealed class LocalAccountManagementService(NurseryDbContext db, ISessionM
         username = (username ?? string.Empty).Trim(); fullName = (fullName ?? string.Empty).Trim();
         if (username.Length is < 3 or > 64 || fullName.Length is < 2 or > 200 || password is not { Length: >= 12 and <= 256 }
             || !password.Any(char.IsLetter) || !password.Any(char.IsDigit)) return CommonErrors.InvalidRequest;
-        var normalized = username.ToUpperInvariant();
-        if (await db.UserAccounts.AnyAsync(x => x.UsernameNormalized == normalized, cancellationToken)) return CommonErrors.Conflict;
+        var normalizedUsername = username.ToUpperInvariant();
+        if (await db.UserAccounts.AnyAsync(x => x.UsernameNormalized == normalizedUsername, cancellationToken)) return CommonErrors.Conflict;
         var role = await db.Roles.SingleOrDefaultAsync(x => x.Id == roleId, cancellationToken);
         if (role is null) return CommonErrors.NotFound;
-        var user = new UserAccount { Username = username, UsernameNormalized = normalized, FullName = fullName,
-            PasswordHash = string.Empty, Role = role, RoleId = role.Id, IsActive = true };
+        var user = new UserAccountMapping(username, fullName, string.Empty, role, DateTimeOffset.UtcNow)
+            .Adapt<UserAccount>(AccountMappingConfig.Config);
         user.PasswordHash = Hasher.HashPassword(user, password);
-        user.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = role.Id, User = user, Role = role });
+        user.UserRoles.Add(new UserRoleMapping(user, role).Adapt<UserRole>(AccountMappingConfig.Config));
         db.UserAccounts.Add(user);
-        db.AuthenticationAuditLogs.Add(new AuthenticationAuditLog { UserId = user.Id, Username = username, Action = "AccountCreated", Success = true });
+        db.AuthenticationAuditLogs.Add(MapAudit(user.Id, username, "AccountCreated", true));
         await db.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
@@ -64,8 +66,8 @@ public sealed class LocalAccountManagementService(NurseryDbContext db, ISessionM
         }
         user.IsActive = isActive; user.UpdatedAt = DateTimeOffset.UtcNow;
         if (!isActive && sessions.CurrentUser?.UserId == userId) sessions.Logout();
-        db.AuthenticationAuditLogs.Add(new AuthenticationAuditLog { UserId = user.Id, Username = user.Username,
-            Action = isActive ? "AccountReactivated" : "AccountDeactivated", Success = true });
+        db.AuthenticationAuditLogs.Add(MapAudit(user.Id, user.Username,
+            isActive ? "AccountReactivated" : "AccountDeactivated", true));
         await db.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
@@ -79,8 +81,7 @@ public sealed class LocalAccountManagementService(NurseryDbContext db, ISessionM
         if (user is null) return CommonErrors.NotFound;
         user.PasswordHash = Hasher.HashPassword(user, newPassword);
         user.FailedLoginAttempts = 0; user.LockoutEnd = null; user.UpdatedAt = DateTimeOffset.UtcNow;
-        db.AuthenticationAuditLogs.Add(new AuthenticationAuditLog { UserId = user.Id, Username = user.Username,
-            Action = "PasswordResetByAdministrator", Success = true });
+        db.AuthenticationAuditLogs.Add(MapAudit(user.Id, user.Username, "PasswordResetByAdministrator", true));
         await db.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
@@ -105,7 +106,8 @@ public sealed class LocalAccountManagementService(NurseryDbContext db, ISessionM
         }
         db.UserRoles.RemoveRange(user.UserRoles);
         user.RoleId = roles[0].Id; user.Role = roles[0];
-        foreach (var role in roles) db.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = role.Id });
+        foreach (var role in roles)
+            db.UserRoles.Add(new UserRoleMapping(user, role).Adapt<UserRole>(AccountMappingConfig.Config));
         user.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
         if (sessions.CurrentUser?.UserId == user.Id) await permissions.RefreshCurrentUserAsync(cancellationToken);
@@ -128,4 +130,8 @@ public sealed class LocalAccountManagementService(NurseryDbContext db, ISessionM
         await permissions.RefreshCurrentUserAsync(cancellationToken);
         return Result.Success();
     }
+
+    private static AuthenticationAuditLog MapAudit(Guid? userId, string username, string action, bool success) =>
+        new AuthenticationAuditMapping(userId, username, action, success)
+            .Adapt<AuthenticationAuditLog>(AccountMappingConfig.Config);
 }
