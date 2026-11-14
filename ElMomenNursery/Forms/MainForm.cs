@@ -20,15 +20,17 @@ public sealed class MainForm : Form
     private readonly IAccountManagementService _accountManagement;
     private readonly IChildService _childService;
     private readonly IEmployeeService _employeeService;
+    private readonly IEmployeeAttendanceService _employeeAttendanceService;
 
     public MainForm(UserSession session, Func<Task> logout, IAccountManagementService accountManagement,
-        IChildService childService, IEmployeeService employeeService)
+        IChildService childService, IEmployeeService employeeService, IEmployeeAttendanceService employeeAttendanceService)
     {
         _session = session;
         _logout = logout;
         _accountManagement = accountManagement;
         _childService = childService;
         _employeeService = employeeService;
+        _employeeAttendanceService = employeeAttendanceService;
         Text = "نظام إدارة حضانة المؤمن";
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(1024, 700);
@@ -241,6 +243,7 @@ public sealed class MainForm : Form
             "الرئيسية" => BuildHomePage(),
             "الأطفال" => BuildChildrenPage(),
             "الموظفون" => BuildEmployeesPage(),
+            "الحضور" => BuildEmployeeAttendancePage(),
             "الفصول" => BuildClassesPage(),
             "إدارة المستخدمين" => new UserManagementForm(_accountManagement, _session),
             _ => BuildSectionPage(section)
@@ -1040,6 +1043,165 @@ public sealed class MainForm : Form
             MessageBoxButtons.OK, MessageBoxIcon.Error, MessageBoxDefaultButton.Button1,
             MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
     }
+
+    private Control BuildEmployeeAttendancePage()
+    {
+        var page = CreateDataPage("حضور الموظفين", "سجل الحضور اليومي للموظفين، مع إمكانية التسجيل اليدوي وتصحيح السجلات حسب الصلاحية.", includePrototypeBanner: false);
+        var dateLabel = new Label
+        {
+            Text = "تاريخ الحضور",
+            TextAlign = ContentAlignment.MiddleRight,
+            RightToLeft = RightToLeft.Yes,
+            ForeColor = BrandPalette.Text
+        };
+        var datePicker = new DateTimePicker
+        {
+            Format = DateTimePickerFormat.Custom,
+            CustomFormat = "dd/MM/yyyy",
+            Value = DateTime.Today,
+            RightToLeft = RightToLeft.Yes,
+            Width = 150,
+            Height = 38
+        };
+        var search = CreateSearchBox("بحث باسم الموظف أو الوظيفة");
+        var refreshButton = CreateActionButton("تحديث القائمة");
+        var markButton = CreateActionButton("تسجيل يدوي", primary: true);
+        var editButton = CreateActionButton("تصحيح السجل");
+        markButton.Visible = _session.HasPermission("Attendance.Record");
+        editButton.Visible = _session.HasPermission("Attendance.Edit");
+        markButton.Enabled = editButton.Enabled = false;
+        var countLabel = new Label
+        {
+            TextAlign = ContentAlignment.MiddleRight,
+            RightToLeft = RightToLeft.Yes,
+            ForeColor = BrandPalette.MutedText
+        };
+        var grid = CreateGrid(["الموظف", "المسمى الوظيفي", "الحالة", "وقت الحضور", "وقت الانصراف", "طريقة التسجيل", "ملاحظات"]);
+        List<EmployeeDailyAttendanceDto> attendanceRows = [];
+
+        datePicker.ValueChanged += async (_, _) => await LoadAttendanceAsync();
+        search.TextChanged += (_, _) => RenderAttendance();
+        refreshButton.Click += async (_, _) => await LoadAttendanceAsync();
+        grid.SelectionChanged += (_, _) => UpdateActions();
+        markButton.Click += async (_, _) => await OpenEditorAsync(correction: false);
+        editButton.Click += async (_, _) => await OpenEditorAsync(correction: true);
+
+        page.Controls.AddRange([dateLabel, datePicker, search, refreshButton, markButton, editButton, countLabel, grid]);
+        page.Resize += (_, _) => LayoutAttendancePage();
+        LayoutAttendancePage();
+        _ = LoadAttendanceAsync();
+        return page;
+
+        async Task LoadAttendanceAsync()
+        {
+            try
+            {
+                datePicker.Enabled = refreshButton.Enabled = false;
+                attendanceRows = (await _employeeAttendanceService.GetDailyAttendanceAsync(
+                    DateOnly.FromDateTime(datePicker.Value))).ToList();
+                RenderAttendance();
+            }
+            catch (Exception exception)
+            {
+                attendanceRows = [];
+                grid.Rows.Clear();
+                countLabel.Text = "تعذر تحميل سجلات الحضور";
+                ShowAttendanceError($"تعذر تحميل حضور الموظفين.\n{exception.Message}");
+            }
+            finally
+            {
+                if (!page.IsDisposed) datePicker.Enabled = refreshButton.Enabled = true;
+            }
+        }
+
+        void RenderAttendance()
+        {
+            var query = search.Text.Trim();
+            var visibleRows = string.IsNullOrEmpty(query)
+                ? attendanceRows
+                : attendanceRows.Where(row =>
+                    row.EmployeeName.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
+                    row.JobDesignation.Contains(query, StringComparison.CurrentCultureIgnoreCase)).ToList();
+
+            grid.Rows.Clear();
+            foreach (var row in visibleRows)
+            {
+                var index = grid.Rows.Add(
+                    row.EmployeeName,
+                    row.JobDesignation,
+                    row.Status.HasValue ? GetAttendanceStatusName(row.Status.Value) : "لم يسجل",
+                    FormatAttendanceTime(row.CheckInTime),
+                    FormatAttendanceTime(row.CheckOutTime),
+                    row.EntryMethod.HasValue ? GetAttendanceMethodName(row.EntryMethod.Value) : "—",
+                    row.Notes ?? string.Empty);
+                grid.Rows[index].Tag = row;
+            }
+            countLabel.Text = $"الموظفون: {visibleRows.Count}  |  تم تسجيل الحضور: {visibleRows.Count(row => row.IsMarked)}  |  لم يسجل: {visibleRows.Count(row => !row.IsMarked)}";
+            UpdateActions();
+        }
+
+        void UpdateActions()
+        {
+            var selected = grid.SelectedRows.Count > 0 ? grid.SelectedRows[0].Tag as EmployeeDailyAttendanceDto : null;
+            markButton.Enabled = markButton.Visible && selected is { IsMarked: false };
+            editButton.Enabled = editButton.Visible && selected is { IsMarked: true };
+        }
+
+        async Task OpenEditorAsync(bool correction)
+        {
+            if (grid.SelectedRows.Count == 0 || grid.SelectedRows[0].Tag is not EmployeeDailyAttendanceDto selected)
+            {
+                MessageBox.Show(this, "اختر موظفًا من الجدول أولًا.", "حضور الموظفين", MessageBoxButtons.OK,
+                    MessageBoxIcon.Information, MessageBoxDefaultButton.Button1,
+                    MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+                return;
+            }
+
+            if (correction != selected.IsMarked) return;
+            using var editor = new EmployeeAttendanceEditorForm(_employeeAttendanceService, selected, _session.UserId);
+            if (editor.ShowDialog(this) == DialogResult.OK)
+                await LoadAttendanceAsync();
+        }
+
+        void LayoutAttendancePage()
+        {
+            LayoutDataHeader(page);
+            var width = Math.Max(300, page.ClientSize.Width - 68);
+            var y = 126;
+            dateLabel.SetBounds(34, y, 100, 38);
+            datePicker.SetBounds(138, y, 150, 38);
+            search.SetBounds(300, y, Math.Max(180, width - 720), 38);
+            refreshButton.SetBounds(page.ClientSize.Width - 34 - 132, y, 132, 40);
+            markButton.SetBounds(refreshButton.Left - 150, y, 142, 40);
+            editButton.SetBounds(markButton.Left - 142, y, 134, 40);
+            countLabel.SetBounds(34, 174, width, 32);
+            grid.SetBounds(34, 210, width, Math.Max(220, page.ClientSize.Height - 244));
+        }
+
+        void ShowAttendanceError(string message) => MessageBox.Show(this, message, "حضور الموظفين",
+            MessageBoxButtons.OK, MessageBoxIcon.Error, MessageBoxDefaultButton.Button1,
+            MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+    }
+
+    private static string GetAttendanceStatusName(AttendanceStatus status) => status switch
+    {
+        AttendanceStatus.Present => "حاضر",
+        AttendanceStatus.Absent => "غائب",
+        AttendanceStatus.Late => "متأخر",
+        AttendanceStatus.Excused => "غياب بعذر",
+        _ => status.ToString()
+    };
+
+    private static string GetAttendanceMethodName(AttendanceEntryMethod method) => method switch
+    {
+        AttendanceEntryMethod.Manual => "يدوي",
+        AttendanceEntryMethod.BiometricDevice => "جهاز بصمة",
+        AttendanceEntryMethod.BarcodeDevice => "قارئ باركود",
+        AttendanceEntryMethod.OtherDevice => "جهاز آخر",
+        _ => method.ToString()
+    };
+
+    private static string FormatAttendanceTime(DateTimeOffset? value) => value?.ToLocalTime().ToString("HH:mm") ?? "—";
 
     private Control BuildClassesPage()
     {

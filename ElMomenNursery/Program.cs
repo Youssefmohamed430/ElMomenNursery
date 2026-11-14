@@ -47,6 +47,7 @@ internal static class Program
             });
             services.AddScoped<IChildService, ChildService>();
             services.AddScoped<IEmployeeService, EmployeeService>();
+            services.AddScoped<IEmployeeAttendanceService, EmployeeAttendanceService>();
             services.AddNurseryInfrastructure(configuration);
             using var serviceProvider = services.BuildServiceProvider();
             using (var scope = serviceProvider.CreateScope())
@@ -68,7 +69,8 @@ internal static class Program
                 System.Windows.Forms.Application.Run(new MainForm(session.CurrentUser!, () => auth.LogoutAsync(),
                     appScope.ServiceProvider.GetRequiredService<IAccountManagementService>(),
                     appScope.ServiceProvider.GetRequiredService<IChildService>(),
-                    appScope.ServiceProvider.GetRequiredService<IEmployeeService>()));
+                    appScope.ServiceProvider.GetRequiredService<IEmployeeService>(),
+                    appScope.ServiceProvider.GetRequiredService<IEmployeeAttendanceService>()));
                 if (session.IsAuthenticated) auth.LogoutAsync().GetAwaiter().GetResult();
             }
 
