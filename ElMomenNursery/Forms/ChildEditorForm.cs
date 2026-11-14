@@ -44,7 +44,8 @@ public sealed class ChildEditorForm : Form
         var content = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(14), BackColor = BackColor };
         var sections = new FlowLayoutPanel
         {
-            Dock = DockStyle.Top,
+            Location = new Point(0, 0),
+            Width = 950,
             AutoSize = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
             FlowDirection = FlowDirection.TopDown,
@@ -210,8 +211,7 @@ public sealed class ChildEditorForm : Form
         {
             Text = title,
             Width = 940,
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Height = 120,
             Padding = new Padding(12),
             Margin = new Padding(0, 0, 0, 10),
             Font = new Font("Segoe UI", 10F, FontStyle.Bold)
@@ -219,17 +219,19 @@ public sealed class ChildEditorForm : Form
         var table = new TableLayoutPanel
         {
             ColumnCount = 4,
-            AutoSize = true,
-            Dock = DockStyle.Top,
+            AutoSize = false,
+            Dock = DockStyle.Fill,
             RightToLeft = RightToLeft.Yes,
             Padding = new Padding(6),
             Font = new Font("Segoe UI", 9.5F, FontStyle.Regular)
         };
         table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 125));
-        table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 300));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 125));
-        table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 300));
         build(table);
+        var tableHeight = table.RowStyles.Cast<RowStyle>().Sum(style => (int)style.Height);
+        group.Height = Math.Max(90, tableHeight + 42);
         group.Controls.Add(table);
         return group;
     }
@@ -237,7 +239,8 @@ public sealed class ChildEditorForm : Form
     private static void AddPair(TableLayoutPanel table, string firstLabel, Control first, string secondLabel, Control second)
     {
         var row = table.RowCount++;
-        table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        var rowHeight = Math.Max(46, Math.Max(first.Height, second.Height) + 8);
+        table.RowStyles.Add(new RowStyle(SizeType.Absolute, rowHeight));
         table.Controls.Add(CreateFieldLabel(firstLabel), 0, row);
         table.Controls.Add(PrepareField(first), 1, row);
         table.Controls.Add(CreateFieldLabel(secondLabel), 2, row);
@@ -247,7 +250,8 @@ public sealed class ChildEditorForm : Form
     private static void AddSingle(TableLayoutPanel table, string label, Control control)
     {
         var row = table.RowCount++;
-        table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        var rowHeight = Math.Max(46, control.Height + 8);
+        table.RowStyles.Add(new RowStyle(SizeType.Absolute, rowHeight));
         table.Controls.Add(CreateFieldLabel(label), 0, row);
         table.Controls.Add(PrepareField(control), 1, row);
         table.SetColumnSpan(control, table.ColumnCount - 1);
@@ -257,7 +261,8 @@ public sealed class ChildEditorForm : Form
     {
         Text = text,
         AutoSize = false,
-        Height = 38,
+        Width = 120,
+        Height = 40,
         Dock = DockStyle.Fill,
         TextAlign = ContentAlignment.MiddleRight,
         RightToLeft = RightToLeft.Yes,

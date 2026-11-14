@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Text.Json;
 using ElMomenNursery.Application.DTOs;
 using ElMomenNursery.Controls;
 using ElMomenNursery.Application.IServices;
@@ -382,26 +383,30 @@ public sealed class MainForm : Form
         editButton.Visible = _session.HasPermission("Students.Edit");
         detailsButton.Visible = _session.HasPermission("Students.View");
         exportButton.Visible = _session.HasPermission("Students.View");
-        var actions = new FlowLayoutPanel
+        addButton.Name = "actions.add";
+        editButton.Name = "actions.edit";
+        detailsButton.Name = "actions.details";
+        exportButton.Name = "actions.export";
+        addButton.Width = 150;
+        editButton.Width = 140;
+        detailsButton.Width = 142;
+        exportButton.Width = 142;
+        var actions = new Panel
         {
-            FlowDirection = FlowDirection.RightToLeft,
-            WrapContents = false,
-            RightToLeft = RightToLeft.No,
             BackColor = Color.Transparent,
             Padding = Padding.Empty
         };
-        actions.Controls.AddRange([addButton, editButton, detailsButton, exportButton]);
 
-        var filterPanel = new FlowLayoutPanel
+        var filterPanel = new Panel
         {
-            FlowDirection = FlowDirection.RightToLeft,
-            WrapContents = false,
             AutoScroll = true,
             RightToLeft = RightToLeft.Yes,
             BackColor = BrandPalette.Surface,
             Padding = new Padding(10, 6, 10, 6),
             BorderStyle = BorderStyle.FixedSingle
         };
+        var draggableControls = new Dictionary<string, Control>(StringComparer.Ordinal);
+        var filterItems = new List<Control>();
         var search = CreateSearchBox("اسم الطفل");
         var genderFilter = CreateFilterCombo(["الكل", "ولد", "بنت"], 116);
         var dateOfBirthFrom = CreateOptionalDatePicker();
@@ -429,21 +434,32 @@ public sealed class MainForm : Form
             RightToLeft = RightToLeft.Yes
         };
 
-        AddFilterField("اسم الطفل", search, 180);
-        AddFilterField("النوع", genderFilter, 128);
-        AddFilterField("الميلاد من", dateOfBirthFrom, 142);
-        AddFilterField("الميلاد إلى", dateOfBirthTo, 142);
-        AddFilterField("الالتحاق من", enrollmentFrom, 142);
-        AddFilterField("الالتحاق إلى", enrollmentTo, 142);
-        AddFilterField("الفصل الحالي", classroomFilter, 158);
-        AddFilterField("الاشتراك الساري", paymentFilter, 150);
+        AddFilterField("filter.search", "اسم الطفل", search, 180);
+        AddFilterField("filter.gender", "النوع", genderFilter, 128);
+        AddFilterField("filter.birth-from", "الميلاد من", dateOfBirthFrom, 142);
+        AddFilterField("filter.birth-to", "الميلاد إلى", dateOfBirthTo, 142);
+        AddFilterField("filter.enrollment-from", "الالتحاق من", enrollmentFrom, 142);
+        AddFilterField("filter.enrollment-to", "الالتحاق إلى", enrollmentTo, 142);
+        AddFilterField("filter.classroom", "الفصل الحالي", classroomFilter, 158);
+        AddFilterField("filter.payment", "الاشتراك الساري", paymentFilter, 150);
 
         var applyButton = CreateActionButton("تطبيق", primary: true);
+        applyButton.Name = "filter.apply";
         applyButton.Width = 96;
         var clearButton = CreateActionButton("مسح الفلاتر");
+        clearButton.Name = "filter.clear";
         clearButton.Width = 112;
         AddFilterButton(applyButton);
         AddFilterButton(clearButton);
+
+        var customizeButton = CreateActionButton("تخصيص الشاشة");
+        customizeButton.Name = "layout.customize";
+        customizeButton.Width = 150;
+        var resetLayoutButton = CreateActionButton("استعادة الافتراضي");
+        resetLayoutButton.Name = "layout.reset";
+        resetLayoutButton.Width = 150;
+        resetLayoutButton.Visible = false;
+        actions.Controls.AddRange([addButton, editButton, detailsButton, exportButton, customizeButton, resetLayoutButton]);
 
         var grid = CreateGrid([
             "المعرف", "اسم الطفل", "العنوان", "تاريخ الالتحاق", "تاريخ الميلاد", "النوع",
@@ -452,18 +468,34 @@ public sealed class MainForm : Form
             "تاريخ الإضافة", "آخر تعديل"
         ]);
         grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
+        grid.Name = "children.grid";
         var columnWidths = new[] { 265, 170, 220, 140, 140, 90, 150, 140, 140, 140, 150, 140, 140, 140, 240, 120, 150, 160, 160 };
         for (var columnIndex = 0; columnIndex < grid.Columns.Count; columnIndex++)
             grid.Columns[columnIndex].Width = columnWidths[columnIndex];
+        resultCount.Name = "children.count";
+
+        RegisterDraggable(addButton);
+        RegisterDraggable(editButton);
+        RegisterDraggable(detailsButton);
+        RegisterDraggable(exportButton);
+        RegisterDraggable(grid);
+        RegisterDraggable(resultCount);
+
+        var isCustomizing = false;
+        var savedLayout = LoadSavedLayout();
+        var hasCustomLayout = savedLayout.Count > 0;
+        AttachDraggableControls();
 
         addButton.Click += async (_, _) =>
         {
+            if (isCustomizing) return;
             using var editor = new ChildEditorForm(_childService);
             if (editor.ShowDialog(this) == DialogResult.OK)
                 await LoadChildrenAsync();
         };
         editButton.Click += async (_, _) =>
         {
+            if (isCustomizing) return;
             if (grid.SelectedRows.Count == 0 || grid.SelectedRows[0].Tag is not Guid childId)
             {
                 MessageBox.Show("اختر طفلًا من الجدول أولًا.", "تعديل بيانات طفل", MessageBoxButtons.OK,
@@ -477,12 +509,13 @@ public sealed class MainForm : Form
             if (editor.ShowDialog(this) == DialogResult.OK)
                 await LoadChildrenAsync();
         };
-        detailsButton.Click += (_, _) => ShowComingSoon("ملف الطفل");
-        exportButton.Click += (_, _) => ShowComingSoon("تصدير القائمة");
+        detailsButton.Click += (_, _) => { if (!isCustomizing) ShowComingSoon("ملف الطفل"); };
+        exportButton.Click += (_, _) => { if (!isCustomizing) ShowComingSoon("تصدير القائمة"); };
 
-        applyButton.Click += async (_, _) => await LoadChildrenAsync();
+        applyButton.Click += async (_, _) => { if (!isCustomizing) await LoadChildrenAsync(); };
         clearButton.Click += async (_, _) =>
         {
+            if (isCustomizing) return;
             search.Clear();
             genderFilter.SelectedIndex = 0;
             dateOfBirthFrom.Checked = false;
@@ -493,6 +526,46 @@ public sealed class MainForm : Form
             paymentFilter.SelectedIndex = 0;
             await LoadChildrenAsync();
         };
+        customizeButton.Click += async (_, _) =>
+        {
+            if (!isCustomizing)
+            {
+                isCustomizing = true;
+                customizeButton.Text = "حفظ التخطيط";
+                resetLayoutButton.Visible = true;
+                resultCount.Text = "وضع التخصيص: اسحب العناصر ثم احفظ.";
+                SetDragAppearance(true);
+                return;
+            }
+
+            if (!SaveCurrentLayout()) return;
+            savedLayout = ReadCurrentLayout();
+            hasCustomLayout = true;
+            isCustomizing = false;
+            customizeButton.Text = "تخصيص الشاشة";
+            resetLayoutButton.Visible = false;
+            SetDragAppearance(false);
+            await LoadChildrenAsync();
+        };
+        resetLayoutButton.Click += (_, _) =>
+        {
+            try
+            {
+                if (File.Exists(GetLayoutFilePath())) File.Delete(GetLayoutFilePath());
+                savedLayout.Clear();
+                hasCustomLayout = false;
+                isCustomizing = false;
+                customizeButton.Text = "تخصيص الشاشة";
+                resetLayoutButton.Visible = false;
+                SetDragAppearance(false);
+                LayoutChildrenPage();
+                _ = LoadChildrenAsync();
+            }
+            catch (Exception exception)
+            {
+                ShowLayoutError(exception.Message);
+            }
+        };
 
         page.Controls.AddRange([filterPanel, actions, resultCount, grid]);
         page.Resize += (_, _) => LayoutChildrenPage();
@@ -500,9 +573,9 @@ public sealed class MainForm : Form
         _ = LoadChildrenAsync();
         return page;
 
-        void AddFilterField(string labelText, Control control, int width)
+        void AddFilterField(string controlName, string labelText, Control control, int width)
         {
-            var group = new Panel { Width = width, Height = 56, BackColor = Color.Transparent, Margin = new Padding(3, 0, 3, 0) };
+            var group = new Panel { Name = controlName, Width = width, Height = 56, BackColor = Color.Transparent, Margin = new Padding(3, 0, 3, 0) };
             var label = new Label
             {
                 Text = labelText,
@@ -520,6 +593,8 @@ public sealed class MainForm : Form
             group.Controls.Add(control);
             group.Controls.Add(label);
             filterPanel.Controls.Add(group);
+            filterItems.Add(group);
+            RegisterDraggable(group);
         }
 
         void AddFilterButton(Button button)
@@ -527,6 +602,8 @@ public sealed class MainForm : Form
             button.Height = 40;
             button.Margin = new Padding(5, 18, 5, 0);
             filterPanel.Controls.Add(button);
+            filterItems.Add(button);
+            RegisterDraggable(button);
         }
 
         async Task LoadChildrenAsync()
@@ -612,15 +689,158 @@ public sealed class MainForm : Form
         void LayoutChildrenPage()
         {
             LayoutDataHeader(page);
-            var contentTop = 204;
             var leftMargin = 34;
             var rightMargin = 34;
             filterPanel.SetBounds(leftMargin, 120, Math.Max(300, page.ClientSize.Width - leftMargin - rightMargin), 72);
-            actions.SetBounds(leftMargin, contentTop, Math.Max(200, page.ClientSize.Width - leftMargin - rightMargin), 44);
-            resultCount.SetBounds(leftMargin, contentTop + 48, 280, 26);
-            var gridTop = contentTop + 78;
+            actions.SetBounds(leftMargin, 204, Math.Max(300, page.ClientSize.Width - leftMargin - rightMargin), 44);
+            resultCount.SetBounds(leftMargin, 252, 280, 26);
+            var gridTop = 282;
             grid.SetBounds(leftMargin, gridTop, Math.Max(300, page.ClientSize.Width - leftMargin - rightMargin), Math.Max(220, page.ClientSize.Height - gridTop - 24));
+            if (!isCustomizing)
+            {
+                ArrangeDefaultFilterItems();
+                ArrangeDefaultActions();
+                if (hasCustomLayout)
+                    ApplySavedLayout();
+            }
+            ArrangePinnedActions();
         }
+
+        void RegisterDraggable(Control control) => draggableControls[control.Name] = control;
+
+        void ArrangeDefaultFilterItems()
+        {
+            var x = 10;
+            foreach (var item in filterItems)
+            {
+                item.SetBounds(x, Math.Max(0, (filterPanel.ClientSize.Height - item.Height) / 2), item.Width, item.Height);
+                x += item.Width + 6;
+            }
+            filterPanel.AutoScrollMinSize = new Size(x + 10, 0);
+        }
+
+        void ArrangeDefaultActions()
+        {
+            var right = actions.ClientSize.Width - 8;
+            foreach (var button in new[] { addButton, editButton, detailsButton, exportButton })
+            {
+                right -= button.Width;
+                button.SetBounds(right, 1, button.Width, 42);
+                right -= 8;
+            }
+        }
+
+        void ArrangePinnedActions()
+        {
+            customizeButton.SetBounds(8, 1, customizeButton.Width, 42);
+            resetLayoutButton.SetBounds(166, 1, resetLayoutButton.Width, 42);
+        }
+
+        void ApplySavedLayout()
+        {
+            foreach (var (name, bounds) in savedLayout)
+            {
+                if (bounds.Length != 4 || !draggableControls.TryGetValue(name, out var control) || control.Parent is null)
+                    continue;
+                var parent = control.Parent;
+                var width = Math.Clamp(bounds[2], 30, Math.Max(30, parent.ClientSize.Width));
+                var height = Math.Clamp(bounds[3], 24, Math.Max(24, parent.ClientSize.Height));
+                var x = Math.Clamp(bounds[0], 0, Math.Max(0, parent.ClientSize.Width - width));
+                var y = Math.Clamp(bounds[1], 0, Math.Max(0, parent.ClientSize.Height - height));
+                control.SetBounds(x, y, width, height);
+            }
+        }
+
+        void AttachDraggableControls()
+        {
+            foreach (var root in draggableControls.Values)
+                AttachDragHandler(root, root);
+        }
+
+        void AttachDragHandler(Control root, Control target)
+        {
+            var dragging = false;
+            var offset = Point.Empty;
+            target.MouseDown += (_, eventArgs) =>
+            {
+                if (!isCustomizing || eventArgs.Button != MouseButtons.Left || root.Parent is null) return;
+                var point = root.Parent.PointToClient(target.PointToScreen(eventArgs.Location));
+                offset = new Point(point.X - root.Left, point.Y - root.Top);
+                dragging = true;
+            };
+            target.MouseMove += (_, eventArgs) =>
+            {
+                if (!dragging || !isCustomizing || root.Parent is null) return;
+                var point = root.Parent.PointToClient(target.PointToScreen(eventArgs.Location));
+                var minX = root.Parent == actions
+                    ? Math.Min(resetLayoutButton.Visible ? resetLayoutButton.Right + 8 : customizeButton.Right + 8,
+                        Math.Max(0, actions.ClientSize.Width - root.Width))
+                    : 0;
+                var minY = root == grid ? Math.Min(282, Math.Max(0, page.ClientSize.Height - root.Height)) : 0;
+                var x = Math.Clamp(point.X - offset.X, minX, Math.Max(minX, root.Parent.ClientSize.Width - root.Width));
+                var y = Math.Clamp(point.Y - offset.Y, minY, Math.Max(minY, root.Parent.ClientSize.Height - root.Height));
+                root.Location = new Point(x, y);
+            };
+            target.MouseUp += (_, _) => dragging = false;
+            foreach (Control child in target.Controls)
+                AttachDragHandler(root, child);
+        }
+
+        void SetDragAppearance(bool enabled)
+        {
+            foreach (var root in draggableControls.Values)
+                SetCursor(root, enabled ? Cursors.SizeAll : Cursors.Default);
+        }
+
+        static void SetCursor(Control control, Cursor cursor)
+        {
+            control.Cursor = cursor;
+            foreach (Control child in control.Controls)
+                SetCursor(child, cursor);
+        }
+
+        bool SaveCurrentLayout()
+        {
+            try
+            {
+                var directory = Path.GetDirectoryName(GetLayoutFilePath())!;
+                Directory.CreateDirectory(directory);
+                File.WriteAllText(GetLayoutFilePath(), JsonSerializer.Serialize(ReadCurrentLayout()));
+                return true;
+            }
+            catch (Exception exception)
+            {
+                ShowLayoutError(exception.Message);
+                return false;
+            }
+        }
+
+        Dictionary<string, int[]> ReadCurrentLayout() => draggableControls.ToDictionary(
+            pair => pair.Key,
+            pair => new[] { pair.Value.Left, pair.Value.Top, pair.Value.Width, pair.Value.Height },
+            StringComparer.Ordinal);
+
+        Dictionary<string, int[]> LoadSavedLayout()
+        {
+            try
+            {
+                if (!File.Exists(GetLayoutFilePath())) return new Dictionary<string, int[]>(StringComparer.Ordinal);
+                return JsonSerializer.Deserialize<Dictionary<string, int[]>>(File.ReadAllText(GetLayoutFilePath()))
+                    ?? new Dictionary<string, int[]>(StringComparer.Ordinal);
+            }
+            catch
+            {
+                return new Dictionary<string, int[]>(StringComparer.Ordinal);
+            }
+        }
+
+        static string GetLayoutFilePath() => Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "AlMoumenNursery", "child-screen-layout.json");
+
+        void ShowLayoutError(string detail) => MessageBox.Show(this, $"تعذر حفظ تخطيط الشاشة.\n{detail}",
+            "تخصيص شاشة الأطفال", MessageBoxButtons.OK, MessageBoxIcon.Error,
+            MessageBoxDefaultButton.Button1, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
 
         static ComboBox CreateFilterCombo(string[] options, int width)
         {
