@@ -46,6 +46,7 @@ internal static class Program
                 logging.AddSerilog(Log.Logger, dispose: false);
             });
             services.AddScoped<IChildService, ChildService>();
+            services.AddScoped<IEmployeeService, EmployeeService>();
             services.AddNurseryInfrastructure(configuration);
             using var serviceProvider = services.BuildServiceProvider();
             using (var scope = serviceProvider.CreateScope())
@@ -66,7 +67,8 @@ internal static class Program
                 var auth = appScope.ServiceProvider.GetRequiredService<IAuthService>();
                 System.Windows.Forms.Application.Run(new MainForm(session.CurrentUser!, () => auth.LogoutAsync(),
                     appScope.ServiceProvider.GetRequiredService<IAccountManagementService>(),
-                    appScope.ServiceProvider.GetRequiredService<IChildService>()));
+                    appScope.ServiceProvider.GetRequiredService<IChildService>(),
+                    appScope.ServiceProvider.GetRequiredService<IEmployeeService>()));
                 if (session.IsAuthenticated) auth.LogoutAsync().GetAwaiter().GetResult();
             }
 

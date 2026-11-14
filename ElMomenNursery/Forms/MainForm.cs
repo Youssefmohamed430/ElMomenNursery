@@ -19,13 +19,16 @@ public sealed class MainForm : Form
     private readonly Func<Task> _logout;
     private readonly IAccountManagementService _accountManagement;
     private readonly IChildService _childService;
+    private readonly IEmployeeService _employeeService;
 
-    public MainForm(UserSession session, Func<Task> logout, IAccountManagementService accountManagement, IChildService childService)
+    public MainForm(UserSession session, Func<Task> logout, IAccountManagementService accountManagement,
+        IChildService childService, IEmployeeService employeeService)
     {
         _session = session;
         _logout = logout;
         _accountManagement = accountManagement;
         _childService = childService;
+        _employeeService = employeeService;
         Text = "نظام إدارة حضانة المؤمن";
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(1024, 700);
@@ -237,6 +240,7 @@ public sealed class MainForm : Form
         {
             "الرئيسية" => BuildHomePage(),
             "الأطفال" => BuildChildrenPage(),
+            "الموظفون" => BuildEmployeesPage(),
             "الفصول" => BuildClassesPage(),
             "إدارة المستخدمين" => new UserManagementForm(_accountManagement, _session),
             _ => BuildSectionPage(section)
@@ -867,6 +871,174 @@ public sealed class MainForm : Form
             Width = 142,
             Height = 30
         };
+    }
+
+    private Control BuildEmployeesPage()
+    {
+        var page = CreateDataPage("الموظفون", "إدارة بيانات الموظفين والبحث فيها.", includePrototypeBanner: false);
+        var search = CreateSearchBox("بحث بالاسم أو الرقم القومي أو الوظيفة");
+        var addButton = CreateActionButton("إضافة موظف", primary: true);
+        var editButton = CreateActionButton("تعديل البيانات");
+        var deleteButton = CreateActionButton("حذف موظف");
+        var canManage = _session.HasPermission("Employees.Manage");
+        addButton.Visible = editButton.Visible = deleteButton.Visible = canManage;
+        var resultCount = new Label
+        {
+            AutoSize = false,
+            ForeColor = BrandPalette.MutedText,
+            TextAlign = ContentAlignment.MiddleRight,
+            RightToLeft = RightToLeft.Yes
+        };
+        var grid = CreateGrid([
+            "اسم الموظف", "المسمى الوظيفي", "الهاتف", "الهاتف البديل", "المؤهل", "سنة التخرج",
+            "الخبرة", "الرقم القومي", "العنوان", "الحالة الاجتماعية", "تاريخ التعيين", "الراتب"
+        ]);
+        grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
+        var columnWidths = new[] { 190, 160, 130, 130, 160, 105, 90, 165, 230, 140, 130, 120 };
+        for (var index = 0; index < grid.Columns.Count; index++)
+            grid.Columns[index].Width = columnWidths[index];
+
+        List<EmployeeDto> employees = [];
+        search.TextChanged += (_, _) => RenderEmployees();
+        addButton.Click += async (_, _) =>
+        {
+            using var editor = new EmployeeEditorForm(_employeeService);
+            if (editor.ShowDialog(this) == DialogResult.OK)
+                await LoadEmployeesAsync();
+        };
+        editButton.Click += async (_, _) =>
+        {
+            if (!TryGetSelectedEmployeeId(out var id)) return;
+            try
+            {
+                var employee = await _employeeService.GetEmployeeById(id);
+                using var editor = new EmployeeEditorForm(_employeeService, employee);
+                if (editor.ShowDialog(this) == DialogResult.OK)
+                    await LoadEmployeesAsync();
+            }
+            catch (Exception exception)
+            {
+                ShowEmployeeError($"تعذر فتح بيانات الموظف.\n{exception.Message}");
+            }
+        };
+        deleteButton.Click += async (_, _) =>
+        {
+            if (!TryGetSelectedEmployeeId(out var id)) return;
+            var confirm = MessageBox.Show(this,
+                "هل تريد حذف سجل الموظف المحدد؟ لا يمكن حذف الموظف إذا كانت له سجلات حضور أو رواتب أو تكليفات مرتبطة.",
+                "تأكيد حذف الموظف", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+                MessageBoxDefaultButton.Button2, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+            if (confirm != DialogResult.Yes) return;
+
+            try
+            {
+                if (!await _employeeService.DeleteEmployee(id))
+                {
+                    ShowEmployeeError("لم يتم العثور على سجل الموظف.");
+                    return;
+                }
+                await LoadEmployeesAsync();
+            }
+            catch
+            {
+                ShowEmployeeError("تعذر حذف الموظف لوجود سجلات مرتبطة به. احتفظ بسجل الموظف واكتفِ بتعديل بياناته.");
+            }
+        };
+
+        page.Controls.AddRange([search, addButton, editButton, deleteButton, resultCount, grid]);
+        page.Resize += (_, _) => LayoutEmployeesPage();
+        LayoutEmployeesPage();
+        _ = LoadEmployeesAsync();
+        return page;
+
+        async Task LoadEmployeesAsync()
+        {
+            try
+            {
+                employees = (await _employeeService.GetEmployees()).ToList();
+                RenderEmployees();
+            }
+            catch (Exception exception)
+            {
+                employees = [];
+                grid.Rows.Clear();
+                resultCount.Text = "تعذر تحميل الموظفين";
+                ShowEmployeeError($"تعذر تحميل قائمة الموظفين.\n{exception.Message}");
+            }
+        }
+
+        void RenderEmployees()
+        {
+            var query = search.Text.Trim();
+            var visibleEmployees = string.IsNullOrEmpty(query)
+                ? employees
+                : employees.Where(employee =>
+                    employee.FullName.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
+                    employee.NationalIdNumber.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
+                    employee.JobDesignation.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
+                    employee.Phone.Contains(query, StringComparison.CurrentCultureIgnoreCase)).ToList();
+
+            grid.Rows.Clear();
+            foreach (var employee in visibleEmployees)
+            {
+                var index = grid.Rows.Add(
+                    employee.FullName,
+                    employee.JobDesignation,
+                    employee.Phone,
+                    employee.AlternatePhone ?? string.Empty,
+                    employee.Qualification ?? string.Empty,
+                    employee.GraduationYear?.ToString() ?? string.Empty,
+                    employee.HasExperience ? "نعم" : "لا",
+                    employee.NationalIdNumber,
+                    employee.Address,
+                    GetMaritalStatusName(employee.MaritalStatus),
+                    employee.HireDate.ToString("dd/MM/yyyy"),
+                    employee.Salary.ToString("N2"));
+                grid.Rows[index].Tag = employee.Id;
+            }
+            resultCount.Text = $"عدد الموظفين: {visibleEmployees.Count}";
+        }
+
+        bool TryGetSelectedEmployeeId(out Guid employeeId)
+        {
+            if (grid.SelectedRows.Count > 0 && grid.SelectedRows[0].Tag is Guid selectedId)
+            {
+                employeeId = selectedId;
+                return true;
+            }
+
+            employeeId = Guid.Empty;
+            MessageBox.Show(this, "اختر موظفًا من الجدول أولًا.", "إدارة الموظفين", MessageBoxButtons.OK,
+                MessageBoxIcon.Information, MessageBoxDefaultButton.Button1,
+                MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+            return false;
+        }
+
+        void LayoutEmployeesPage()
+        {
+            LayoutDataHeader(page);
+            var width = page.ClientSize.Width - 68;
+            var y = 190;
+            search.SetBounds(34, y, Math.Max(220, width - 560), 42);
+            addButton.SetBounds(page.ClientSize.Width - 34 - 145, y, 145, 42);
+            editButton.SetBounds(addButton.Left - 150, y, 142, 42);
+            deleteButton.SetBounds(editButton.Left - 142, y, 134, 42);
+            resultCount.SetBounds(34, 236, 300, 26);
+            grid.SetBounds(34, 266, width, Math.Max(220, page.ClientSize.Height - 300));
+        }
+
+        static string GetMaritalStatusName(MaritalStatus status) => status switch
+        {
+            MaritalStatus.Single => "أعزب/عزباء",
+            MaritalStatus.Married => "متزوج/ة",
+            MaritalStatus.Divorced => "مطلق/ة",
+            MaritalStatus.Widowed => "أرمل/ة",
+            _ => status.ToString()
+        };
+
+        void ShowEmployeeError(string message) => MessageBox.Show(this, message, "إدارة الموظفين",
+            MessageBoxButtons.OK, MessageBoxIcon.Error, MessageBoxDefaultButton.Button1,
+            MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
     }
 
     private Control BuildClassesPage()
