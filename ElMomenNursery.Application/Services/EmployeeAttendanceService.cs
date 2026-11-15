@@ -4,15 +4,17 @@ using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Domain.Entities;
 using ElMomenNursery.Domain.Enums;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
 
 namespace ElMomenNursery.Application.Services;
 
-public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<EmployeeAttendanceService> logger) : IEmployeeAttendanceService
+public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<EmployeeAttendanceService> logger, IPermissionService permissions) : IEmployeeAttendanceService
 {
     public async Task<IReadOnlyList<EmployeeDailyAttendanceDto>> GetDailyAttendanceAsync(
         DateOnly date,
         CancellationToken cancellationToken = default)
     {
+        permissions.EnsurePermission("Attendance.View");
         var employees = await unitOfWork.Repository<Employee>().ListAsync(cancellationToken: cancellationToken);
         var attendances = await unitOfWork.Repository<EmployeeAttendance>().ListAsync(
             attendance => attendance.AttendanceDate == date,
@@ -39,6 +41,7 @@ public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<Em
         DateOnly endDate,
         CancellationToken cancellationToken = default)
     {
+        permissions.EnsurePermission("Attendance.View");
         if (startDate > endDate)
             throw new ArgumentException("Attendance start date must be before or equal to its end date.");
 
@@ -55,6 +58,7 @@ public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<Em
         CreateEmployeeAttendanceDto dto,
         CancellationToken cancellationToken = default)
     {
+        permissions.EnsurePermission("Attendance.Record");
         ArgumentNullException.ThrowIfNull(dto);
         ValidateAttendance(dto.AttendanceDate, dto.Status, dto.CheckInTime, dto.CheckOutTime);
 
@@ -69,7 +73,7 @@ public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<Em
             cancellationToken);
         if (alreadyMarked)
         {
-            logger.LogWarning("Manual attendance rejected because a record already exists; employeeId={EmployeeId}; date={AttendanceDate}", dto.EmployeeId, dto.AttendanceDate);
+            logger.LogWarning("Manual attendance rejected because a record already exists; employeeId={EmployeeId}", dto.EmployeeId);
             throw new InvalidOperationException("Attendance has already been recorded for this employee and date.");
         }
 
@@ -92,8 +96,17 @@ public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<Em
             dto.RecordedByUserId,
             attendance,
             $"Status={attendance.Status}; CheckIn={FormatTime(attendance.CheckInTime)}; CheckOut={FormatTime(attendance.CheckOutTime)}");
-        await unitOfWork.SaveChangesAsync(cancellationToken);
-        logger.LogInformation("Recorded manual employee attendance; attendanceId={AttendanceId}; employeeId={EmployeeId}; date={AttendanceDate}", attendance.Id, dto.EmployeeId, dto.AttendanceDate);
+        try
+        {
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (IsEmployeeDateUniqueViolation(exception))
+        {
+            logger.LogWarning(exception, "Manual attendance raced with another insert; employeeId={EmployeeId}; constraint={ConstraintName}",
+                dto.EmployeeId, "UX_EmployeeAttendances_Employee_Date");
+            throw new InvalidOperationException("تم تسجيل الحضور لهذا الموظف في هذا التاريخ بالفعل.", exception);
+        }
+        logger.LogInformation("Recorded manual employee attendance; attendanceId={AttendanceId}; employeeId={EmployeeId}", attendance.Id, dto.EmployeeId);
         return ToDto(attendance);
     }
 
@@ -102,6 +115,7 @@ public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<Em
         UpdateEmployeeAttendanceDto dto,
         CancellationToken cancellationToken = default)
     {
+        permissions.EnsurePermission("Attendance.Edit");
         ArgumentNullException.ThrowIfNull(dto);
         var attendance = await unitOfWork.Repository<EmployeeAttendance>().FirstOrDefaultAsync(
             item => item.Id == id,
@@ -119,7 +133,7 @@ public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<Em
             cancellationToken);
         if (duplicateDate)
         {
-            logger.LogWarning("Attendance correction rejected because another record exists for the selected date; attendanceId={AttendanceId}; employeeId={EmployeeId}; date={AttendanceDate}", id, attendance.EmployeeId, dto.AttendanceDate);
+            logger.LogWarning("Attendance correction rejected because another record exists for the selected date; attendanceId={AttendanceId}; employeeId={EmployeeId}", id, attendance.EmployeeId);
             throw new InvalidOperationException("Attendance is already recorded for this employee and date.");
         }
 
@@ -137,8 +151,17 @@ public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<Em
             dto.RecordedByUserId,
             attendance,
             $"Before: {oldValues}; After: Date={attendance.AttendanceDate}; Status={attendance.Status}; CheckIn={FormatTime(attendance.CheckInTime)}; CheckOut={FormatTime(attendance.CheckOutTime)}");
-        await unitOfWork.SaveChangesAsync(cancellationToken);
-        logger.LogInformation("Corrected employee attendance; attendanceId={AttendanceId}; employeeId={EmployeeId}; date={AttendanceDate}", id, attendance.EmployeeId, dto.AttendanceDate);
+        try
+        {
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (IsEmployeeDateUniqueViolation(exception))
+        {
+            logger.LogWarning(exception, "Attendance correction raced with another insert; attendanceId={AttendanceId}; employeeId={EmployeeId}; constraint={ConstraintName}",
+                id, attendance.EmployeeId, "UX_EmployeeAttendances_Employee_Date");
+            throw new InvalidOperationException("تم تسجيل الحضور لهذا الموظف في هذا التاريخ بالفعل.", exception);
+        }
+        logger.LogInformation("Corrected employee attendance; attendanceId={AttendanceId}; employeeId={EmployeeId}", id, attendance.EmployeeId);
         return ToDto(attendance);
     }
 
@@ -199,4 +222,13 @@ public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<Em
 
     private static string? NormalizeNotes(string? notes) => string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
     private static string FormatTime(DateTimeOffset? value) => value?.ToString("O") ?? "—";
+
+    private static bool IsEmployeeDateUniqueViolation(DbUpdateException exception)
+    {
+        var details = exception.GetBaseException().Message;
+        return details.Contains("UNIQUE constraint failed", StringComparison.OrdinalIgnoreCase)
+            && details.Contains("EmployeeAttendances", StringComparison.OrdinalIgnoreCase)
+            && details.Contains("EmployeeId", StringComparison.OrdinalIgnoreCase)
+            && details.Contains("AttendanceDate", StringComparison.OrdinalIgnoreCase);
+    }
 }

@@ -2,6 +2,7 @@ using ElMomenNursery.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using System.Globalization;
 
 namespace ElMomenNursery.Infrastructure.Persistence;
 
@@ -53,8 +54,8 @@ public sealed class NurseryDbContext(DbContextOptions<NurseryDbContext> options)
         base.OnModelCreating(modelBuilder);
     }
 
-    private sealed class DateOnlyConverter() : ValueConverter<DateOnly, string>(v => v.ToString("yyyy-MM-dd"), v => DateOnly.Parse(v));
-    private sealed class NullableDateOnlyConverter() : ValueConverter<DateOnly?, string?>(v => v.HasValue ? v.Value.ToString("yyyy-MM-dd") : null, v => v == null ? null : DateOnly.Parse(v));
+    private sealed class DateOnlyConverter() : ValueConverter<DateOnly, string>(v => v.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), v => DateOnly.ParseExact(v, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None));
+    private sealed class NullableDateOnlyConverter() : ValueConverter<DateOnly?, string?>(v => v.HasValue ? v.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : null, v => v == null ? null : DateOnly.ParseExact(v, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None));
     private sealed class DateOnlyComparer() : ValueComparer<DateOnly>((a, b) => a.DayNumber == b.DayNumber, v => v.GetHashCode(), v => v);
     private sealed class NullableDateOnlyComparer() : ValueComparer<DateOnly?>((a, b) => a == b, v => v.GetHashCode(), v => v);
     private sealed class NullableDateTimeOffsetConverter() : ValueConverter<DateTimeOffset?, long?>(v => v.HasValue ? v.Value.ToUnixTimeMilliseconds() : null, v => v.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(v.Value) : null);

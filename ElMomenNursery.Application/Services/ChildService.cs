@@ -5,16 +5,26 @@ using ElMomenNursery.Application.Mappings;
 using ElMomenNursery.Domain.Entities;
 using ElMomenNursery.Domain.Enums;
 using System.Linq.Expressions;
+using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace ElMomenNursery.Application.Services;
 
-public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger) : IChildService
+public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger, IPermissionService permissions) : IChildService
 {
     public async Task<ChildDto> CreateChildAsync(CreateChildDTO childDto)
     {
+        permissions.EnsurePermission("Students.Create");
+        ArgumentNullException.ThrowIfNull(childDto);
         try
         {
+            var validationResults = new List<ValidationResult>();
+            if (!Validator.TryValidateObject(childDto, new ValidationContext(childDto), validationResults, validateAllProperties: true))
+            {
+                logger.LogWarning("Child creation rejected by validation; errorCount={ErrorCount}", validationResults.Count);
+                throw new ValidationException("بيانات الطفل غير مكتملة أو غير صحيحة.");
+            }
             var child = childDto.Adapt<Child>();
             await unitOfWork.Repository<Child>().AddAsync(child);
             var affectedRows = await unitOfWork.SaveChangesAsync();
@@ -22,6 +32,11 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger) 
                 logger.LogWarning("Child creation saved no rows; childId={ChildId}", child.Id);
             logger.LogInformation("Created child record; childId={ChildId}", child.Id);
             return child.Adapt<ChildDto>();
+        }
+        catch (DbUpdateException exception)
+        {
+            logger.LogWarning(exception, "Child creation rejected by database constraint; constraintKind={ConstraintKind}", GetConstraintKind(exception));
+            throw;
         }
         catch (Exception exception)
         {
@@ -31,6 +46,7 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger) 
     }
     public async Task<ChildDto> UpdateChildAsync(Guid childId, UpdateChildDTO childDto)
     {
+        permissions.EnsurePermission("Students.Edit");
         try
         {
             var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(c => c.Id == childId, asNoTracking: false);
@@ -43,6 +59,11 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger) 
             logger.LogInformation("Updated child record; childId={ChildId}", childId);
             return child.Adapt<ChildDto>();
         }
+        catch (DbUpdateException exception)
+        {
+            logger.LogWarning(exception, "Child update rejected by database constraint; childId={ChildId}; constraintKind={ConstraintKind}", childId, GetConstraintKind(exception));
+            throw;
+        }
         catch (Exception exception)
         {
             logger.LogError(exception, "ChildService failed to update child record; childId={ChildId}", childId);
@@ -51,6 +72,7 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger) 
     }
     public async Task<bool> DeleteChildAsync(Guid childId)
     {
+        permissions.EnsurePermission("Students.Delete");
         try
         {
             var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(c => c.Id == childId);
@@ -62,6 +84,11 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger) 
             logger.LogInformation("Deleted child record; childId={ChildId}", childId);
             return true;
         }
+        catch (DbUpdateException exception)
+        {
+            logger.LogWarning(exception, "Child deletion rejected by database constraint; childId={ChildId}; constraintKind={ConstraintKind}", childId, GetConstraintKind(exception));
+            throw;
+        }
         catch (Exception exception)
         {
             logger.LogError(exception, "ChildService failed to delete child record; childId={ChildId}", childId);
@@ -71,18 +98,30 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger) 
 
     public async Task<List<ChildDto>> GetAllChildrenAsync()
     {
+        permissions.EnsurePermission("Students.View");
         var childrens = await unitOfWork.Repository<Child>().ListAsync();
         return childrens.Adapt<List<ChildDto>>();
     }
 
     public async Task<List<ChildDto>> GetChildrenAsync(ChildFilter filter, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(filter);
+        permissions.EnsurePermission("Students.View");
+        var activeFilterCount = CountActiveFilters(filter);
+        logger.LogDebug("Loading children; activeFilterCount={ActiveFilterCount}", activeFilterCount);
+        try
+        {
+            ArgumentNullException.ThrowIfNull(filter);
 
-        if (filter.DateOfBirthFrom > filter.DateOfBirthTo && filter.DateOfBirthTo.HasValue)
-            throw new ArgumentException("Date of birth start must be before or equal to its end.", nameof(filter));
-        if (filter.EnrollmentDateFrom > filter.EnrollmentDateTo && filter.EnrollmentDateTo.HasValue)
-            throw new ArgumentException("Enrollment start must be before or equal to its end.", nameof(filter));
+            if (filter.DateOfBirthFrom > filter.DateOfBirthTo && filter.DateOfBirthTo.HasValue)
+            {
+                logger.LogWarning("Child search rejected because date of birth range is invalid");
+                throw new ArgumentException("Date of birth start must be before or equal to its end.", nameof(filter));
+            }
+            if (filter.EnrollmentDateFrom > filter.EnrollmentDateTo && filter.EnrollmentDateTo.HasValue)
+            {
+                logger.LogWarning("Child search rejected because enrollment date range is invalid");
+                throw new ArgumentException("Enrollment start must be before or equal to its end.", nameof(filter));
+            }
 
         Expression<Func<Child, bool>> predicate = child => true;
         var searchText = filter.SearchText?.Trim();
@@ -123,11 +162,19 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger) 
         var children = await unitOfWork.Repository<Child>().ListAsync(
             predicate,
             cancellationToken: cancellationToken);
+        logger.LogDebug("Loaded children; resultCount={ResultCount}", children.Count);
         return children.Adapt<List<ChildDto>>();
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "ChildService failed to load child records");
+            throw;
+        }
     }
 
     public async Task<List<ClassroomFilterOptionDto>> GetClassroomsForFilterAsync(CancellationToken cancellationToken = default)
     {
+        permissions.EnsurePermission("Students.View");
         var classrooms = await unitOfWork.Repository<Classroom>().ListAsync(
             classroom => classroom.IsActive,
             cancellationToken: cancellationToken);
@@ -155,6 +202,7 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger) 
 
     public async Task<ChildDto> GetChildByIdAsync(Guid childId)
     {
+        permissions.EnsurePermission("Students.View");
         var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(c => c.Id == childId);
         if (child is null)
         {
@@ -166,6 +214,7 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger) 
 
     public async Task<ChildDto> GetChildByNameAsync(string childName)
     {
+        permissions.EnsurePermission("Students.View");
         var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(c => c.FullName == childName);
         if (child is null)
         {
@@ -177,18 +226,21 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger) 
 
     public async Task<List<ChildDto>> GetChildrenByDateOfBirthAsync(DateOnly dateOfBirth)
     {
+        permissions.EnsurePermission("Students.View");
         var children = await unitOfWork.Repository<Child>().ListAsync(c => c.DateOfBirth == dateOfBirth);
         return children.Adapt<List<ChildDto>>();
     }
 
     public async Task<List<ChildDto>> GetChildrenByGenderAsync(ChildGender gender)
     {
+        permissions.EnsurePermission("Students.View");
         var children = await unitOfWork.Repository<Child>().ListAsync(c => c.Gender == gender);
         return children.Adapt<List<ChildDto>>();
     }
 
     public async Task<List<ChildDto>> GetChildrenByRangeOfEnrollmentDateAsync(DateOnly startDate, DateOnly endDate)
     {
+        permissions.EnsurePermission("Students.View");
         var children = await unitOfWork.Repository<Child>().ListAsync(c => c.EnrollmentDate >= startDate && c.EnrollmentDate <= endDate);
         return children.Adapt<List<ChildDto>>();
     }
@@ -198,4 +250,25 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger) 
 
     public Task<List<ChildDto>> GetChildrenWithPaidSubscriptions(int parentId) =>
         GetChildrenAsync(new ChildFilter { HasPaidSubscription = true });
+
+    private static string GetConstraintKind(DbUpdateException exception)
+    {
+        var details = exception.GetBaseException().ToString();
+        if (details.Contains("UNIQUE constraint", StringComparison.OrdinalIgnoreCase)) return "UNIQUE";
+        if (details.Contains("FOREIGN KEY constraint", StringComparison.OrdinalIgnoreCase)) return "FOREIGN KEY";
+        if (details.Contains("CHECK constraint", StringComparison.OrdinalIgnoreCase)) return "CHECK";
+        return "UNKNOWN";
+    }
+
+    private static int CountActiveFilters(ChildFilter? filter)
+    {
+        if (filter is null) return 0;
+        return new[]
+        {
+            !string.IsNullOrWhiteSpace(filter.SearchText), filter.Gender.HasValue,
+            filter.DateOfBirthFrom.HasValue, filter.DateOfBirthTo.HasValue,
+            filter.EnrollmentDateFrom.HasValue, filter.EnrollmentDateTo.HasValue,
+            filter.ClassroomId.HasValue, filter.HasPaidSubscription.HasValue
+        }.Count(active => active);
+    }
 }

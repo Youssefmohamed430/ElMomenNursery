@@ -5,23 +5,23 @@ namespace ElMomenNursery.Application.DTOs;
 
 public class CreateChildDTO
 {
-    [Required(ErrorMessage = "Full name is required.")]
-    [StringLength(100, ErrorMessage = "Full name cannot exceed 100 characters.")]
+    [Required(ErrorMessage = "اسم الطفل مطلوب.")]
+    [StringLength(100, ErrorMessage = "يجب ألا يزيد اسم الطفل عن 100 حرف.")]
     public required string FullName { get; set; }
 
-    [Required(ErrorMessage = "Address is required.")]
-    [StringLength(200, ErrorMessage = "Address cannot exceed 200 characters.")]
+    [Required(ErrorMessage = "العنوان مطلوب.")]
+    [StringLength(200, ErrorMessage = "يجب ألا يزيد العنوان عن 200 حرف.")]
     public required string Address { get; set; }
 
-    [Required(ErrorMessage = "EnrollmentDate is required.")]
-    [DataType(DataType.Date, ErrorMessage = "EnrollmentDate must be a valid date.")]
+    [Required(ErrorMessage = "تاريخ الالتحاق مطلوب.")]
+    [DataType(DataType.Date, ErrorMessage = "أدخل تاريخ التحاق صحيحًا.")]
     //[CustomValidation(typeof(CreateChildDTO), nameof(ValidateEnrollmentDate))]
-    [Range(typeof(DateOnly), "2020-01-01", "2100-12-31", ErrorMessage = "EnrollmentDate must be between 2000-01-01 and 2100-12-31.")]
+    [Range(typeof(DateOnly), "2000-01-01", "2100-12-31", ErrorMessage = "يجب أن يكون تاريخ الالتحاق بين 01/01/2000 و31/12/2100.")]
     public DateOnly EnrollmentDate { get; set; }
 
-    [Required(ErrorMessage = "DateOfBirth is required.")]
-    [DataType(DataType.Date, ErrorMessage = "DateOfBirth must be a valid date.")]
-    [Range(typeof(DateOnly), "2000-01-01", "2100-12-31", ErrorMessage = "DateOfBirth must be between 2000-01-01 and 2100-12-31.")]
+    [Required(ErrorMessage = "تاريخ الميلاد مطلوب.")]
+    [DataType(DataType.Date, ErrorMessage = "أدخل تاريخ ميلاد صحيحًا.")]
+    [Range(typeof(DateOnly), "2000-01-01", "2100-12-31", ErrorMessage = "يجب أن يكون تاريخ الميلاد بين 01/01/2000 و31/12/2100.")]
     public DateOnly DateOfBirth { get; set; }
 
     [Required(ErrorMessage = "Gender is required.")]
