@@ -1,12 +1,14 @@
 using ElMomenNursery.Application.DTOs;
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Domain.Enums;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
 
 namespace ElMomenNursery.Forms;
 
 public sealed class ChildEditorForm : Form
 {
+    private static readonly ILogger _log = Log.ForContext<ChildEditorForm>();
     private readonly IChildService _childService;
     private readonly ChildDto? _child;
 
@@ -92,7 +94,7 @@ public sealed class ChildEditorForm : Form
         var cancelButton = CreateButton("إلغاء");
         cancelButton.Width = 130;
         cancelButton.DialogResult = DialogResult.Cancel;
-        _saveButton.Click += async (_, _) => await SaveAsync();
+        _saveButton.Click += (_, _) => RunSafeEvent(() => SaveAsync(), "Save child record");
         footer.Controls.Add(_saveButton);
         footer.Controls.Add(cancelButton);
         Controls.Add(content);
@@ -192,18 +194,50 @@ public sealed class ChildEditorForm : Form
                 });
             }
 
+            if (IsDisposed) return;
             DialogResult = DialogResult.OK;
             Close();
         }
+        catch (DbUpdateException exception)
+        {
+            var details = exception.GetBaseException().Message;
+            var constraintKind = details.Contains("CHECK constraint", StringComparison.OrdinalIgnoreCase) ? "CHECK"
+                : details.Contains("UNIQUE constraint", StringComparison.OrdinalIgnoreCase) ? "UNIQUE"
+                : details.Contains("FOREIGN KEY constraint", StringComparison.OrdinalIgnoreCase) ? "FOREIGN KEY"
+                : "UNKNOWN";
+            _log.Warning(exception, "Child save rejected by database constraint; childId={ChildId}; constraintKind={ConstraintKind}", _child?.Id, constraintKind);
+            var message = details.Contains("CK_Children_DateOrder", StringComparison.OrdinalIgnoreCase)
+                ? "يجب أن يكون تاريخ الالتحاق في يوم الميلاد أو بعده."
+                : constraintKind switch
+                {
+                    "UNIQUE" => "تعذر حفظ البيانات لوجود سجل مكرر.",
+                    "FOREIGN KEY" => "تعذر حفظ البيانات لوجود سجلات مرتبطة.",
+                    _ => "تعذر حفظ بيانات الطفل. راجع البيانات ثم أعد المحاولة."
+                };
+            if (!IsDisposed) ShowValidationError(message);
+        }
         catch (Exception exception)
         {
-            Log.Error(exception, "Failed to save child record; childId={ChildId}", _child?.Id);
-            ShowValidationError($"تعذر حفظ بيانات الطفل.\n{exception.Message}");
+            _log.Error(exception, "Failed to save child record; childId={ChildId}", _child?.Id);
+            if (!IsDisposed) ShowValidationError("تعذر حفظ بيانات الطفل. راجع البيانات ثم أعد المحاولة.");
         }
         finally
         {
             if (!IsDisposed)
                 _saveButton.Enabled = true;
+        }
+    }
+
+    private async void RunSafeEvent(Func<Task> work, string operation)
+    {
+        try
+        {
+            await work();
+        }
+        catch (Exception exception)
+        {
+            _log.Error(exception, "Unhandled child form event failure; operation={Operation}", operation);
+            if (!IsDisposed) ShowValidationError("تعذر إكمال العملية. أعد المحاولة.");
         }
     }
 

@@ -8,6 +8,7 @@ namespace ElMomenNursery.Forms;
 
 public sealed class EmployeeAttendanceEditorForm : Form
 {
+    private static readonly ILogger _log = Log.ForContext<EmployeeAttendanceEditorForm>();
     private readonly IEmployeeAttendanceService _attendanceService;
     private readonly EmployeeDailyAttendanceDto _row;
     private readonly Guid _currentUserId;
@@ -80,7 +81,7 @@ public sealed class EmployeeAttendanceEditorForm : Form
         var cancelButton = CreateButton("إلغاء");
         cancelButton.Width = 130;
         cancelButton.DialogResult = DialogResult.Cancel;
-        _saveButton.Click += async (_, _) => await SaveAsync();
+        _saveButton.Click += (_, _) => RunSafeEvent(() => SaveAsync(), "Save employee attendance");
         footer.Controls.Add(_saveButton);
         footer.Controls.Add(cancelButton);
         Controls.Add(fields);
@@ -161,28 +162,41 @@ public sealed class EmployeeAttendanceEditorForm : Form
                 });
             }
 
+            if (IsDisposed) return;
             DialogResult = DialogResult.OK;
             Close();
         }
         catch (InvalidOperationException exception)
         {
-            Log.Warning(exception, "Attendance save rejected by a business rule; employeeId={EmployeeId}; date={AttendanceDate}", _row.EmployeeId, _row.AttendanceDate);
+            _log.Warning(exception, "Attendance save rejected by a business rule; employeeId={EmployeeId}", _row.EmployeeId);
             ShowError("تم تسجيل الحضور لهذا الموظف في هذا التاريخ بالفعل.");
         }
         catch (DbUpdateException exception) when (exception.GetBaseException().Message.Contains("UNIQUE constraint failed", StringComparison.OrdinalIgnoreCase))
         {
-            Log.Warning(exception, "Attendance save hit the unique employee/date constraint; employeeId={EmployeeId}; date={AttendanceDate}", _row.EmployeeId, _row.AttendanceDate);
+            _log.Warning(exception, "Attendance save hit the unique employee/date constraint; employeeId={EmployeeId}; constraint={ConstraintName}", _row.EmployeeId, "UX_EmployeeAttendances_Employee_Date");
             ShowError("تم تسجيل الحضور لهذا الموظف في هذا التاريخ بالفعل. حدّث القائمة ثم راجع السجل.");
         }
         catch (Exception exception)
         {
-            Log.Error(exception, "Failed to save employee attendance; employeeId={EmployeeId}; date={AttendanceDate}", _row.EmployeeId, _row.AttendanceDate);
-            var cause = exception.GetBaseException().Message;
-            ShowError($"تعذر حفظ سجل الحضور. السبب: {cause}");
+            _log.Error(exception, "Failed to save employee attendance; employeeId={EmployeeId}", _row.EmployeeId);
+            ShowError("تعذر حفظ سجل الحضور. راجع البيانات ثم أعد المحاولة.");
         }
         finally
         {
             if (!IsDisposed) _saveButton.Enabled = true;
+        }
+    }
+
+    private async void RunSafeEvent(Func<Task> work, string operation)
+    {
+        try
+        {
+            await work();
+        }
+        catch (Exception exception)
+        {
+            _log.Error(exception, "Unhandled attendance form event failure; operation={Operation}", operation);
+            if (!IsDisposed) ShowError("تعذر إكمال العملية. أعد المحاولة.");
         }
     }
 

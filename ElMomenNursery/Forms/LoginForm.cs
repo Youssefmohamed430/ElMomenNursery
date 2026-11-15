@@ -7,6 +7,7 @@ namespace ElMomenNursery.Forms;
 
 public sealed class LoginForm : Form
 {
+    private static readonly ILogger _log = Log.ForContext<LoginForm>();
     private readonly IAuthService auth;
     private readonly TextBox _username = CreateTextBox("اسم المستخدم");
     private readonly TextBox _fullName = CreateTextBox("الاسم الكامل");
@@ -32,16 +33,7 @@ public sealed class LoginForm : Form
         _note.Height = 48; _note.ForeColor = BrandPalette.MutedText; _note.Font = new Font("Segoe UI", 9F);
         card.Controls.AddRange([heading, subtitle, userLabel, _username, _nameLabel, _fullName, passLabel, _password, _submit, _note]);
         Controls.Add(card);
-        Shown += async (_, _) =>
-        {
-            _setupMode = await auth.NeedsInitialAdministratorSetupAsync();
-            Text = _setupMode ? "إعداد المسؤول الأول - حضانة المؤمن" : "تسجيل الدخول - حضانة المؤمن";
-            heading.Text = _setupMode ? "إنشاء حساب المسؤول" : "تسجيل الدخول";
-            subtitle.Text = _setupMode ? "اختر اسم مستخدم وكلمة مرور قوية للمسؤول الأول" : "مرحبًا بك في نظام إدارة حضانة المؤمن";
-            _submit.Text = _setupMode ? "إنشاء الحساب" : "دخول";
-            _fullName.Visible = _nameLabel.Visible = _setupMode;
-            _note.Text = _setupMode ? "كلمة المرور 12 حرفًا على الأقل، وبها أحرف وأرقام." : "";
-        };
+        Shown += (_, _) => _ = LoadInitialSetupAsync(heading, subtitle);
         void LayoutCard()
         {
             card.Location = new Point((ClientSize.Width - card.Width) / 2, (ClientSize.Height - card.Height) / 2);
@@ -56,6 +48,30 @@ public sealed class LoginForm : Form
         Shown += (_, _) => LayoutCard();
     }
 
+    private async Task LoadInitialSetupAsync(Label heading, Label subtitle)
+    {
+        try
+        {
+            _setupMode = await auth.NeedsInitialAdministratorSetupAsync();
+            if (IsDisposed || _note.IsDisposed || _submit.IsDisposed) return;
+            Text = _setupMode ? "إعداد المسؤول الأول - حضانة المؤمن" : "تسجيل الدخول - حضانة المؤمن";
+            heading.Text = _setupMode ? "إنشاء حساب المسؤول" : "تسجيل الدخول";
+            subtitle.Text = _setupMode ? "اختر اسم مستخدم وكلمة مرور قوية للمسؤول الأول" : "مرحبًا بك في نظام إدارة حضانة المؤمن";
+            _submit.Text = _setupMode ? "إنشاء الحساب" : "دخول";
+            _fullName.Visible = _nameLabel.Visible = _setupMode;
+            _note.Text = _setupMode ? "كلمة المرور 12 حرفًا على الأقل، وبها أحرف وأرقام." : "";
+        }
+        catch (Exception exception)
+        {
+            _log.Error(exception, "Initial administrator setup check failed");
+            if (!IsDisposed && !_note.IsDisposed)
+            {
+                _note.Text = "تعذر التحقق من إعداد المسؤول. أعد تشغيل التطبيق.";
+                _note.ForeColor = BrandPalette.DangerText;
+            }
+        }
+    }
+
     private async void Submit(object? sender, EventArgs e)
     {
         _submit.Enabled = false; _note.ForeColor = BrandPalette.MutedText;
@@ -64,6 +80,7 @@ public sealed class LoginForm : Form
             var result = _setupMode
                 ? await auth.CreateInitialAdministratorAsync(_username.Text, _fullName.Text, _password.Text)
                 : await auth.LoginAsync(_username.Text, _password.Text);
+            if (IsDisposed) return;
             if (result.IsSuccess)
             {
                 if (_setupMode)
@@ -77,17 +94,17 @@ public sealed class LoginForm : Form
             }
             else
             {
-                Log.Warning("Authentication operation was rejected; setupMode={SetupMode}; errorCode={ErrorCode}", _setupMode, result.Error.Code);
+                _log.Warning("Authentication operation was rejected; setupMode={SetupMode}; errorCode={ErrorCode}", _setupMode, result.Error.Code);
                 _note.Text = _setupMode ? "تعذر إنشاء الحساب. تحقق من البيانات أو أعد فتح التطبيق." : "اسم المستخدم أو كلمة المرور غير صحيحة، أو الحساب غير متاح مؤقتًا.";
                 _note.ForeColor = BrandPalette.DangerText;
             }
         }
         catch (Exception exception)
         {
-            Log.Error(exception, "Login form operation failed; setupMode={SetupMode}", _setupMode);
+            _log.Error(exception, "Login form operation failed; setupMode={SetupMode}", _setupMode);
             _note.Text = "تعذر إكمال العملية. أعد المحاولة."; _note.ForeColor = BrandPalette.DangerText;
         }
-        finally { _submit.Enabled = true; }
+        finally { if (!IsDisposed && !_submit.IsDisposed) _submit.Enabled = true; }
     }
 
     private static Label LabelFor(string text) => new() { Text = text, ForeColor = BrandPalette.Text, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft };

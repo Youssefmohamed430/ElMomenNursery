@@ -11,6 +11,7 @@ namespace ElMomenNursery.Forms;
 
 public sealed class MainForm : Form
 {
+    private static readonly ILogger _log = Log.ForContext<MainForm>();
     private const int SidebarWidth = 258;
     private Image? _logoImage;
     private readonly Panel _pageHost = new() { Dock = DockStyle.Fill, AutoScroll = true, BackColor = BrandPalette.AppBackground };
@@ -100,9 +101,20 @@ public sealed class MainForm : Form
         var logoPath = Path.Combine(AppContext.BaseDirectory, "Resources", "Branding", "AlMoumenNurseryLogo.jpeg");
         if (File.Exists(logoPath))
         {
-            using var sourceImage = Image.FromFile(logoPath);
-            _logoImage = new Bitmap(sourceImage);
-            logo.Image = _logoImage;
+            try
+            {
+                using var sourceImage = Image.FromFile(logoPath);
+                _logoImage = new Bitmap(sourceImage);
+                logo.Image = _logoImage;
+            }
+            catch (Exception exception)
+            {
+                _log.Warning(exception, "Unable to load nursery logo image");
+            }
+        }
+        else
+        {
+            _log.Warning("Nursery logo image was not found");
         }
 
         var brandText = new Panel { Width = 330, Height = 68, Margin = new Padding(0, 1, 0, 0) };
@@ -138,7 +150,22 @@ public sealed class MainForm : Form
             TextAlign = ContentAlignment.MiddleRight, ForeColor = BrandPalette.Text, Font = new Font("Segoe UI", 9F, FontStyle.Bold), RightToLeft = RightToLeft.Yes };
         var logout = CreateActionButton("تسجيل الخروج");
         logout.Width = 120; logout.Height = 40;
-        logout.Click += async (_, _) => { logout.Enabled = false; await _logout(); Close(); };
+        logout.Click += (_, _) => RunSafeEvent(async () =>
+        {
+            logout.Enabled = false;
+            try
+            {
+                await _logout();
+                Close();
+            }
+            catch (Exception exception)
+            {
+                _log.Error(exception, "Logout failed; userId={UserId}", _session.UserId);
+                if (!logout.IsDisposed) logout.Enabled = true;
+                MessageBox.Show(this, "تعذر تسجيل الخروج. أعد المحاولة.", "تسجيل الخروج", MessageBoxButtons.OK,
+                    MessageBoxIcon.Error, MessageBoxDefaultButton.Button1, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+            }
+        }, "Logout");
         account.Controls.Add(who); account.Controls.Add(logout);
         header.Controls.Add(account);
 
@@ -222,10 +249,12 @@ public sealed class MainForm : Form
     {
         if (!CanViewSection(section))
         {
+            _log.Warning("Section access denied; section={Section}; userId={UserId}", section, _session.UserId);
             MessageBox.Show("ليست لديك صلاحية لفتح هذا القسم.", "صلاحية غير متاحة", MessageBoxButtons.OK, MessageBoxIcon.Warning,
                 MessageBoxDefaultButton.Button1, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
             return;
         }
+        _log.Information("Section opened; section={Section}; userId={UserId}", section, _session.UserId);
         foreach (var (name, button) in _navigationButtons)
         {
             button.SetSelected(string.Equals(name, section, StringComparison.Ordinal));
@@ -239,18 +268,28 @@ public sealed class MainForm : Form
             oldPage.Dispose();
         }
 
-        var page = section switch
+        try
         {
-            "الرئيسية" => BuildHomePage(),
-            "الأطفال" => BuildChildrenPage(),
-            "الموظفون" => BuildEmployeesPage(),
-            "الحضور" => BuildEmployeeAttendancePage(),
-            "الفصول" => BuildClassesPage(),
-            "إدارة المستخدمين" => new UserManagementForm(_accountManagement, _session),
-            _ => BuildSectionPage(section)
-        };
-        _pageHost.Controls.Add(page);
-        _pageHost.ResumeLayout(performLayout: true);
+            var page = section switch
+            {
+                "الرئيسية" => BuildHomePage(),
+                "الأطفال" => BuildChildrenPage(),
+                "الموظفون" => BuildEmployeesPage(),
+                "الحضور" => BuildEmployeeAttendancePage(),
+                "الفصول" => BuildClassesPage(),
+                "إدارة المستخدمين" => new UserManagementForm(_accountManagement, _session),
+                _ => BuildSectionPage(section)
+            };
+            _pageHost.Controls.Add(page);
+            _pageHost.ResumeLayout(performLayout: true);
+        }
+        catch (Exception exception)
+        {
+            _log.Error(exception, "Failed to build page; section={Section}; userId={UserId}", section, _session.UserId);
+            _pageHost.ResumeLayout(performLayout: true);
+            MessageBox.Show(this, "تعذر فتح هذا القسم. أعد المحاولة.", "تعذر فتح القسم", MessageBoxButtons.OK,
+                MessageBoxIcon.Error, MessageBoxDefaultButton.Button1, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+        }
     }
 
     private bool CanViewSection(string section) => section switch
@@ -385,18 +424,22 @@ public sealed class MainForm : Form
         var page = CreateDataPage("الأطفال", "استعرض الأطفال وادمج أكثر من فلتر للوصول إلى المجموعة المطلوبة.", includePrototypeBanner: false);
         var addButton = CreateActionButton("إضافة طفل", primary: true);
         var editButton = CreateActionButton("تعديل البيانات");
+        var deleteButton = CreateActionButton("حذف طفل");
         var detailsButton = CreateActionButton("عرض الملف");
         var exportButton = CreateActionButton("تصدير القائمة");
         addButton.Visible = _session.HasPermission("Students.Create");
         editButton.Visible = _session.HasPermission("Students.Edit");
+        deleteButton.Visible = _session.HasPermission("Students.Delete");
         detailsButton.Visible = _session.HasPermission("Students.View");
         exportButton.Visible = _session.HasPermission("Students.View");
         addButton.Name = "actions.add";
         editButton.Name = "actions.edit";
+        deleteButton.Name = "actions.delete";
         detailsButton.Name = "actions.details";
         exportButton.Name = "actions.export";
         addButton.Width = 150;
         editButton.Width = 140;
+        deleteButton.Width = 126;
         detailsButton.Width = 142;
         exportButton.Width = 142;
         var actions = new Panel
@@ -467,7 +510,7 @@ public sealed class MainForm : Form
         resetLayoutButton.Name = "layout.reset";
         resetLayoutButton.Width = 150;
         resetLayoutButton.Visible = false;
-        actions.Controls.AddRange([addButton, editButton, detailsButton, exportButton, customizeButton, resetLayoutButton]);
+        actions.Controls.AddRange([addButton, editButton, deleteButton, detailsButton, exportButton, customizeButton, resetLayoutButton]);
 
         var grid = CreateGrid([
             "المعرف", "اسم الطفل", "العنوان", "تاريخ الالتحاق", "تاريخ الميلاد", "النوع",
@@ -484,6 +527,7 @@ public sealed class MainForm : Form
 
         RegisterDraggable(addButton);
         RegisterDraggable(editButton);
+        RegisterDraggable(deleteButton);
         RegisterDraggable(detailsButton);
         RegisterDraggable(exportButton);
         RegisterDraggable(grid);
@@ -495,14 +539,14 @@ public sealed class MainForm : Form
         var loadInProgress = false;
         AttachDraggableControls();
 
-        addButton.Click += async (_, _) =>
+        addButton.Click += (_, _) => RunSafeEvent(async () =>
         {
             if (isCustomizing) return;
             using var editor = new ChildEditorForm(_childService);
             if (editor.ShowDialog(this) == DialogResult.OK)
                 await LoadChildrenAsync();
-        };
-        editButton.Click += async (_, _) =>
+        }, "Open child creation form");
+        editButton.Click += (_, _) => RunSafeEvent(async () =>
         {
             if (isCustomizing) return;
             if (grid.SelectedRows.Count == 0 || grid.SelectedRows[0].Tag is not Guid childId)
@@ -516,29 +560,76 @@ public sealed class MainForm : Form
             try
             {
                 var child = await _childService.GetChildByIdAsync(childId);
+                if (page.IsDisposed)
+                {
+                    _log.Debug("Child editor opening cancelled: page disposed");
+                    return;
+                }
                 using var editor = new ChildEditorForm(_childService, child);
                 if (editor.ShowDialog(this) == DialogResult.OK)
                     await LoadChildrenAsync();
             }
             catch (KeyNotFoundException exception)
             {
-                Log.ForContext<MainForm>().Warning(exception, "Selected child was not found; childId={ChildId}", childId);
+                if (page.IsDisposed) return;
+                _log.Warning(exception, "Selected child was not found; childId={ChildId}", childId);
                 MessageBox.Show(this, "لم يتم العثور على سجل الطفل. حدّث القائمة.", "تعديل بيانات طفل", MessageBoxButtons.OK,
                     MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
                 await LoadChildrenAsync();
             }
             catch (Exception exception)
             {
-                Log.ForContext<MainForm>().Error(exception, "Failed to open child editor; childId={ChildId}", childId);
+                _log.Error(exception, "Failed to open child editor; childId={ChildId}", childId);
+                if (page.IsDisposed) return;
                 MessageBox.Show(this, "تعذر فتح سجل الطفل.", "تعديل بيانات طفل", MessageBoxButtons.OK,
                     MessageBoxIcon.Error, MessageBoxDefaultButton.Button1, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
             }
-        };
+        }, "Open child editor");
+        deleteButton.Click += (_, _) => RunSafeEvent(async () =>
+        {
+            if (isCustomizing) return;
+            if (grid.SelectedRows.Count == 0 || grid.SelectedRows[0].Tag is not Guid childId)
+            {
+                MessageBox.Show(this, "اختر طفلًا من الجدول أولًا.", "حذف سجل طفل", MessageBoxButtons.OK,
+                    MessageBoxIcon.Information, MessageBoxDefaultButton.Button1, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+                return;
+            }
+            var confirm = MessageBox.Show(this,
+                "هل تريد حذف سجل الطفل المحدد؟ لا يمكن حذف السجل إذا كانت له مدفوعات أو حضور أو اشتراكات مرتبطة.",
+                "تأكيد حذف الطفل", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2,
+                MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+            if (confirm != DialogResult.Yes) return;
+            try
+            {
+                var deleted = await _childService.DeleteChildAsync(childId);
+                if (page.IsDisposed)
+                {
+                    _log.Debug("Child deletion UI update cancelled: page disposed");
+                    return;
+                }
+                if (!deleted)
+                {
+                    MessageBox.Show(this, "لم يتم العثور على سجل الطفل. حدّث القائمة.", "حذف سجل طفل", MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+                    await LoadChildrenAsync();
+                    return;
+                }
+                await LoadChildrenAsync();
+            }
+            catch (Exception exception)
+            {
+                _log.Warning(exception, "Child deletion could not be completed; childId={ChildId}", childId);
+                if (page.IsDisposed) return;
+                MessageBox.Show(this, "لا يمكن حذف سجل الطفل لوجود مدفوعات أو حضور أو اشتراكات مرتبطة به.", "تعذر حذف الطفل",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1,
+                    MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+            }
+        }, "Delete child");
         detailsButton.Click += (_, _) => { if (!isCustomizing) ShowComingSoon("ملف الطفل"); };
         exportButton.Click += (_, _) => { if (!isCustomizing) ShowComingSoon("تصدير القائمة"); };
 
-        applyButton.Click += async (_, _) => { if (!isCustomizing) await LoadChildrenAsync(); };
-        clearButton.Click += async (_, _) =>
+        applyButton.Click += (_, _) => RunSafeEvent(async () => { if (!isCustomizing) await LoadChildrenAsync(); }, "Apply child filters");
+        clearButton.Click += (_, _) => RunSafeEvent(async () =>
         {
             if (isCustomizing) return;
             search.Clear();
@@ -550,8 +641,8 @@ public sealed class MainForm : Form
             classroomFilter.SelectedIndex = 0;
             paymentFilter.SelectedIndex = 0;
             await LoadChildrenAsync();
-        };
-        customizeButton.Click += async (_, _) =>
+        }, "Clear child filters");
+        customizeButton.Click += (_, _) => RunSafeEvent(async () =>
         {
             if (!isCustomizing)
             {
@@ -571,7 +662,7 @@ public sealed class MainForm : Form
             resetLayoutButton.Visible = false;
             SetDragAppearance(false);
             await LoadChildrenAsync();
-        };
+        }, "Customize child page");
         resetLayoutButton.Click += (_, _) =>
         {
             try
@@ -588,8 +679,8 @@ public sealed class MainForm : Form
             }
             catch (Exception exception)
             {
-                Log.Error(exception, "Failed to reset child screen layout");
-                ShowLayoutError(exception.Message);
+                _log.Error(exception, "Failed to reset child screen layout");
+                ShowLayoutError();
             }
         };
 
@@ -636,7 +727,7 @@ public sealed class MainForm : Form
         {
             if (loadInProgress)
             {
-                Log.Debug("Skipped child load because another load is in progress");
+                _log.Debug("Skipped child load because another load is in progress");
                 return;
             }
             loadInProgress = true;
@@ -650,7 +741,7 @@ public sealed class MainForm : Form
                     var classrooms = await _childService.GetClassroomsForFilterAsync();
                     if (page.IsDisposed || classroomFilter.IsDisposed)
                     {
-                        Log.Debug("Child load cancelled: page disposed");
+                        _log.Debug("Child load cancelled: page disposed");
                         return;
                     }
                     foreach (var classroom in classrooms)
@@ -684,7 +775,7 @@ public sealed class MainForm : Form
                 var children = await _childService.GetChildrenAsync(filter);
                 if (page.IsDisposed || grid.IsDisposed || resultCount.IsDisposed)
                 {
-                    Log.Debug("Child load cancelled: page disposed");
+                    _log.Debug("Child load cancelled: page disposed");
                     return;
                 }
                 grid.Rows.Clear();
@@ -716,11 +807,14 @@ public sealed class MainForm : Form
             }
             catch (Exception exception)
             {
-                Log.Error(exception, "Failed to load children for display");
-                resultCount.Text = "تعذر تحميل البيانات";
-                MessageBox.Show($"تعذر تحميل قائمة الأطفال.\n{exception.Message}", "خطأ في تحميل البيانات",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error, MessageBoxDefaultButton.Button1,
-                    MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+                _log.Error(exception, "Failed to load children for display");
+                if (!page.IsDisposed && !resultCount.IsDisposed)
+                {
+                    resultCount.Text = "تعذر تحميل البيانات";
+                    MessageBox.Show(this, "تعذر تحميل قائمة الأطفال. أعد المحاولة.", "خطأ في تحميل البيانات",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error, MessageBoxDefaultButton.Button1,
+                        MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+                }
             }
             finally
             {
@@ -769,7 +863,7 @@ public sealed class MainForm : Form
         void ArrangeDefaultActions()
         {
             var right = actions.ClientSize.Width - 8;
-            foreach (var button in new[] { addButton, editButton, detailsButton, exportButton })
+            foreach (var button in new[] { addButton, editButton, deleteButton, detailsButton, exportButton })
             {
                 right -= button.Width;
                 button.SetBounds(right, 1, button.Width, 42);
@@ -857,8 +951,8 @@ public sealed class MainForm : Form
             }
             catch (Exception exception)
             {
-                Log.Error(exception, "Failed to save child screen layout");
-                ShowLayoutError(exception.Message);
+                _log.Error(exception, "Failed to save child screen layout");
+                ShowLayoutError();
                 return false;
             }
         }
@@ -878,7 +972,7 @@ public sealed class MainForm : Form
             }
             catch (Exception exception)
             {
-                Log.Warning(exception, "Failed to read saved child screen layout; using default layout");
+                _log.Warning(exception, "Failed to read saved child screen layout; using default layout");
                 return new Dictionary<string, int[]>(StringComparer.Ordinal);
             }
         }
@@ -887,7 +981,7 @@ public sealed class MainForm : Form
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "AlMoumenNursery", "child-screen-layout.json");
 
-        void ShowLayoutError(string detail) => MessageBox.Show(this, $"تعذر حفظ تخطيط الشاشة.\n{detail}",
+        void ShowLayoutError() => MessageBox.Show(this, "تعذر حفظ تخطيط الشاشة. أعد المحاولة.",
             "تخصيص شاشة الأطفال", MessageBoxButtons.OK, MessageBoxIcon.Error,
             MessageBoxDefaultButton.Button1, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
 
@@ -946,29 +1040,30 @@ public sealed class MainForm : Form
         List<EmployeeDto> employees = [];
         var employeeLoadInProgress = false;
         search.TextChanged += (_, _) => RenderEmployees();
-        addButton.Click += async (_, _) =>
+        addButton.Click += (_, _) => RunSafeEvent(async () =>
         {
             using var editor = new EmployeeEditorForm(_employeeService);
             if (editor.ShowDialog(this) == DialogResult.OK)
                 await LoadEmployeesAsync();
-        };
-        editButton.Click += async (_, _) =>
+        }, "Open employee creation form");
+        editButton.Click += (_, _) => RunSafeEvent(async () =>
         {
             if (!TryGetSelectedEmployeeId(out var id)) return;
             try
             {
                 var employee = await _employeeService.GetEmployeeById(id);
+                if (page.IsDisposed) return;
                 using var editor = new EmployeeEditorForm(_employeeService, employee);
                 if (editor.ShowDialog(this) == DialogResult.OK)
                     await LoadEmployeesAsync();
             }
             catch (Exception exception)
             {
-                Log.Error(exception, "Failed to open employee editor; employeeId={EmployeeId}", id);
-                ShowEmployeeError($"تعذر فتح بيانات الموظف.\n{exception.Message}");
+                _log.Error(exception, "Failed to open employee editor; employeeId={EmployeeId}", id);
+                if (!page.IsDisposed) ShowEmployeeError("تعذر فتح بيانات الموظف. أعد المحاولة.");
             }
-        };
-        deleteButton.Click += async (_, _) =>
+        }, "Open employee editor");
+        deleteButton.Click += (_, _) => RunSafeEvent(async () =>
         {
             if (!TryGetSelectedEmployeeId(out var id)) return;
             var confirm = MessageBox.Show(this,
@@ -979,7 +1074,13 @@ public sealed class MainForm : Form
 
             try
             {
-                if (!await _employeeService.DeleteEmployee(id))
+                var deleted = await _employeeService.DeleteEmployee(id);
+                if (page.IsDisposed)
+                {
+                    _log.Debug("Employee deletion UI update cancelled: page disposed");
+                    return;
+                }
+                if (!deleted)
                 {
                     ShowEmployeeError("لم يتم العثور على سجل الموظف.");
                     return;
@@ -988,10 +1089,10 @@ public sealed class MainForm : Form
             }
             catch (Exception exception)
             {
-                Log.Error(exception, "Failed to delete employee; employeeId={EmployeeId}", id);
-                ShowEmployeeError("تعذر حذف الموظف لوجود سجلات مرتبطة به. احتفظ بسجل الموظف واكتفِ بتعديل بياناته.");
+                _log.Error(exception, "Failed to delete employee; employeeId={EmployeeId}", id);
+                if (!page.IsDisposed) ShowEmployeeError("تعذر حذف الموظف لوجود سجلات مرتبطة به. احتفظ بسجل الموظف واكتفِ بتعديل بياناته.");
             }
-        };
+        }, "Delete employee");
 
         page.Controls.AddRange([search, addButton, editButton, deleteButton, resultCount, grid]);
         page.Resize += (_, _) => LayoutEmployeesPage();
@@ -1003,16 +1104,16 @@ public sealed class MainForm : Form
         {
             if (employeeLoadInProgress)
             {
-                Log.Debug("Skipped employee load because another load is in progress");
+                _log.Debug("Skipped employee load because another load is in progress");
                 return;
             }
             employeeLoadInProgress = true;
             try
             {
                 var loadedEmployees = (await _employeeService.GetEmployees()).ToList();
-                if (page.IsDisposed || grid.IsDisposed)
+                if (page.IsDisposed || grid.IsDisposed || resultCount.IsDisposed)
                 {
-                    Log.Debug("Employee load cancelled: page disposed");
+                    _log.Debug("Employee load cancelled: page disposed");
                     return;
                 }
                 employees = loadedEmployees;
@@ -1020,8 +1121,8 @@ public sealed class MainForm : Form
             }
             catch (Exception exception)
             {
-                Log.Error(exception, "Failed to load employees for display");
-                if (!page.IsDisposed && !grid.IsDisposed)
+                _log.Error(exception, "Failed to load employees for display");
+                if (!page.IsDisposed && !grid.IsDisposed && !resultCount.IsDisposed)
                 {
                     employees = [];
                     grid.Rows.Clear();
@@ -1145,12 +1246,12 @@ public sealed class MainForm : Form
         List<EmployeeDailyAttendanceDto> attendanceRows = [];
         var attendanceLoadInProgress = false;
 
-        datePicker.ValueChanged += async (_, _) => await LoadAttendanceAsync();
+        datePicker.ValueChanged += (_, _) => RunSafeEvent(() => LoadAttendanceAsync(), "Load attendance for selected date");
         search.TextChanged += (_, _) => RenderAttendance();
-        refreshButton.Click += async (_, _) => await LoadAttendanceAsync();
+        refreshButton.Click += (_, _) => RunSafeEvent(() => LoadAttendanceAsync(), "Refresh attendance");
         grid.SelectionChanged += (_, _) => UpdateActions();
-        markButton.Click += async (_, _) => await OpenEditorAsync(correction: false);
-        editButton.Click += async (_, _) => await OpenEditorAsync(correction: true);
+        markButton.Click += (_, _) => RunSafeEvent(() => OpenEditorAsync(correction: false), "Open attendance entry form");
+        editButton.Click += (_, _) => RunSafeEvent(() => OpenEditorAsync(correction: true), "Open attendance correction form");
 
         page.Controls.AddRange([dateLabel, datePicker, search, refreshButton, markButton, editButton, countLabel, grid]);
         page.Resize += (_, _) => LayoutAttendancePage();
@@ -1162,7 +1263,7 @@ public sealed class MainForm : Form
         {
             if (attendanceLoadInProgress)
             {
-                Log.Debug("Skipped attendance load because another load is in progress");
+                _log.Debug("Skipped attendance load because another load is in progress");
                 return;
             }
             attendanceLoadInProgress = true;
@@ -1171,9 +1272,9 @@ public sealed class MainForm : Form
                 datePicker.Enabled = refreshButton.Enabled = false;
                 var loadedAttendance = (await _employeeAttendanceService.GetDailyAttendanceAsync(
                     DateOnly.FromDateTime(datePicker.Value))).ToList();
-                if (page.IsDisposed || grid.IsDisposed)
+                if (page.IsDisposed || grid.IsDisposed || datePicker.IsDisposed || countLabel.IsDisposed)
                 {
-                    Log.Debug("Attendance load cancelled: page disposed");
+                    _log.Debug("Attendance load cancelled: page disposed");
                     return;
                 }
                 attendanceRows = loadedAttendance;
@@ -1181,8 +1282,8 @@ public sealed class MainForm : Form
             }
             catch (Exception exception)
             {
-                Log.Error(exception, "Failed to load employee attendance; date={AttendanceDate}", datePicker.Value.Date);
-                if (!page.IsDisposed && !grid.IsDisposed)
+                _log.Error(exception, "Failed to load employee attendance");
+                if (!page.IsDisposed && !grid.IsDisposed && !countLabel.IsDisposed)
                 {
                     attendanceRows = [];
                     grid.Rows.Clear();
@@ -1192,7 +1293,7 @@ public sealed class MainForm : Form
             }
             finally
             {
-                if (!page.IsDisposed) datePicker.Enabled = refreshButton.Enabled = true;
+                if (!page.IsDisposed && !datePicker.IsDisposed && !refreshButton.IsDisposed) datePicker.Enabled = refreshButton.Enabled = true;
                 attendanceLoadInProgress = false;
             }
         }
@@ -1232,6 +1333,11 @@ public sealed class MainForm : Form
 
         async Task OpenEditorAsync(bool correction)
         {
+            if (page.IsDisposed)
+            {
+                _log.Debug("Attendance editor opening cancelled: page disposed");
+                return;
+            }
             if (grid.SelectedRows.Count == 0 || grid.SelectedRows[0].Tag is not EmployeeDailyAttendanceDto selected)
             {
                 MessageBox.Show(this, "اختر موظفًا من الجدول أولًا.", "حضور الموظفين", MessageBoxButtons.OK,
@@ -1242,7 +1348,7 @@ public sealed class MainForm : Form
 
             if (correction != selected.IsMarked) return;
             using var editor = new EmployeeAttendanceEditorForm(_employeeAttendanceService, selected, _session.UserId);
-            if (editor.ShowDialog(this) == DialogResult.OK)
+            if (editor.ShowDialog(this) == DialogResult.OK && !page.IsDisposed)
                 await LoadAttendanceAsync();
         }
 
@@ -1482,7 +1588,22 @@ public sealed class MainForm : Form
         }
         catch (Exception exception)
         {
-            Log.ForContext<MainForm>().Error(exception, "Unhandled page load failure; operation={Operation}", operation);
+            _log.Error(exception, "Unhandled page load failure; operation={Operation}", operation);
+        }
+    }
+
+    private async void RunSafeEvent(Func<Task> work, string operation)
+    {
+        try
+        {
+            await work();
+        }
+        catch (Exception exception)
+        {
+            _log.Error(exception, "Unhandled main form event failure; operation={Operation}; userId={UserId}", operation, _session.UserId);
+            if (!IsDisposed)
+                MessageBox.Show(this, "تعذر إكمال العملية. أعد المحاولة.", "تعذر إكمال العملية", MessageBoxButtons.OK,
+                    MessageBoxIcon.Error, MessageBoxDefaultButton.Button1, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
         }
     }
 

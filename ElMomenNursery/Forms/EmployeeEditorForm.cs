@@ -1,12 +1,14 @@
 using ElMomenNursery.Application.DTOs;
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Domain.Enums;
+using System.Globalization;
 using Serilog;
 
 namespace ElMomenNursery.Forms;
 
 public sealed class EmployeeEditorForm : Form
 {
+    private static readonly ILogger _log = Log.ForContext<EmployeeEditorForm>();
     private readonly IEmployeeService _employeeService;
     private readonly EmployeeDto? _employee;
 
@@ -80,7 +82,7 @@ public sealed class EmployeeEditorForm : Form
         var cancelButton = CreateButton("إلغاء");
         cancelButton.Width = 130;
         cancelButton.DialogResult = DialogResult.Cancel;
-        _saveButton.Click += async (_, _) => await SaveAsync();
+        _saveButton.Click += (_, _) => RunSafeEvent(() => SaveAsync(), "Save employee record");
         footer.Controls.Add(_saveButton);
         footer.Controls.Add(cancelButton);
         Controls.Add(content);
@@ -103,7 +105,7 @@ public sealed class EmployeeEditorForm : Form
         _address.Text = employee.Address;
         _jobDesignation.Text = employee.JobDesignation;
         _hireDate.Value = employee.HireDate.ToDateTime(TimeOnly.MinValue);
-        _salary.Text = employee.Salary.ToString("0.00");
+        _salary.Text = employee.Salary.ToString("0.00", CultureInfo.CurrentCulture);
         _hasExperience.Checked = employee.HasExperience;
     }
 
@@ -117,8 +119,9 @@ public sealed class EmployeeEditorForm : Form
             return;
         }
 
-        if (!decimal.TryParse(_salary.Text, out var salary) || salary < 0)
+        if (!decimal.TryParse(NormalizeNumericInput(_salary.Text), NumberStyles.Number, CultureInfo.CurrentCulture, out var salary) || salary < 0)
         {
+            _log.Warning("Employee salary input rejected; errorCode={ErrorCode}", "InvalidNumericInput");
             ShowError("أدخل راتبًا صحيحًا يساوي صفرًا أو أكثر.");
             _salary.Focus();
             return;
@@ -127,8 +130,9 @@ public sealed class EmployeeEditorForm : Form
         int? graduationYear = null;
         if (!string.IsNullOrWhiteSpace(_graduationYear.Text))
         {
-            if (!int.TryParse(_graduationYear.Text, out var year))
+            if (!int.TryParse(NormalizeNumericInput(_graduationYear.Text), NumberStyles.Integer, CultureInfo.CurrentCulture, out var year))
             {
+                _log.Warning("Employee graduation year input rejected; errorCode={ErrorCode}", "InvalidNumericInput");
                 ShowError("أدخل سنة تخرج صحيحة أو اتركها فارغة.");
                 _graduationYear.Focus();
                 return;
@@ -177,22 +181,50 @@ public sealed class EmployeeEditorForm : Form
                 });
             }
 
+            if (IsDisposed) return;
             DialogResult = DialogResult.OK;
             Close();
         }
         catch (InvalidOperationException exception)
         {
-            Log.Warning(exception, "Failed to save employee because of a business rule; employeeId={EmployeeId}", _employee?.Id);
+            _log.Warning(exception, "Failed to save employee because of a business rule; employeeId={EmployeeId}", _employee?.Id);
             ShowError("الرقم القومي مسجل لموظف آخر.");
         }
         catch (Exception exception)
         {
-            Log.Error(exception, "Failed to save employee; employeeId={EmployeeId}", _employee?.Id);
+            _log.Error(exception, "Failed to save employee; employeeId={EmployeeId}", _employee?.Id);
             ShowError("تعذر حفظ بيانات الموظف. راجع القيم المدخلة، وتأكد أن الرقم القومي غير مسجل من قبل.");
         }
         finally
         {
             if (!IsDisposed) _saveButton.Enabled = true;
+        }
+    }
+
+    private static string NormalizeNumericInput(string value)
+    {
+        var decimalSeparator = CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator;
+        var groupSeparator = CultureInfo.CurrentCulture.NumberFormat.NumberGroupSeparator;
+        var chars = value.Trim().Select(character => character switch
+        {
+            >= '\u0660' and <= '\u0669' => (char)('0' + character - '\u0660'),
+            >= '\u06F0' and <= '\u06F9' => (char)('0' + character - '\u06F0'),
+            _ => character
+        }).ToArray();
+        return new string(chars).Replace("٫", decimalSeparator, StringComparison.Ordinal)
+            .Replace("٬", groupSeparator, StringComparison.Ordinal);
+    }
+
+    private async void RunSafeEvent(Func<Task> work, string operation)
+    {
+        try
+        {
+            await work();
+        }
+        catch (Exception exception)
+        {
+            _log.Error(exception, "Unhandled employee form event failure; operation={Operation}", operation);
+            if (!IsDisposed) ShowError("تعذر إكمال العملية. أعد المحاولة.");
         }
     }
 
