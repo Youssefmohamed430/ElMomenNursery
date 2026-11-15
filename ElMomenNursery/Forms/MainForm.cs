@@ -492,6 +492,7 @@ public sealed class MainForm : Form
         var isCustomizing = false;
         var savedLayout = LoadSavedLayout();
         var hasCustomLayout = savedLayout.Count > 0;
+        var loadInProgress = false;
         AttachDraggableControls();
 
         addButton.Click += async (_, _) =>
@@ -512,10 +513,26 @@ public sealed class MainForm : Form
                 return;
             }
 
-            var child = await _childService.GetChildByIdAsync(childId);
-            using var editor = new ChildEditorForm(_childService, child);
-            if (editor.ShowDialog(this) == DialogResult.OK)
+            try
+            {
+                var child = await _childService.GetChildByIdAsync(childId);
+                using var editor = new ChildEditorForm(_childService, child);
+                if (editor.ShowDialog(this) == DialogResult.OK)
+                    await LoadChildrenAsync();
+            }
+            catch (KeyNotFoundException exception)
+            {
+                Log.ForContext<MainForm>().Warning(exception, "Selected child was not found; childId={ChildId}", childId);
+                MessageBox.Show(this, "لم يتم العثور على سجل الطفل. حدّث القائمة.", "تعديل بيانات طفل", MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
                 await LoadChildrenAsync();
+            }
+            catch (Exception exception)
+            {
+                Log.ForContext<MainForm>().Error(exception, "Failed to open child editor; childId={ChildId}", childId);
+                MessageBox.Show(this, "تعذر فتح سجل الطفل.", "تعديل بيانات طفل", MessageBoxButtons.OK,
+                    MessageBoxIcon.Error, MessageBoxDefaultButton.Button1, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+            }
         };
         detailsButton.Click += (_, _) => { if (!isCustomizing) ShowComingSoon("ملف الطفل"); };
         exportButton.Click += (_, _) => { if (!isCustomizing) ShowComingSoon("تصدير القائمة"); };
@@ -567,7 +584,7 @@ public sealed class MainForm : Form
                 resetLayoutButton.Visible = false;
                 SetDragAppearance(false);
                 LayoutChildrenPage();
-                _ = LoadChildrenAsync();
+                _ = RunSafeAsync(LoadChildrenAsync, "Load children after layout reset");
             }
             catch (Exception exception)
             {
@@ -579,7 +596,7 @@ public sealed class MainForm : Form
         page.Controls.AddRange([filterPanel, actions, resultCount, grid]);
         page.Resize += (_, _) => LayoutChildrenPage();
         LayoutChildrenPage();
-        _ = LoadChildrenAsync();
+        _ = RunSafeAsync(LoadChildrenAsync, "Load children");
         return page;
 
         void AddFilterField(string controlName, string labelText, Control control, int width)
@@ -617,6 +634,12 @@ public sealed class MainForm : Form
 
         async Task LoadChildrenAsync()
         {
+            if (loadInProgress)
+            {
+                Log.Debug("Skipped child load because another load is in progress");
+                return;
+            }
+            loadInProgress = true;
             applyButton.Enabled = false;
             clearButton.Enabled = false;
             resultCount.Text = "جارٍ تحميل الأطفال...";
@@ -625,6 +648,11 @@ public sealed class MainForm : Form
                 if (classroomFilter.Items.Count == 1)
                 {
                     var classrooms = await _childService.GetClassroomsForFilterAsync();
+                    if (page.IsDisposed || classroomFilter.IsDisposed)
+                    {
+                        Log.Debug("Child load cancelled: page disposed");
+                        return;
+                    }
                     foreach (var classroom in classrooms)
                         classroomFilter.Items.Add(classroom);
                 }
@@ -654,6 +682,11 @@ public sealed class MainForm : Form
                     HasPaidSubscription = hasPaidSubscription
                 };
                 var children = await _childService.GetChildrenAsync(filter);
+                if (page.IsDisposed || grid.IsDisposed || resultCount.IsDisposed)
+                {
+                    Log.Debug("Child load cancelled: page disposed");
+                    return;
+                }
                 grid.Rows.Clear();
                 foreach (var child in children)
                 {
@@ -691,8 +724,12 @@ public sealed class MainForm : Form
             }
             finally
             {
-                applyButton.Enabled = true;
-                clearButton.Enabled = true;
+                loadInProgress = false;
+                if (!page.IsDisposed && !applyButton.IsDisposed && !clearButton.IsDisposed)
+                {
+                    applyButton.Enabled = true;
+                    clearButton.Enabled = true;
+                }
             }
         }
 
@@ -907,6 +944,7 @@ public sealed class MainForm : Form
             grid.Columns[index].Width = columnWidths[index];
 
         List<EmployeeDto> employees = [];
+        var employeeLoadInProgress = false;
         search.TextChanged += (_, _) => RenderEmployees();
         addButton.Click += async (_, _) =>
         {
@@ -958,23 +996,42 @@ public sealed class MainForm : Form
         page.Controls.AddRange([search, addButton, editButton, deleteButton, resultCount, grid]);
         page.Resize += (_, _) => LayoutEmployeesPage();
         LayoutEmployeesPage();
-        _ = LoadEmployeesAsync();
+        _ = RunSafeAsync(LoadEmployeesAsync, "Load employees");
         return page;
 
         async Task LoadEmployeesAsync()
         {
+            if (employeeLoadInProgress)
+            {
+                Log.Debug("Skipped employee load because another load is in progress");
+                return;
+            }
+            employeeLoadInProgress = true;
             try
             {
-                employees = (await _employeeService.GetEmployees()).ToList();
+                var loadedEmployees = (await _employeeService.GetEmployees()).ToList();
+                if (page.IsDisposed || grid.IsDisposed)
+                {
+                    Log.Debug("Employee load cancelled: page disposed");
+                    return;
+                }
+                employees = loadedEmployees;
                 RenderEmployees();
             }
             catch (Exception exception)
             {
                 Log.Error(exception, "Failed to load employees for display");
-                employees = [];
-                grid.Rows.Clear();
-                resultCount.Text = "تعذر تحميل الموظفين";
-                ShowEmployeeError($"تعذر تحميل قائمة الموظفين.\n{exception.Message}");
+                if (!page.IsDisposed && !grid.IsDisposed)
+                {
+                    employees = [];
+                    grid.Rows.Clear();
+                    resultCount.Text = "تعذر تحميل الموظفين";
+                    ShowEmployeeError("تعذر تحميل قائمة الموظفين.");
+                }
+            }
+            finally
+            {
+                employeeLoadInProgress = false;
             }
         }
 
@@ -1086,6 +1143,7 @@ public sealed class MainForm : Form
         };
         var grid = CreateGrid(["الموظف", "المسمى الوظيفي", "الحالة", "وقت الحضور", "وقت الانصراف", "طريقة التسجيل", "ملاحظات"]);
         List<EmployeeDailyAttendanceDto> attendanceRows = [];
+        var attendanceLoadInProgress = false;
 
         datePicker.ValueChanged += async (_, _) => await LoadAttendanceAsync();
         search.TextChanged += (_, _) => RenderAttendance();
@@ -1097,29 +1155,45 @@ public sealed class MainForm : Form
         page.Controls.AddRange([dateLabel, datePicker, search, refreshButton, markButton, editButton, countLabel, grid]);
         page.Resize += (_, _) => LayoutAttendancePage();
         LayoutAttendancePage();
-        _ = LoadAttendanceAsync();
+        _ = RunSafeAsync(LoadAttendanceAsync, "Load employee attendance");
         return page;
 
         async Task LoadAttendanceAsync()
         {
+            if (attendanceLoadInProgress)
+            {
+                Log.Debug("Skipped attendance load because another load is in progress");
+                return;
+            }
+            attendanceLoadInProgress = true;
             try
             {
                 datePicker.Enabled = refreshButton.Enabled = false;
-                attendanceRows = (await _employeeAttendanceService.GetDailyAttendanceAsync(
+                var loadedAttendance = (await _employeeAttendanceService.GetDailyAttendanceAsync(
                     DateOnly.FromDateTime(datePicker.Value))).ToList();
+                if (page.IsDisposed || grid.IsDisposed)
+                {
+                    Log.Debug("Attendance load cancelled: page disposed");
+                    return;
+                }
+                attendanceRows = loadedAttendance;
                 RenderAttendance();
             }
             catch (Exception exception)
             {
                 Log.Error(exception, "Failed to load employee attendance; date={AttendanceDate}", datePicker.Value.Date);
-                attendanceRows = [];
-                grid.Rows.Clear();
-                countLabel.Text = "تعذر تحميل سجلات الحضور";
-                ShowAttendanceError($"تعذر تحميل حضور الموظفين.\n{exception.Message}");
+                if (!page.IsDisposed && !grid.IsDisposed)
+                {
+                    attendanceRows = [];
+                    grid.Rows.Clear();
+                    countLabel.Text = "تعذر تحميل سجلات الحضور";
+                    ShowAttendanceError("تعذر تحميل حضور الموظفين.");
+                }
             }
             finally
             {
                 if (!page.IsDisposed) datePicker.Enabled = refreshButton.Enabled = true;
+                attendanceLoadInProgress = false;
             }
         }
 
@@ -1398,6 +1472,18 @@ public sealed class MainForm : Form
         button.FlatAppearance.MouseOverBackColor = BrandPalette.SoftGreen;
         button.Click += (_, _) => Navigate(section);
         return button;
+    }
+
+    private static async Task RunSafeAsync(Func<Task> work, string operation)
+    {
+        try
+        {
+            await work();
+        }
+        catch (Exception exception)
+        {
+            Log.ForContext<MainForm>().Error(exception, "Unhandled page load failure; operation={Operation}", operation);
+        }
     }
 
     protected override void Dispose(bool disposing)

@@ -24,7 +24,9 @@ public class EmployeeService(IUnitOfWork unitOfWork, ILogger<EmployeeService> lo
 
         var newEmp = employee.Adapt<Employee>();
         await unitOfWork.Repository<Employee>().AddAsync(newEmp);
-        await unitOfWork.SaveChangesAsync();
+        var affectedRows = await unitOfWork.SaveChangesAsync();
+        if (affectedRows == 0)
+            logger.LogWarning("Employee creation saved no rows; employeeId={EmployeeId}", newEmp.Id);
         logger.LogInformation("Created employee record; employeeId={EmployeeId}", newEmp.Id);
         return newEmp.Adapt<EmployeeDto>();
     }
@@ -35,7 +37,9 @@ public class EmployeeService(IUnitOfWork unitOfWork, ILogger<EmployeeService> lo
         if (employee == null) return false;
 
         unitOfWork.Repository<Employee>().Remove(employee);
-        await unitOfWork.SaveChangesAsync();
+        var affectedRows = await unitOfWork.SaveChangesAsync();
+        if (affectedRows == 0)
+            logger.LogWarning("Employee deletion saved no rows; employeeId={EmployeeId}", id);
         logger.LogInformation("Deleted employee record; employeeId={EmployeeId}", id);
         return true;
     }
@@ -88,7 +92,9 @@ public class EmployeeService(IUnitOfWork unitOfWork, ILogger<EmployeeService> lo
         employee.Adapt(existingEmployee, MapsterConfigForEmployee.Config);
         existingEmployee.UpdatedAt = DateTimeOffset.UtcNow;
         unitOfWork.Repository<Employee>().Update(existingEmployee);
-        await unitOfWork.SaveChangesAsync();
+        var affectedRows = await unitOfWork.SaveChangesAsync();
+        if (affectedRows == 0)
+            logger.LogWarning("Employee update saved no rows; employeeId={EmployeeId}", id);
         logger.LogInformation("Updated employee record; employeeId={EmployeeId}", id);
         return existingEmployee.Adapt<EmployeeDto>();
     }

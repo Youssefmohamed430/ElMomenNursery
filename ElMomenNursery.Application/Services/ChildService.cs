@@ -17,7 +17,9 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger) 
         {
             var child = childDto.Adapt<Child>();
             await unitOfWork.Repository<Child>().AddAsync(child);
-            await unitOfWork.SaveChangesAsync();
+            var affectedRows = await unitOfWork.SaveChangesAsync();
+            if (affectedRows == 0)
+                logger.LogWarning("Child creation saved no rows; childId={ChildId}", child.Id);
             logger.LogInformation("Created child record; childId={ChildId}", child.Id);
             return child.Adapt<ChildDto>();
         }
@@ -31,11 +33,13 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger) 
     {
         try
         {
-            var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(c => c.Id == childId);
+            var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(c => c.Id == childId, asNoTracking: false);
             if (child == null) throw new KeyNotFoundException($"Child with ID '{childId}' was not found.");
             childDto.Adapt(child, MapsterConfigForChild.Config);
             child.UpdatedAt = DateTimeOffset.UtcNow;
-            await unitOfWork.SaveChangesAsync();
+            var affectedRows = await unitOfWork.SaveChangesAsync();
+            if (affectedRows == 0)
+                logger.LogWarning("Child update saved no rows; childId={ChildId}", childId);
             logger.LogInformation("Updated child record; childId={ChildId}", childId);
             return child.Adapt<ChildDto>();
         }
@@ -52,7 +56,9 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger) 
             var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(c => c.Id == childId);
             if (child == null) return false;
             unitOfWork.Repository<Child>().Remove(child);
-            await unitOfWork.SaveChangesAsync();
+            var affectedRows = await unitOfWork.SaveChangesAsync();
+            if (affectedRows == 0)
+                logger.LogWarning("Child deletion saved no rows; childId={ChildId}", childId);
             logger.LogInformation("Deleted child record; childId={ChildId}", childId);
             return true;
         }
@@ -150,12 +156,22 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger) 
     public async Task<ChildDto> GetChildByIdAsync(Guid childId)
     {
         var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(c => c.Id == childId);
+        if (child is null)
+        {
+            logger.LogWarning("Child record was not found; childId={ChildId}", childId);
+            throw new KeyNotFoundException($"Child '{childId}' was not found.");
+        }
         return child.Adapt<ChildDto>();
     }
 
     public async Task<ChildDto> GetChildByNameAsync(string childName)
     {
         var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(c => c.FullName == childName);
+        if (child is null)
+        {
+            logger.LogWarning("Child record was not found by name lookup");
+            throw new KeyNotFoundException("Child record was not found.");
+        }
         return child.Adapt<ChildDto>();
     }
 

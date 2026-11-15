@@ -36,7 +36,7 @@ internal sealed class EfRepository<TEntity>(NurseryDbContext dbContext) : IRepos
     public Task<List<TEntity>> ListAsync(
         Expression<Func<TEntity, bool>>? predicate = null,
         bool asNoTracking = true,
-        string[] includeProperties = null,
+        string[]? includeProperties = null,
         CancellationToken cancellationToken = default)
     {
         var query = asNoTracking ? Query() : Query(asNoTracking: false);

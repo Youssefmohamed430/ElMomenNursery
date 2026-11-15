@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace ElMomenNursery.Infrastructure.Persistence;
 
-internal sealed class EfUnitOfWork(NurseryDbContext dbContext, ILogger<EfUnitOfWork> logger) : IUnitOfWork
+internal sealed class EfUnitOfWork(NurseryDbContext dbContext, ILogger<EfUnitOfWork> logger) : IUnitOfWork, IDisposable
 {
     private readonly ConcurrentDictionary<Type, object> _repositories = new();
     private IDbContextTransaction? _transaction;
@@ -109,6 +109,19 @@ internal sealed class EfUnitOfWork(NurseryDbContext dbContext, ILogger<EfUnitOfW
             _transaction = null;
         }
 
+        // DbContext is scoped and disposed by the dependency injection container.
+        _disposed = true;
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _transaction?.Dispose();
+        _transaction = null;
         // DbContext is scoped and disposed by the dependency injection container.
         _disposed = true;
     }
