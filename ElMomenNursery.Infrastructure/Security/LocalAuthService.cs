@@ -19,7 +19,7 @@ public sealed class LocalAuthService(NurseryDbContext db, ISessionManager sessio
 
     public async Task<bool> NeedsInitialAdministratorSetupAsync(CancellationToken cancellationToken = default)
     {
-        var setupNeeded = !await db.UserAccounts.AnyAsync(x => IsRecognizedPasswordHash(x.PasswordHash), cancellationToken);
+        var setupNeeded = !await HasRecognizedPasswordHashAsync(cancellationToken);
         if (setupNeeded) logger.LogInformation("Initial administrator setup mode entered");
         return setupNeeded;
     }
@@ -129,7 +129,7 @@ public sealed class LocalAuthService(NurseryDbContext db, ISessionManager sessio
     {
         if (username.Length is < 3 or > 64 || fullName.Length is < 2 or > 200 || !ValidPassword(password))
             return (null, CommonErrors.InvalidRequest);
-        if (await db.UserAccounts.AnyAsync(x => IsRecognizedPasswordHash(x.PasswordHash), cancellationToken))
+        if (await HasRecognizedPasswordHashAsync(cancellationToken))
             return (null, CommonErrors.Conflict);
         var role = await db.Roles.SingleOrDefaultAsync(x => x.Name == "Admin", cancellationToken);
         if (role is null) return (null, CommonErrors.Conflict);
@@ -180,6 +180,10 @@ public sealed class LocalAuthService(NurseryDbContext db, ISessionManager sessio
             return false;
         }
     }
+
+    private async Task<bool> HasRecognizedPasswordHashAsync(CancellationToken cancellationToken) =>
+        (await db.UserAccounts.AsNoTracking().Select(user => user.PasswordHash).ToListAsync(cancellationToken))
+        .Any(IsRecognizedPasswordHash);
 
     private async Task SaveChangesWithLoggingAsync(string operation, Guid? userId, CancellationToken cancellationToken)
     {
