@@ -1,6 +1,7 @@
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Infrastructure.Security;
 using ElMomenNursery.Styling;
+using Serilog;
 
 namespace ElMomenNursery.Forms;
 
@@ -43,8 +44,8 @@ internal sealed class UserManagementForm : UserControl
                 _grid.Rows.Add(user.Username, user.FullName, string.Join("، ", user.Roles), user.IsActive ? "نشط" : "موقوف", user.Id, user.IsActive);
             _status.Text = $"عدد الحسابات: {_grid.Rows.Count}";
         }
-        catch (UnauthorizedAccessException) { _status.Text = "ليست لديك صلاحية عرض الحسابات."; }
-        catch { _status.Text = "تعذر تحميل الحسابات."; }
+        catch (UnauthorizedAccessException exception) { Log.Warning(exception, "Access denied while loading user accounts"); _status.Text = "ليست لديك صلاحية عرض الحسابات."; }
+        catch (Exception exception) { Log.Error(exception, "Failed to load user accounts"); _status.Text = "تعذر تحميل الحسابات."; }
     }
 
     private async Task AddAccountAsync()
@@ -62,11 +63,12 @@ internal sealed class UserManagementForm : UserControl
                 LabelAt("كلمة المرور", 103), password, LabelAt("الدور", 153), role, button]);
             if (dialog.ShowDialog(FindForm()) != DialogResult.OK || role.SelectedItem is not RoleSummary selected) return;
             var result = await _service.CreateAccountAsync(username.Text, name.Text, password.Text, selected.Id);
+            if (result.IsFailure) Log.Warning("Account creation was rejected; errorCode={ErrorCode}", result.Error.Code);
             _status.Text = result.IsSuccess ? "تم إنشاء الحساب." : "تعذر إنشاء الحساب. تحقق من البيانات وكلمة المرور.";
             await ReloadAsync();
         }
-        catch (UnauthorizedAccessException) { _status.Text = "ليست لديك صلاحية إنشاء الحسابات."; }
-        catch { _status.Text = "تعذر إنشاء الحساب."; }
+        catch (UnauthorizedAccessException exception) { Log.Warning(exception, "Access denied while creating a user account"); _status.Text = "ليست لديك صلاحية إنشاء الحسابات."; }
+        catch (Exception exception) { Log.Error(exception, "Failed to create user account"); _status.Text = "تعذر إنشاء الحساب."; }
     }
 
     private async Task ToggleAccountAsync()
@@ -77,11 +79,12 @@ internal sealed class UserManagementForm : UserControl
         try
         {
             var result = await _service.SetAccountActiveAsync(id, !active);
+            if (result.IsFailure) Log.Warning("Account status change was rejected; userId={UserId}; errorCode={ErrorCode}", id, result.Error.Code);
             _status.Text = result.IsSuccess ? "تم تحديث حالة الحساب." : "تعذر إيقاف الحساب. تأكد من وجود مسؤول نشط آخر.";
             await ReloadAsync();
         }
-        catch (UnauthorizedAccessException) { _status.Text = "ليست لديك صلاحية إدارة الحسابات."; }
-        catch { _status.Text = "تعذر تحديث الحساب."; }
+        catch (UnauthorizedAccessException exception) { Log.Warning(exception, "Access denied while changing account status; userId={UserId}", id); _status.Text = "ليست لديك صلاحية إدارة الحسابات."; }
+        catch (Exception exception) { Log.Error(exception, "Failed to change account status; userId={UserId}", id); _status.Text = "تعذر تحديث الحساب."; }
     }
 
     private async Task ResetPasswordAsync()
@@ -98,10 +101,11 @@ internal sealed class UserManagementForm : UserControl
         {
             var id = (Guid)_grid.SelectedRows[0].Cells[4].Value!;
             var result = await _service.ResetPasswordAsync(id, password.Text);
+            if (result.IsFailure) Log.Warning("Account password reset was rejected; userId={UserId}; errorCode={ErrorCode}", id, result.Error.Code);
             _status.Text = result.IsSuccess ? "تم تعيين كلمة مرور جديدة." : "يجب أن تحتوي كلمة المرور على 12 حرفًا على الأقل، تشمل أحرفًا وأرقامًا.";
         }
-        catch (UnauthorizedAccessException) { _status.Text = "ليست لديك صلاحية إعادة تعيين كلمات المرور."; }
-        catch { _status.Text = "تعذر إعادة تعيين كلمة المرور."; }
+        catch (UnauthorizedAccessException exception) { Log.Warning(exception, "Access denied while resetting account password"); _status.Text = "ليست لديك صلاحية إعادة تعيين كلمات المرور."; }
+        catch (Exception exception) { Log.Error(exception, "Failed to reset account password"); _status.Text = "تعذر إعادة تعيين كلمة المرور."; }
     }
 
     private async Task EditRolePermissionsAsync()
@@ -126,10 +130,11 @@ internal sealed class UserManagementForm : UserControl
             dialog.Controls.AddRange([select, list, save]);
             if (dialog.ShowDialog(FindForm()) != DialogResult.OK || select.SelectedItem is not RoleSummary chosen) return;
             var result = await _service.SetRolePermissionsAsync(chosen.Id, permissions.Where(x => x.Checked).Select(x => (string)x.Tag!).ToArray());
+            if (result.IsFailure) Log.Warning("Role permission update was rejected; roleId={RoleId}; errorCode={ErrorCode}", chosen.Id, result.Error.Code);
             _status.Text = result.IsSuccess ? "تم تحديث صلاحيات الدور." : "تعذر حفظ الصلاحيات.";
         }
-        catch (UnauthorizedAccessException) { _status.Text = "ليست لديك صلاحية إدارة الأدوار."; }
-        catch { _status.Text = "تعذر تحميل أو حفظ صلاحيات الأدوار."; }
+        catch (UnauthorizedAccessException exception) { Log.Warning(exception, "Access denied while managing role permissions"); _status.Text = "ليست لديك صلاحية إدارة الأدوار."; }
+        catch (Exception exception) { Log.Error(exception, "Failed to load or save role permissions"); _status.Text = "تعذر تحميل أو حفظ صلاحيات الأدوار."; }
     }
 
     private async Task AssignRolesAsync()
@@ -149,11 +154,12 @@ internal sealed class UserManagementForm : UserControl
             if (dialog.ShowDialog(FindForm()) != DialogResult.OK) return;
             var selected = list.CheckedItems.Cast<RoleSummary>().Select(x => x.Id).ToArray();
             var result = await _service.SetUserRolesAsync(userId, selected);
+            if (result.IsFailure) Log.Warning("User role update was rejected; userId={UserId}; errorCode={ErrorCode}", userId, result.Error.Code);
             _status.Text = result.IsSuccess ? "تم تحديث أدوار الحساب." : "يجب إبقاء دور واحد على الأقل، ولا يمكن إزالة آخر مسؤول نشط.";
             await ReloadAsync();
         }
-        catch (UnauthorizedAccessException) { _status.Text = "ليست لديك صلاحية تعيين الأدوار."; }
-        catch { _status.Text = "تعذر تحديث أدوار الحساب."; }
+        catch (UnauthorizedAccessException exception) { Log.Warning(exception, "Access denied while assigning account roles"); _status.Text = "ليست لديك صلاحية تعيين الأدوار."; }
+        catch (Exception exception) { Log.Error(exception, "Failed to assign account roles"); _status.Text = "تعذر تحديث أدوار الحساب."; }
     }
 
     private static Button Button(string text) => new() { Text = text, Width = 140, Height = 40, Margin = new Padding(5), FlatStyle = FlatStyle.Flat,

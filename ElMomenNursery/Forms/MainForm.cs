@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Text.Json;
+using Serilog;
 using ElMomenNursery.Application.DTOs;
 using ElMomenNursery.Controls;
 using ElMomenNursery.Application.IServices;
@@ -570,6 +571,7 @@ public sealed class MainForm : Form
             }
             catch (Exception exception)
             {
+                Log.Error(exception, "Failed to reset child screen layout");
                 ShowLayoutError(exception.Message);
             }
         };
@@ -681,6 +683,7 @@ public sealed class MainForm : Form
             }
             catch (Exception exception)
             {
+                Log.Error(exception, "Failed to load children for display");
                 resultCount.Text = "تعذر تحميل البيانات";
                 MessageBox.Show($"تعذر تحميل قائمة الأطفال.\n{exception.Message}", "خطأ في تحميل البيانات",
                     MessageBoxButtons.OK, MessageBoxIcon.Error, MessageBoxDefaultButton.Button1,
@@ -817,6 +820,7 @@ public sealed class MainForm : Form
             }
             catch (Exception exception)
             {
+                Log.Error(exception, "Failed to save child screen layout");
                 ShowLayoutError(exception.Message);
                 return false;
             }
@@ -835,8 +839,9 @@ public sealed class MainForm : Form
                 return JsonSerializer.Deserialize<Dictionary<string, int[]>>(File.ReadAllText(GetLayoutFilePath()))
                     ?? new Dictionary<string, int[]>(StringComparer.Ordinal);
             }
-            catch
+            catch (Exception exception)
             {
+                Log.Warning(exception, "Failed to read saved child screen layout; using default layout");
                 return new Dictionary<string, int[]>(StringComparer.Ordinal);
             }
         }
@@ -921,6 +926,7 @@ public sealed class MainForm : Form
             }
             catch (Exception exception)
             {
+                Log.Error(exception, "Failed to open employee editor; employeeId={EmployeeId}", id);
                 ShowEmployeeError($"تعذر فتح بيانات الموظف.\n{exception.Message}");
             }
         };
@@ -942,8 +948,9 @@ public sealed class MainForm : Form
                 }
                 await LoadEmployeesAsync();
             }
-            catch
+            catch (Exception exception)
             {
+                Log.Error(exception, "Failed to delete employee; employeeId={EmployeeId}", id);
                 ShowEmployeeError("تعذر حذف الموظف لوجود سجلات مرتبطة به. احتفظ بسجل الموظف واكتفِ بتعديل بياناته.");
             }
         };
@@ -963,6 +970,7 @@ public sealed class MainForm : Form
             }
             catch (Exception exception)
             {
+                Log.Error(exception, "Failed to load employees for display");
                 employees = [];
                 grid.Rows.Clear();
                 resultCount.Text = "تعذر تحميل الموظفين";
@@ -1103,6 +1111,7 @@ public sealed class MainForm : Form
             }
             catch (Exception exception)
             {
+                Log.Error(exception, "Failed to load employee attendance; date={AttendanceDate}", datePicker.Value.Date);
                 attendanceRows = [];
                 grid.Rows.Clear();
                 countLabel.Text = "تعذر تحميل سجلات الحضور";

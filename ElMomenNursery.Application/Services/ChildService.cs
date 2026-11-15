@@ -5,41 +5,62 @@ using ElMomenNursery.Application.Mappings;
 using ElMomenNursery.Domain.Entities;
 using ElMomenNursery.Domain.Enums;
 using System.Linq.Expressions;
+using Microsoft.Extensions.Logging;
 
 namespace ElMomenNursery.Application.Services;
 
-public class ChildService(IUnitOfWork unitOfWork) : IChildService
+public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger) : IChildService
 {
     public async Task<ChildDto> CreateChildAsync(CreateChildDTO childDto)
     {
-        var child = childDto.Adapt<Child>();
-
-        await unitOfWork.Repository<Child>().AddAsync(child);
-        await unitOfWork.SaveChangesAsync();
-
-        return child.Adapt<ChildDto>();
+        try
+        {
+            var child = childDto.Adapt<Child>();
+            await unitOfWork.Repository<Child>().AddAsync(child);
+            await unitOfWork.SaveChangesAsync();
+            logger.LogInformation("Created child record; childId={ChildId}", child.Id);
+            return child.Adapt<ChildDto>();
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "ChildService failed to create child record");
+            throw;
+        }
     }
     public async Task<ChildDto> UpdateChildAsync(Guid childId, UpdateChildDTO childDto)
     {
-        var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(c => c.Id == childId);
-
-        if (child == null) throw new KeyNotFoundException($"Child with ID '{childId}' was not found.");
-
-        childDto.Adapt(child, MapsterConfigForChild.Config);
-        child.UpdatedAt = DateTimeOffset.UtcNow;
-        await unitOfWork.SaveChangesAsync();
-
-        return child.Adapt<ChildDto>();
+        try
+        {
+            var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(c => c.Id == childId);
+            if (child == null) throw new KeyNotFoundException($"Child with ID '{childId}' was not found.");
+            childDto.Adapt(child, MapsterConfigForChild.Config);
+            child.UpdatedAt = DateTimeOffset.UtcNow;
+            await unitOfWork.SaveChangesAsync();
+            logger.LogInformation("Updated child record; childId={ChildId}", childId);
+            return child.Adapt<ChildDto>();
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "ChildService failed to update child record; childId={ChildId}", childId);
+            throw;
+        }
     }
     public async Task<bool> DeleteChildAsync(Guid childId)
     {
-        var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(c => c.Id == childId);
-        if (child == null) return false;
-
-        unitOfWork.Repository<Child>().Remove(child);
-        await unitOfWork.SaveChangesAsync();
-
-        return true;
+        try
+        {
+            var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(c => c.Id == childId);
+            if (child == null) return false;
+            unitOfWork.Repository<Child>().Remove(child);
+            await unitOfWork.SaveChangesAsync();
+            logger.LogInformation("Deleted child record; childId={ChildId}", childId);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "ChildService failed to delete child record; childId={ChildId}", childId);
+            throw;
+        }
     }
 
     public async Task<List<ChildDto>> GetAllChildrenAsync()

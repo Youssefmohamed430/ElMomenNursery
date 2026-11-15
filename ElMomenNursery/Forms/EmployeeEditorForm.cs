@@ -1,6 +1,7 @@
 using ElMomenNursery.Application.DTOs;
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Domain.Enums;
+using Serilog;
 
 namespace ElMomenNursery.Forms;
 
@@ -179,12 +180,14 @@ public sealed class EmployeeEditorForm : Form
             DialogResult = DialogResult.OK;
             Close();
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException exception)
         {
+            Log.Warning(exception, "Failed to save employee because of a business rule; employeeId={EmployeeId}", _employee?.Id);
             ShowError("الرقم القومي مسجل لموظف آخر.");
         }
-        catch
+        catch (Exception exception)
         {
+            Log.Error(exception, "Failed to save employee; employeeId={EmployeeId}", _employee?.Id);
             ShowError("تعذر حفظ بيانات الموظف. راجع القيم المدخلة، وتأكد أن الرقم القومي غير مسجل من قبل.");
         }
         finally

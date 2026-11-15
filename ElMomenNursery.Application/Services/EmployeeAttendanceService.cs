@@ -3,10 +3,11 @@ using ElMomenNursery.Application.DTOs;
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Domain.Entities;
 using ElMomenNursery.Domain.Enums;
+using Microsoft.Extensions.Logging;
 
 namespace ElMomenNursery.Application.Services;
 
-public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork) : IEmployeeAttendanceService
+public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<EmployeeAttendanceService> logger) : IEmployeeAttendanceService
 {
     public async Task<IReadOnlyList<EmployeeDailyAttendanceDto>> GetDailyAttendanceAsync(
         DateOnly date,
@@ -67,7 +68,10 @@ public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork) : IEmploye
             attendance => attendance.EmployeeId == dto.EmployeeId && attendance.AttendanceDate == dto.AttendanceDate,
             cancellationToken);
         if (alreadyMarked)
+        {
+            logger.LogWarning("Manual attendance rejected because a record already exists; employeeId={EmployeeId}; date={AttendanceDate}", dto.EmployeeId, dto.AttendanceDate);
             throw new InvalidOperationException("Attendance has already been recorded for this employee and date.");
+        }
 
         var attendance = new EmployeeAttendance
         {
@@ -89,6 +93,7 @@ public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork) : IEmploye
             attendance,
             $"Status={attendance.Status}; CheckIn={FormatTime(attendance.CheckInTime)}; CheckOut={FormatTime(attendance.CheckOutTime)}");
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        logger.LogInformation("Recorded manual employee attendance; attendanceId={AttendanceId}; employeeId={EmployeeId}; date={AttendanceDate}", attendance.Id, dto.EmployeeId, dto.AttendanceDate);
         return ToDto(attendance);
     }
 
@@ -113,7 +118,10 @@ public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork) : IEmploye
                     item.AttendanceDate == dto.AttendanceDate,
             cancellationToken);
         if (duplicateDate)
+        {
+            logger.LogWarning("Attendance correction rejected because another record exists for the selected date; attendanceId={AttendanceId}; employeeId={EmployeeId}; date={AttendanceDate}", id, attendance.EmployeeId, dto.AttendanceDate);
             throw new InvalidOperationException("Attendance is already recorded for this employee and date.");
+        }
 
         var oldValues = $"Date={attendance.AttendanceDate}; Status={attendance.Status}; CheckIn={FormatTime(attendance.CheckInTime)}; CheckOut={FormatTime(attendance.CheckOutTime)}";
         attendance.AttendanceDate = dto.AttendanceDate;
@@ -130,6 +138,7 @@ public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork) : IEmploye
             attendance,
             $"Before: {oldValues}; After: Date={attendance.AttendanceDate}; Status={attendance.Status}; CheckIn={FormatTime(attendance.CheckInTime)}; CheckOut={FormatTime(attendance.CheckOutTime)}");
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        logger.LogInformation("Corrected employee attendance; attendanceId={AttendanceId}; employeeId={EmployeeId}; date={AttendanceDate}", id, attendance.EmployeeId, dto.AttendanceDate);
         return ToDto(attendance);
     }
 

@@ -92,7 +92,7 @@ internal static class Program
         var configuredPath = configuration["Serilog:File:Path"] ?? "Logs/log-.txt";
         var logPath = Path.IsPathRooted(configuredPath)
             ? configuredPath
-            : Path.Combine(AppContext.BaseDirectory, configuredPath);
+            : Path.Combine(FindProjectRoot() ?? AppContext.BaseDirectory, configuredPath);
         logPath = Path.GetFullPath(logPath);
         Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
 
@@ -110,6 +110,17 @@ internal static class Program
                 shared: true,
                 outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}")
             .CreateLogger();
+    }
+
+    private static string? FindProjectRoot()
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "ElMomenNursery.sln")))
+                return directory.FullName;
+        }
+
+        return null;
     }
 
     private static void ShowUnexpectedError()

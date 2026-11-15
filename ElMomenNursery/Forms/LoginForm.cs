@@ -1,6 +1,7 @@
 using System.Drawing;
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Styling;
+using Serilog;
 
 namespace ElMomenNursery.Forms;
 
@@ -76,12 +77,14 @@ public sealed class LoginForm : Form
             }
             else
             {
+                Log.Warning("Authentication operation was rejected; setupMode={SetupMode}; errorCode={ErrorCode}", _setupMode, result.Error.Code);
                 _note.Text = _setupMode ? "تعذر إنشاء الحساب. تحقق من البيانات أو أعد فتح التطبيق." : "اسم المستخدم أو كلمة المرور غير صحيحة، أو الحساب غير متاح مؤقتًا.";
                 _note.ForeColor = BrandPalette.DangerText;
             }
         }
-        catch
+        catch (Exception exception)
         {
+            Log.Error(exception, "Login form operation failed; setupMode={SetupMode}", _setupMode);
             _note.Text = "تعذر إكمال العملية. أعد المحاولة."; _note.ForeColor = BrandPalette.DangerText;
         }
         finally { _submit.Enabled = true; }

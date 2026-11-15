@@ -1,6 +1,8 @@
 using ElMomenNursery.Application.DTOs;
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Domain.Enums;
+using Microsoft.EntityFrameworkCore;
+using Serilog;
 
 namespace ElMomenNursery.Forms;
 
@@ -162,13 +164,21 @@ public sealed class EmployeeAttendanceEditorForm : Form
             DialogResult = DialogResult.OK;
             Close();
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException exception)
         {
+            Log.Warning(exception, "Attendance save rejected by a business rule; employeeId={EmployeeId}; date={AttendanceDate}", _row.EmployeeId, _row.AttendanceDate);
             ShowError("تم تسجيل الحضور لهذا الموظف في هذا التاريخ بالفعل.");
         }
-        catch
+        catch (DbUpdateException exception) when (exception.GetBaseException().Message.Contains("UNIQUE constraint failed", StringComparison.OrdinalIgnoreCase))
         {
-            ShowError("تعذر حفظ سجل الحضور. راجع البيانات وحاول مرة أخرى.");
+            Log.Warning(exception, "Attendance save hit the unique employee/date constraint; employeeId={EmployeeId}; date={AttendanceDate}", _row.EmployeeId, _row.AttendanceDate);
+            ShowError("تم تسجيل الحضور لهذا الموظف في هذا التاريخ بالفعل. حدّث القائمة ثم راجع السجل.");
+        }
+        catch (Exception exception)
+        {
+            Log.Error(exception, "Failed to save employee attendance; employeeId={EmployeeId}; date={AttendanceDate}", _row.EmployeeId, _row.AttendanceDate);
+            var cause = exception.GetBaseException().Message;
+            ShowError($"تعذر حفظ سجل الحضور. السبب: {cause}");
         }
         finally
         {

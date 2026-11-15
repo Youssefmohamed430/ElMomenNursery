@@ -3,10 +3,11 @@ using ElMomenNursery.Application.DTOs;
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Application.Mappings;
 using ElMomenNursery.Domain.Entities;
+using Microsoft.Extensions.Logging;
 
 namespace ElMomenNursery.Application.Services;
 
-public class EmployeeService(IUnitOfWork unitOfWork) : IEmployeeService
+public class EmployeeService(IUnitOfWork unitOfWork, ILogger<EmployeeService> logger) : IEmployeeService
 {
     public async Task<EmployeeDto> CreateEmployee(CreateEmployeeDto employee)
     {
@@ -16,11 +17,15 @@ public class EmployeeService(IUnitOfWork unitOfWork) : IEmployeeService
             throw new ArgumentOutOfRangeException(nameof(employee), "Salary cannot be negative.");
         employee.NationalIdNumber = employee.NationalIdNumber.Trim();
         if (await unitOfWork.Repository<Employee>().AnyAsync(e => e.NationalIdNumber == employee.NationalIdNumber))
+        {
+            logger.LogWarning("Employee creation rejected because national ID is already registered");
             throw new InvalidOperationException("An employee with this national ID already exists.");
+        }
 
         var newEmp = employee.Adapt<Employee>();
         await unitOfWork.Repository<Employee>().AddAsync(newEmp);
         await unitOfWork.SaveChangesAsync();
+        logger.LogInformation("Created employee record; employeeId={EmployeeId}", newEmp.Id);
         return newEmp.Adapt<EmployeeDto>();
     }
 
@@ -31,6 +36,7 @@ public class EmployeeService(IUnitOfWork unitOfWork) : IEmployeeService
 
         unitOfWork.Repository<Employee>().Remove(employee);
         await unitOfWork.SaveChangesAsync();
+        logger.LogInformation("Deleted employee record; employeeId={EmployeeId}", id);
         return true;
     }
 
@@ -72,7 +78,10 @@ public class EmployeeService(IUnitOfWork unitOfWork) : IEmployeeService
             throw new ArgumentOutOfRangeException(nameof(employee), "Salary cannot be negative.");
         if (employee.NationalIdNumber is not null && await unitOfWork.Repository<Employee>().AnyAsync(e =>
                 e.Id != id && e.NationalIdNumber == employee.NationalIdNumber.Trim()))
+        {
+            logger.LogWarning("Employee update rejected because national ID is already registered; employeeId={EmployeeId}", id);
             throw new InvalidOperationException("An employee with this national ID already exists.");
+        }
 
         if (employee.NationalIdNumber is not null)
             employee.NationalIdNumber = employee.NationalIdNumber.Trim();
@@ -80,6 +89,7 @@ public class EmployeeService(IUnitOfWork unitOfWork) : IEmployeeService
         existingEmployee.UpdatedAt = DateTimeOffset.UtcNow;
         unitOfWork.Repository<Employee>().Update(existingEmployee);
         await unitOfWork.SaveChangesAsync();
+        logger.LogInformation("Updated employee record; employeeId={EmployeeId}", id);
         return existingEmployee.Adapt<EmployeeDto>();
     }
 

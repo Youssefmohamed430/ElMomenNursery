@@ -1,0 +1,9 @@
+2026-11-15 07:07:46.000 +02:00 [INF]  Application starting
+2026-11-15 07:07:59.789 +02:00 [WRN] Microsoft.EntityFrameworkCore.Query Compiling a query which loads related collections for more than one collection navigation, either via 'Include' or through projection, but no 'QuerySplittingBehavior' has been configured. By default, Entity Framework will use 'QuerySplittingBehavior.SingleQuery', which can potentially result in slow query performance. See https://go.microsoft.com/fwlink/?linkid=2134277 for more information. To identify the query that's triggering this warning call 'ConfigureWarnings(w => w.Throw(RelationalEventId.MultipleCollectionIncludeWarning))'.
+2026-11-15 07:08:00.329 +02:00 [WRN]  Authentication operation was rejected; setupMode=false; errorCode=Common.InvalidCredentials
+2026-11-15 07:08:24.352 +02:00 [INF] ElMomenNursery.Application.Services.ChildService Updated child record; childId="d49b1c22-b1a3-4073-9723-a9e95482834e"
+2026-11-15 07:08:40.815 +02:00 [FTL]  Application terminated during startup or execution
+System.InvalidOperationException: 'ElMomenNursery.Infrastructure.Persistence.EfUnitOfWork' type only implements IAsyncDisposable. Use DisposeAsync to dispose the container.
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceProviderEngineScope.Dispose()
+   at ElMomenNursery.Program.Main() in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery\Program.cs:line 74
+   at ElMomenNursery.Program.Main() in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery\Program.cs:line 18

@@ -2,10 +2,11 @@ using System.Collections.Concurrent;
 using ElMomenNursery.Application.Abstractions.Persistence;
 using ElMomenNursery.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Logging;
 
 namespace ElMomenNursery.Infrastructure.Persistence;
 
-internal sealed class EfUnitOfWork(NurseryDbContext dbContext) : IUnitOfWork
+internal sealed class EfUnitOfWork(NurseryDbContext dbContext, ILogger<EfUnitOfWork> logger) : IUnitOfWork
 {
     private readonly ConcurrentDictionary<Type, object> _repositories = new();
     private IDbContextTransaction? _transaction;
@@ -19,10 +20,24 @@ internal sealed class EfUnitOfWork(NurseryDbContext dbContext) : IUnitOfWork
             _ => new EfRepository<TEntity>(dbContext));
     }
 
-    public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        return dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            var affectedRows = await dbContext.SaveChangesAsync(cancellationToken);
+            logger.LogDebug("Saved {AffectedRows} database changes", affectedRows);
+            return affectedRows;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "Failed to save database changes");
+            throw;
+        }
     }
 
     public async Task BeginTransactionAsync(CancellationToken cancellationToken = default)
@@ -49,8 +64,9 @@ internal sealed class EfUnitOfWork(NurseryDbContext dbContext) : IUnitOfWork
             await dbContext.SaveChangesAsync(cancellationToken);
             await _transaction.CommitAsync(cancellationToken);
         }
-        catch
+        catch (Exception exception)
         {
+            logger.LogError(exception, "Failed to commit database transaction; rolling back");
             await _transaction.RollbackAsync(CancellationToken.None);
             throw;
         }

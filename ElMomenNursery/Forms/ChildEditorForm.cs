@@ -1,6 +1,7 @@
 using ElMomenNursery.Application.DTOs;
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Domain.Enums;
+using Serilog;
 
 namespace ElMomenNursery.Forms;
 
@@ -196,6 +197,7 @@ public sealed class ChildEditorForm : Form
         }
         catch (Exception exception)
         {
+            Log.Error(exception, "Failed to save child record; childId={ChildId}", _child?.Id);
             ShowValidationError($"تعذر حفظ بيانات الطفل.\n{exception.Message}");
         }
         finally
