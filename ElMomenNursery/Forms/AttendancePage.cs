@@ -10,15 +10,15 @@ namespace ElMomenNursery.Forms;
 
 public sealed class AttendancePage : UserControl
 {
-    public AttendancePage(IServiceScopeFactory scopes, UserSession session)
+    public AttendancePage(IServiceScopeFactory scopes, UserSession session, IExcelExportService excelExportService)
     {
         Dock = DockStyle.Fill;
         RightToLeft = RightToLeft.Yes;
         var tabs = new TabControl { Dock = DockStyle.Fill, RightToLeft = RightToLeft.Yes };
         if (session.HasPermission("Attendance.View"))
-            tabs.TabPages.Add(new TabPage("حضور الأطفال") { Controls = { new ChildAttendancePage(scopes, session) } });
+            tabs.TabPages.Add(new TabPage("حضور الأطفال") { Controls = { new ChildAttendancePage(scopes, session, excelExportService) } });
         if (session.HasPermission("EmployeeAttendance.View"))
-            tabs.TabPages.Add(new TabPage("حضور الموظفين") { Controls = { new EmployeeAttendancePage(scopes, session) } });
+            tabs.TabPages.Add(new TabPage("حضور الموظفين") { Controls = { new EmployeeAttendancePage(scopes, session, excelExportService) } });
         Controls.Add(tabs);
     }
 }
@@ -26,6 +26,7 @@ public sealed class AttendancePage : UserControl
 internal sealed class ChildAttendancePage : UserControl
 {
     private readonly IServiceScopeFactory _scopes;
+    private readonly IExcelExportService _excelExportService;
     private readonly DateTimePicker _date = new() { Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy", MaxDate = DateTime.Today, Width = 140 };
     private readonly ComboBox _classroom = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 190 };
     private readonly ComboBox _status = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
@@ -42,9 +43,9 @@ internal sealed class ChildAttendancePage : UserControl
     private List<ChildDailyAttendanceDto> _rows = [];
     private int _loadVersion;
 
-    public ChildAttendancePage(IServiceScopeFactory scopes, UserSession session)
+    public ChildAttendancePage(IServiceScopeFactory scopes, UserSession session, IExcelExportService excelExportService)
     {
-        _scopes = scopes;
+        _scopes = scopes; _excelExportService = excelExportService;
         Dock = DockStyle.Fill; RightToLeft = RightToLeft.Yes; BackColor = Color.White; Padding = new Padding(14);
         _status.Items.AddRange(["الكل", "لم يسجل", "حاضر", "غائب", "متأخر", "غياب بعذر"]); _status.SelectedIndex = 0;
         _classroom.Items.Add(new ClassroomFilterOptionDto(Guid.Empty, "كل الفصول")); _classroom.SelectedIndex = 0;
@@ -52,9 +53,13 @@ internal sealed class ChildAttendancePage : UserControl
         _present.Visible = _absent.Visible = _checkout.Visible = session.HasPermission("Attendance.Record");
         _manual.Visible = session.HasPermission("Attendance.Record"); _correct.Visible = session.HasPermission("Attendance.Edit");
         var filters = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = true, FlowDirection = FlowDirection.RightToLeft, AutoScroll = true };
+        var export = MakeButton("تصدير Excel"); export.Visible = session.HasPermission("Attendance.Export");
+        export.Click += async (_, _) => await GridExcelExport.SaveAsync((IWin32Window?)FindForm() ?? this, _grid,
+            _excelExportService, "تصدير حضور الأطفال", "حضور الأطفال");
         filters.Controls.AddRange([new Label { Text = "التاريخ", AutoSize = true, Padding = new Padding(0, 8, 0, 0) }, _date,
             new Label { Text = "الفصل", AutoSize = true, Padding = new Padding(0, 8, 0, 0) }, _classroom,
             new Label { Text = "الحالة", AutoSize = true, Padding = new Padding(0, 8, 0, 0) }, _status, _search, _refresh, _manual, _present, _absent, _checkout, _correct, _markAll]);
+        filters.Controls.Add(export);
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 3, ColumnCount = 1, RightToLeft = RightToLeft.Yes };
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 92)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         layout.Controls.Add(filters, 0, 0); layout.Controls.Add(_summary, 0, 1); layout.Controls.Add(_grid, 0, 2); Controls.Add(layout);
@@ -203,6 +208,7 @@ internal sealed class ChildAttendancePage : UserControl
 internal sealed class EmployeeAttendancePage : UserControl
 {
     private readonly IServiceScopeFactory _scopes;
+    private readonly IExcelExportService _excelExportService;
     private readonly DateTimePicker _date = new() { Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy", MaxDate = DateTime.Today, Width = 145 };
     private readonly TextBox _search = new() { PlaceholderText = "بحث باسم الموظف أو الوظيفة", Width = 230, RightToLeft = RightToLeft.Yes };
     private readonly DataGridView _grid = new() { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, RightToLeft = RightToLeft.Yes, RowHeadersVisible = false, Columns = { new DataGridViewTextBoxColumn { HeaderText = "الموظف" }, new DataGridViewTextBoxColumn { HeaderText = "الوظيفة" }, new DataGridViewTextBoxColumn { HeaderText = "الحالة" }, new DataGridViewTextBoxColumn { HeaderText = "الحضور" }, new DataGridViewTextBoxColumn { HeaderText = "الانصراف" }, new DataGridViewTextBoxColumn { HeaderText = "طريقة التسجيل" }, new DataGridViewTextBoxColumn { HeaderText = "ملاحظات" } } };
@@ -211,15 +217,19 @@ internal sealed class EmployeeAttendancePage : UserControl
     private readonly Button _checkout = new() { Text = "تسجيل انصراف", AutoSize = true };
     private readonly Button _edit = new() { Text = "تصحيح السجل", AutoSize = true };
     private readonly Button _refresh = new() { Text = "تحديث", AutoSize = true };
+    private readonly Button _export = new() { Text = "تصدير Excel", AutoSize = true };
     private readonly Label _summary = new() { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight };
     private List<EmployeeDailyAttendanceDto> _rows = [];
     private int _version;
 
-    public EmployeeAttendancePage(IServiceScopeFactory scopes, UserSession session)
+    public EmployeeAttendancePage(IServiceScopeFactory scopes, UserSession session, IExcelExportService excelExportService)
     {
-        _scopes = scopes; Dock = DockStyle.Fill; BackColor = Color.White; Padding = new Padding(12); RightToLeft = RightToLeft.Yes;
+        _scopes = scopes; _excelExportService = excelExportService; Dock = DockStyle.Fill; BackColor = Color.White; Padding = new Padding(12); RightToLeft = RightToLeft.Yes;
+        _export.Visible = session.HasPermission("EmployeeAttendance.Export");
+        _export.Click += async (_, _) => await GridExcelExport.SaveAsync((IWin32Window?)FindForm() ?? this, _grid,
+            _excelExportService, "تصدير حضور الموظفين", "حضور الموظفين");
         var bar = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = true, FlowDirection = FlowDirection.RightToLeft, AutoScroll = true };
-        bar.Controls.AddRange([new Label { Text = "التاريخ", AutoSize = true, Padding = new Padding(0, 8, 0, 0) }, _date, _search, _refresh, _present, _absent, _checkout, _edit]);
+        bar.Controls.AddRange([new Label { Text = "التاريخ", AutoSize = true, Padding = new Padding(0, 8, 0, 0) }, _date, _search, _refresh, _present, _absent, _checkout, _edit, _export]);
         _present.Visible = _absent.Visible = _checkout.Visible = session.HasPermission("EmployeeAttendance.Record");
         _edit.Visible = session.HasPermission("EmployeeAttendance.Edit");
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 3, ColumnCount = 1 };

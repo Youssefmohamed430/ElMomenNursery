@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Infrastructure.Security;
+using ElMomenNursery.Infrastructure.Spreadsheet;
 using Microsoft.Data.Sqlite;
 using Serilog;
 
@@ -71,6 +72,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IAuthService, LocalAuthService>();
         services.AddScoped<IPermissionService, LocalPermissionService>();
         services.AddScoped<IAccountManagementService, LocalAccountManagementService>();
+        services.AddSingleton<IExcelExportService, ExcelExportService>();
         services.AddSingleton<ISessionManager, SessionManager>();
         return services;
     }

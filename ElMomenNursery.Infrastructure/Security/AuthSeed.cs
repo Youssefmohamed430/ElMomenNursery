@@ -12,7 +12,8 @@ public static class AuthSeed
         "EmployeeAttendance.View", "EmployeeAttendance.Record", "EmployeeAttendance.Edit",
         "Employees.View", "Employees.Manage", "Payments.View", "Payments.Create", "Payments.Edit",
         "Expenses.View", "Expenses.Manage", "Inventory.View", "Inventory.Manage",
-        "Subscriptions.View", "Subscriptions.Manage", "Users.View", "Users.Manage", "Roles.Manage", "Permissions.Manage", "Settings.View", "Settings.Manage"
+        "Subscriptions.View", "Subscriptions.Manage", "Users.View", "Users.Manage", "Roles.Manage", "Permissions.Manage", "Settings.View", "Settings.Manage",
+        "Students.Export", "Employees.Export", "Classes.Export", "Attendance.Export", "EmployeeAttendance.Export", "Users.Export"
     ];
 
     public static async Task InitializeAsync(NurseryDbContext db, CancellationToken ct = default)
@@ -67,6 +68,34 @@ public static class AuthSeed
                 Key = "Authentication.RolePermissionsSeeded.V2",
                 Value = "true",
                 Description = "Employee attendance permission seed completed without replacing existing mappings."
+            });
+            await db.SaveChangesAsync(ct);
+        }
+
+        // Grant current list-export permissions to the built-in Admin and Manager roles once.
+        var v3Seeded = await db.AppSettings.AnyAsync(x => x.Key == "Authentication.RolePermissionsSeeded.V3", ct);
+        if (!v3Seeded)
+        {
+            var exportsByRole = new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                ["Admin"] = ["Students.Export", "Employees.Export", "Classes.Export", "Attendance.Export", "EmployeeAttendance.Export", "Users.Export"],
+                ["Manager"] = ["Students.Export", "Employees.Export", "Classes.Export", "Attendance.Export", "EmployeeAttendance.Export"]
+            };
+            foreach (var (roleName, codes) in exportsByRole)
+            {
+                var role = await db.Roles.Include(x => x.RolePermissions).SingleAsync(x => x.Name == roleName, ct);
+                var assignedCodes = (await db.RolePermissions.Where(x => x.RoleId == role.Id)
+                    .Select(x => x.Permission.Code).ToListAsync(ct)).ToHashSet(StringComparer.Ordinal);
+                var permissionIds = await db.Permissions.Where(x => codes.Contains(x.Code) && !assignedCodes.Contains(x.Code))
+                    .Select(x => x.Id).ToListAsync(ct);
+                foreach (var permissionId in permissionIds)
+                    db.RolePermissions.Add(new RolePermission { RoleId = role.Id, PermissionId = permissionId });
+            }
+            db.AppSettings.Add(new AppSetting
+            {
+                Key = "Authentication.RolePermissionsSeeded.V3",
+                Value = "true",
+                Description = "Initial list export permission seed completed without replacing administrator-edited mappings."
             });
             await db.SaveChangesAsync(ct);
         }

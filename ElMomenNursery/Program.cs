@@ -109,6 +109,7 @@ internal static class Program
                         appScope.ServiceProvider.GetRequiredService<IAccountManagementService>(),
                         appScope.ServiceProvider.GetRequiredService<IChildService>(),
                         appScope.ServiceProvider.GetRequiredService<IEmployeeService>(),
+                        appScope.ServiceProvider.GetRequiredService<IExcelExportService>(),
                         serviceProvider.GetRequiredService<IServiceScopeFactory>()));
                     if (session.IsAuthenticated)
                     {

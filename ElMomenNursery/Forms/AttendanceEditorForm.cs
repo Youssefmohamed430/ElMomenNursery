@@ -20,6 +20,15 @@ internal sealed class AttendanceEditorForm : Form
     private readonly TextBox _reason = new() { Multiline = true, MaxLength = 500, ScrollBars = ScrollBars.Vertical, RightToLeft = RightToLeft.Yes, Dock = DockStyle.Fill };
     private readonly Button _submit = new() { Text = "حفظ", DialogResult = DialogResult.None, Width = 120, Height = 38 };
 
+    // Visual Studio's WinForms designer needs a parameterless constructor to preview this form.
+    // The preview uses sample values and a no-op save callback; normal app flows use the full constructor below.
+    public AttendanceEditorForm()
+        : this("معاينة", "اسم الطفل", DateOnly.FromDateTime(DateTime.Today), correction: false,
+            status: AttendanceStatus.Present, checkIn: null, checkOut: null, notes: null,
+            save: _ => Task.FromResult<Error?>(null))
+    {
+    }
+
     public AttendanceEditorForm(string title, string subject, DateOnly date, bool correction,
         AttendanceStatus? status, DateTimeOffset? checkIn, DateTimeOffset? checkOut, string? notes,
         Func<AttendanceEditorValues, Task<Error?>> save)

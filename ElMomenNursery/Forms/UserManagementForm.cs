@@ -9,14 +9,15 @@ internal sealed class UserManagementForm : UserControl
 {
     private static readonly ILogger _log = Log.ForContext<UserManagementForm>();
     private readonly IAccountManagementService _service;
+    private readonly IExcelExportService _excelExportService;
     private readonly DataGridView _grid = new() { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false,
         AllowUserToDeleteRows = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false,
         AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, RowHeadersVisible = false };
     private readonly Label _status = new() { AutoSize = true, ForeColor = BrandPalette.MutedText };
 
-    public UserManagementForm(IAccountManagementService service, UserSession session)
+    public UserManagementForm(IAccountManagementService service, UserSession session, IExcelExportService excelExportService)
     {
-        _service = service;
+        _service = service; _excelExportService = excelExportService;
         Dock = DockStyle.Fill; BackColor = BrandPalette.AppBackground; RightToLeft = RightToLeft.Yes; Padding = new Padding(24);
         _grid.Columns.Add("Username", "اسم المستخدم"); _grid.Columns.Add("FullName", "الاسم");
         _grid.Columns.Add("Roles", "الأدوار"); _grid.Columns.Add("Active", "الحالة");
@@ -26,6 +27,8 @@ internal sealed class UserManagementForm : UserControl
         var add = Button("إضافة حساب"); var toggle = Button("تفعيل / إيقاف الحساب"); var roles = Button("صلاحيات الأدوار");
         var assignments = Button("تعيين أدوار");
         var resetPassword = Button("إعادة كلمة المرور");
+        var export = Button("تصدير Excel");
+        export.Visible = session.HasPermission("Users.Export");
         add.Visible = toggle.Visible = assignments.Visible = resetPassword.Visible = session.HasPermission("Users.Manage");
         roles.Visible = session.HasPermission("Permissions.Manage");
         add.Click += (_, _) => RunSafeEvent(() => AddAccountAsync(), "Create user account");
@@ -33,7 +36,9 @@ internal sealed class UserManagementForm : UserControl
         roles.Click += (_, _) => RunSafeEvent(() => EditRolePermissionsAsync(), "Edit role permissions");
         assignments.Click += (_, _) => RunSafeEvent(() => AssignRolesAsync(), "Assign account roles");
         resetPassword.Click += (_, _) => RunSafeEvent(() => ResetPasswordAsync(), "Reset account password");
-        toolbar.Controls.AddRange([add, toggle, assignments, resetPassword, roles, _status]);
+        export.Click += async (_, _) => await GridExcelExport.SaveAsync((IWin32Window?)FindForm() ?? this, _grid,
+            _excelExportService, "تصدير الحسابات", "الحسابات");
+        toolbar.Controls.AddRange([add, toggle, assignments, resetPassword, roles, export, _status]);
         Controls.Add(_grid); Controls.Add(toolbar);
         Load += (_, _) => RunSafeEvent(() => ReloadAsync(), "Load user accounts");
     }

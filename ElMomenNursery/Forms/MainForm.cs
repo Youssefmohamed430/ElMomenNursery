@@ -23,16 +23,19 @@ public sealed class MainForm : Form
     private readonly IAccountManagementService _accountManagement;
     private readonly IChildService _childService;
     private readonly IEmployeeService _employeeService;
+    private readonly IExcelExportService _excelExportService;
     private readonly IServiceScopeFactory _scopeFactory;
 
     public MainForm(UserSession session, Func<Task> logout, IAccountManagementService accountManagement,
-        IChildService childService, IEmployeeService employeeService, IServiceScopeFactory scopeFactory)
+        IChildService childService, IEmployeeService employeeService, IExcelExportService excelExportService,
+        IServiceScopeFactory scopeFactory)
     {
         _session = session;
         _logout = logout;
         _accountManagement = accountManagement;
         _childService = childService;
         _employeeService = employeeService;
+        _excelExportService = excelExportService;
         _scopeFactory = scopeFactory;
         Text = "نظام إدارة حضانة المؤمن";
         StartPosition = FormStartPosition.CenterScreen;
@@ -276,9 +279,9 @@ public sealed class MainForm : Form
                 "الرئيسية" => BuildHomePage(),
                 "الأطفال" => BuildChildrenPage(),
                 "الموظفون" => BuildEmployeesPage(),
-                "الحضور" => new AttendancePage(_scopeFactory, _session),
+                "الحضور" => new AttendancePage(_scopeFactory, _session, _excelExportService),
                 "الفصول" => BuildClassesPage(),
-                "إدارة المستخدمين" => new UserManagementForm(_accountManagement, _session),
+                "إدارة المستخدمين" => new UserManagementForm(_accountManagement, _session, _excelExportService),
                 _ => BuildSectionPage(section)
             };
             _pageHost.Controls.Add(page);
@@ -432,7 +435,7 @@ public sealed class MainForm : Form
         editButton.Visible = _session.HasPermission("Students.Edit");
         deleteButton.Visible = _session.HasPermission("Students.Delete");
         detailsButton.Visible = _session.HasPermission("Students.View");
-        exportButton.Visible = _session.HasPermission("Students.View");
+        exportButton.Visible = _session.HasPermission("Students.Export");
         addButton.Name = "actions.add";
         editButton.Name = "actions.edit";
         deleteButton.Name = "actions.delete";
@@ -627,7 +630,10 @@ public sealed class MainForm : Form
             }
         }, "Delete child");
         detailsButton.Click += (_, _) => { if (!isCustomizing) ShowComingSoon("ملف الطفل"); };
-        exportButton.Click += (_, _) => { if (!isCustomizing) ShowComingSoon("تصدير القائمة"); };
+        exportButton.Click += async (_, _) =>
+        {
+            if (!isCustomizing) await GridExcelExport.SaveAsync(this, grid, _excelExportService, "تصدير قائمة الأطفال", "الأطفال");
+        };
 
         applyButton.Click += (_, _) => RunSafeEvent(async () => { if (!isCustomizing) await LoadChildrenAsync(); }, "Apply child filters");
         clearButton.Click += (_, _) => RunSafeEvent(async () =>
@@ -1020,6 +1026,8 @@ public sealed class MainForm : Form
         var addButton = CreateActionButton("إضافة موظف", primary: true);
         var editButton = CreateActionButton("تعديل البيانات");
         var deleteButton = CreateActionButton("حذف موظف");
+        var exportButton = CreateActionButton("تصدير Excel");
+        exportButton.Visible = _session.HasPermission("Employees.Export");
         var canManage = _session.HasPermission("Employees.Manage");
         addButton.Visible = editButton.Visible = deleteButton.Visible = canManage;
         var resultCount = new Label
@@ -1064,6 +1072,8 @@ public sealed class MainForm : Form
                 if (!page.IsDisposed) ShowEmployeeError("تعذر فتح بيانات الموظف. أعد المحاولة.");
             }
         }, "Open employee editor");
+        exportButton.Click += async (_, _) => await GridExcelExport.SaveAsync(this, grid, _excelExportService,
+            "تصدير قائمة الموظفين", "الموظفون");
         deleteButton.Click += (_, _) => RunSafeEvent(async () =>
         {
             if (!TryGetSelectedEmployeeId(out var id)) return;
@@ -1095,7 +1105,7 @@ public sealed class MainForm : Form
             }
         }, "Delete employee");
 
-        page.Controls.AddRange([search, addButton, editButton, deleteButton, resultCount, grid]);
+        page.Controls.AddRange([search, addButton, editButton, deleteButton, exportButton, resultCount, grid]);
         page.Resize += (_, _) => LayoutEmployeesPage();
         LayoutEmployeesPage();
         _ = RunSafeAsync(LoadEmployeesAsync, "Load employees");
@@ -1189,10 +1199,11 @@ public sealed class MainForm : Form
             LayoutDataHeader(page);
             var width = page.ClientSize.Width - 68;
             var y = 190;
-            search.SetBounds(34, y, Math.Max(220, width - 560), 42);
+            search.SetBounds(34, y, Math.Max(220, width - 720), 42);
             addButton.SetBounds(page.ClientSize.Width - 34 - 145, y, 145, 42);
             editButton.SetBounds(addButton.Left - 150, y, 142, 42);
             deleteButton.SetBounds(editButton.Left - 142, y, 134, 42);
+            exportButton.SetBounds(deleteButton.Left - 142, y, 134, 42);
             resultCount.SetBounds(34, 236, 300, 26);
             grid.SetBounds(34, 266, width, Math.Max(220, page.ClientSize.Height - 300));
         }
@@ -1220,6 +1231,8 @@ public sealed class MainForm : Form
         addButton.Visible = editButton.Visible = _session.HasPermission("Classes.Manage");
         var rosterButton = CreateActionButton("عرض قائمة الأطفال");
         var printButton = CreateActionButton("طباعة القائمة");
+        var exportButton = CreateActionButton("تصدير Excel");
+        exportButton.Visible = _session.HasPermission("Classes.Export");
         var grid = CreateGrid(["اسم الفصل", "المعلمة", "عدد الأطفال", "الحالة"]);
         grid.Rows.Add("فصل الفراشات", "—", "١٢", "متاح");
         grid.Rows.Add("فصل الزهور", "—", "١٠", "متاح");
@@ -1229,8 +1242,10 @@ public sealed class MainForm : Form
         editButton.Click += (_, _) => ShowComingSoon("تعديل بيانات الفصل");
         rosterButton.Click += (_, _) => ShowComingSoon("قائمة الأطفال بالفصل");
         printButton.Click += (_, _) => ShowComingSoon("طباعة قائمة الفصل");
+        exportButton.Click += async (_, _) => await GridExcelExport.SaveAsync(this, grid, _excelExportService,
+            "تصدير قائمة الفصول", "الفصول");
 
-        page.Controls.AddRange([search, addButton, editButton, rosterButton, printButton, grid]);
+        page.Controls.AddRange([search, addButton, editButton, rosterButton, printButton, exportButton, grid]);
         page.Resize += (_, _) => LayoutClassesPage();
         LayoutClassesPage();
         return page;
@@ -1244,6 +1259,7 @@ public sealed class MainForm : Form
             editButton.SetBounds(addButton.Left - 140 - 8, y, 140, 42);
             rosterButton.SetBounds(editButton.Left - 180 - 8, y, 180, 42);
             printButton.SetBounds(rosterButton.Left - 145 - 8, y, 145, 42);
+            exportButton.SetBounds(printButton.Left - 142 - 8, y, 142, 42);
             grid.SetBounds(34, 248, page.ClientSize.Width - 68, Math.Max(220, page.ClientSize.Height - 282));
         }
     }
