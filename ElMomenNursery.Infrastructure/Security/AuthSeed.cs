@@ -9,6 +9,7 @@ public static class AuthSeed
     public static readonly string[] PermissionCodes = [
         "Students.View", "Students.Create", "Students.Edit", "Students.Delete",
         "Classes.View", "Classes.Manage", "Attendance.View", "Attendance.Record", "Attendance.Edit",
+        "EmployeeAttendance.View", "EmployeeAttendance.Record", "EmployeeAttendance.Edit",
         "Employees.View", "Employees.Manage", "Payments.View", "Payments.Create", "Payments.Edit",
         "Expenses.View", "Expenses.Manage", "Inventory.View", "Inventory.Manage",
         "Subscriptions.View", "Subscriptions.Manage", "Users.View", "Users.Manage", "Roles.Manage", "Permissions.Manage", "Settings.View", "Settings.Manage"
@@ -46,6 +47,27 @@ public static class AuthSeed
             }
             db.AppSettings.Add(new AppSetting { Key = "Authentication.RolePermissionsSeeded.V1", Value = "true",
                 Description = "Initial role permission mapping seed completed." });
+            await db.SaveChangesAsync(ct);
+        }
+
+        // Add employee attendance access to Manager without replacing administrator-edited mappings.
+        var v2Seeded = await db.AppSettings.AnyAsync(x => x.Key == "Authentication.RolePermissionsSeeded.V2", ct);
+        if (!v2Seeded)
+        {
+            var manager = await db.Roles.Include(x => x.RolePermissions).SingleAsync(x => x.Name == "Manager", ct);
+            var managerCodes = await db.RolePermissions.Where(x => x.RoleId == manager.Id)
+                .Select(x => x.Permission.Code).ToListAsync(ct);
+            var missingCodes = new[] { "EmployeeAttendance.View", "EmployeeAttendance.Record", "EmployeeAttendance.Edit" }
+                .Except(managerCodes, StringComparer.Ordinal).ToArray();
+            var permissionIds = await db.Permissions.Where(x => missingCodes.Contains(x.Code)).Select(x => x.Id).ToListAsync(ct);
+            foreach (var permissionId in permissionIds)
+                db.RolePermissions.Add(new RolePermission { RoleId = manager.Id, PermissionId = permissionId });
+            db.AppSettings.Add(new AppSetting
+            {
+                Key = "Authentication.RolePermissionsSeeded.V2",
+                Value = "true",
+                Description = "Employee attendance permission seed completed without replacing existing mappings."
+            });
             await db.SaveChangesAsync(ct);
         }
     }

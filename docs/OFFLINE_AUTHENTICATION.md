@@ -17,9 +17,9 @@ Login failures use a generic message. The default lockout is five consecutive fa
 
 ## Permissions and current feature boundaries
 
-The session stores a snapshot of role names and permission codes. UI navigation/actions use that snapshot, and `IPermissionService` provides business-operation guards for services. Role edits refresh the currently logged-in process session before the next operation. The present nursery section screens are still placeholders, so there are not yet child/payment/attendance business services where domain writes can be guarded. Add `EnsurePermission` to each such operation when that module is implemented; button visibility is only a UI aid.
+The session stores a snapshot of role names and permission codes. UI navigation/actions use that snapshot, and `IPermissionService` provides business-operation guards for services. Role edits refresh the currently logged-in process session before the next operation. Attendance services enforce the child permissions `Attendance.View/Record/Edit` and employee permissions `EmployeeAttendance.View/Record/Edit`; UI visibility is only a usability aid.
 
-Role defaults are deliberately limited to implemented modules: Admin receives all seeded codes; Manager manages students, classes, attendance, employees, subscriptions, and inventory; Teacher views students/classes and records attendance; Accountant manages payments/expenses and views subscriptions; Receptionist views/registers students and views classes/subscriptions. Administrators can edit these mappings.
+Role defaults are deliberately limited to implemented modules: Admin receives all seeded codes; Manager manages students, classes, child and employee attendance, employees, subscriptions, and inventory; Teacher views students/classes and records child attendance; Accountant manages payments/expenses and views subscriptions; Receptionist views/registers students and views classes/subscriptions. Administrators can edit these mappings. `Authentication.RolePermissionsSeeded.V2` adds the three employee-attendance permissions to Manager only and only when missing; it does not replace existing role-permission edits. Admin receives the new codes through the existing Admin-all-permissions behavior.
 
 ## Database and security limits
 

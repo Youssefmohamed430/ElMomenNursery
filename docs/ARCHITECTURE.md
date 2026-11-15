@@ -1,6 +1,6 @@
 # Solution architecture
 
-This solution is organized into four projects. The application is still a Windows Forms desktop app; this setup only establishes clean project boundaries and does not implement nursery features.
+This solution is organized into four product projects plus an xUnit test project. The desktop app uses Windows Forms and keeps local persistence and use cases in the same offline solution.
 
 ```text
 ElMomenNursery.sln
@@ -24,6 +24,7 @@ ElMomenNursery.Infrastructure/          # Local database, files, exports, device
   Devices/
   Backup/
   Security/
+ElMomenNursery.Tests/                   # SQLite in-memory application/integration tests
 docs/                                   # Project and architecture documentation
 ```
 
@@ -40,6 +41,7 @@ Desktop UI  ->  Application  ->  Domain
 - **Infrastructure** implements those interfaces for the local database, PDF/Excel output, backup, and hardware adapters.
 - **Desktop UI** displays the workflows and calls Application use cases. It acts as the composition root that wires Infrastructure implementations into Application interfaces.
 - The database is local to this one PC/branch. No network server or cross-branch sync is part of this structure.
+- `ApplicationServiceCollectionExtensions.AddNurseryApplication()` registers Application use cases. Attendance pages resolve services from a fresh asynchronous DI scope for each load/save, so each operation gets its own scoped `DbContext` and unit of work.
 
 ## Initial technology target
 
@@ -60,9 +62,9 @@ All projects currently target .NET 9: the desktop project uses `net9.0-windows` 
 - The actual logo is kept at `ElMomenNursery/Resources/Branding/AlMoumenNurseryLogo.jpeg` and copied to the output directory for the app header.
 - `ElMomenNursery/Controls/` contains reusable navigation buttons, loading/empty/message states, validation hints, form sections/field rows, and Arabic confirmation/information dialogs.
 - The Admin-only settings entry is intentionally not shown until sign-in and permission enforcement are implemented. Role-based filtering remains a later task.
-- Current section pages are visual placeholders only; they do not read or write nursery data.
+- Attendance is the first operational section and reads/writes through scoped Application services. Other main-shell sections remain placeholders or existing partial workflows.
 
 
 
 
-The foundational model uses EF Core 9 with SQLite. ElMomenNursery.Infrastructure/Persistence/NurseryDbContext.cs owns provider mappings and entity configurations; versioned migrations live beside it. Desktop startup applies pending migrations and stores the local database under %LOCALAPPDATA%\AlMoumenNursery by default. See ADR 0002 for implemented scope and remaining decisions.
+The foundational model uses EF Core 9 with SQLite. `ElMomenNursery.Infrastructure/Persistence/NurseryDbContext.cs` owns provider mappings and entity configurations; versioned migrations live beside it. Desktop startup applies pending migrations and stores the local database under `%LOCALAPPDATA%\AlMoumenNursery` by default. The existing `ChildAttendances` and `EmployeeAttendances` tables retain their unique person/date indexes; Phase 8 adds no schema changes. `Forms/AttendancePage` hosts the child and employee daily views, and the Application attendance services enforce permissions and return `Result<T>` with Arabic errors. Attendance corrections write before/after values, reason, and session user name to `AuditLog.ChangeSummary`. Device input and current-view print/export remain future work. See [Phase 8 attendance changes](PHASE-8-ATTENDANCE-CHANGES-AR.md) and ADR 0002 for remaining model decisions.

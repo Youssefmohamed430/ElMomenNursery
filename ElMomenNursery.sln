@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ElMomenNursery.Application"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ElMomenNursery.Infrastructure", "ElMomenNursery.Infrastructure\ElMomenNursery.Infrastructure.csproj", "{C18DE42F-97D0-4AA8-B126-A9F8F1B1F0AD}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ElMomenNursery.Tests", "ElMomenNursery.Tests\ElMomenNursery.Tests.csproj", "{70C098E3-A1DB-415A-BBD6-C7C445BE5931}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -69,6 +71,18 @@ Global
 		{C18DE42F-97D0-4AA8-B126-A9F8F1B1F0AD}.Release|x64.Build.0 = Release|Any CPU
 		{C18DE42F-97D0-4AA8-B126-A9F8F1B1F0AD}.Release|x86.ActiveCfg = Release|Any CPU
 		{C18DE42F-97D0-4AA8-B126-A9F8F1B1F0AD}.Release|x86.Build.0 = Release|Any CPU
+		{70C098E3-A1DB-415A-BBD6-C7C445BE5931}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{70C098E3-A1DB-415A-BBD6-C7C445BE5931}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{70C098E3-A1DB-415A-BBD6-C7C445BE5931}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{70C098E3-A1DB-415A-BBD6-C7C445BE5931}.Debug|x64.Build.0 = Debug|Any CPU
+		{70C098E3-A1DB-415A-BBD6-C7C445BE5931}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{70C098E3-A1DB-415A-BBD6-C7C445BE5931}.Debug|x86.Build.0 = Debug|Any CPU
+		{70C098E3-A1DB-415A-BBD6-C7C445BE5931}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{70C098E3-A1DB-415A-BBD6-C7C445BE5931}.Release|Any CPU.Build.0 = Release|Any CPU
+		{70C098E3-A1DB-415A-BBD6-C7C445BE5931}.Release|x64.ActiveCfg = Release|Any CPU
+		{70C098E3-A1DB-415A-BBD6-C7C445BE5931}.Release|x64.Build.0 = Release|Any CPU
+		{70C098E3-A1DB-415A-BBD6-C7C445BE5931}.Release|x86.ActiveCfg = Release|Any CPU
+		{70C098E3-A1DB-415A-BBD6-C7C445BE5931}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

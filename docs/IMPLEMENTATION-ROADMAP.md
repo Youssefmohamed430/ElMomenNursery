@@ -120,12 +120,14 @@ This roadmap breaks the approved product scope into an ordered, end-to-end task 
 ## Phase 8 — Manual attendance
 
 - [ ] Confirm attendance states and correction policy with the nursery.
-- [ ] Implement child and employee attendance domain rules and date/time handling.
-- [ ] Build a direct daily attendance screen with class/date selection and quick manual actions.
-- [ ] Show each person's current status and prevent accidental duplicate marking where appropriate.
-- [ ] Provide an authorized correction path with actor/time/reason traceability.
-- [ ] Make attendance search and list filtering simple; add current-view print/export where allowed.
-- [ ] Ensure attendance remains fully usable with devices absent, unplugged, or unsupported.
+- [x] Implement shared child and employee attendance rules, date/time validation, and typed Arabic errors.
+- [x] Build daily child and employee attendance tabs with date selection and quick manual actions.
+- [x] Show current status and prevent duplicate daily marks with a pre-check and the existing unique indexes.
+- [x] Provide permission-guarded corrections with actor, timestamp, and required reason in the audit summary.
+- [x] Add Arabic-normalized name search, child classroom/status filters, and daily status counts.
+- [x] Keep manual attendance usable without a configured device; device adapters remain unimplemented.
+- [ ] Add current-view print/export (planned in Phase 11).
+- [ ] Verify the full flow visually on the nursery workstation at 1024×700.
 
 **Gate:** staff can record and correct attendance manually for children and employees offline.
 

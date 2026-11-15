@@ -3,7 +3,7 @@ using ElMomenNursery.Infrastructure.Persistence;
 using ElMomenNursery.Forms;
 using ElMomenNursery.Infrastructure.Security;
 using ElMomenNursery.Application.IServices;
-using ElMomenNursery.Application.Services;
+using ElMomenNursery.Application;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -50,9 +50,7 @@ internal static class Program
             {
                 logging.AddSerilog(Log.Logger, dispose: false);
             });
-            services.AddScoped<IChildService, ChildService>();
-            services.AddScoped<IEmployeeService, EmployeeService>();
-            services.AddScoped<IEmployeeAttendanceService, EmployeeAttendanceService>();
+            services.AddNurseryApplication();
             services.AddNurseryInfrastructure(configuration);
             using var serviceProvider = services.BuildServiceProvider();
             using (var scope = serviceProvider.CreateScope())
@@ -111,7 +109,7 @@ internal static class Program
                         appScope.ServiceProvider.GetRequiredService<IAccountManagementService>(),
                         appScope.ServiceProvider.GetRequiredService<IChildService>(),
                         appScope.ServiceProvider.GetRequiredService<IEmployeeService>(),
-                        appScope.ServiceProvider.GetRequiredService<IEmployeeAttendanceService>()));
+                        serviceProvider.GetRequiredService<IServiceScopeFactory>()));
                     if (session.IsAuthenticated)
                     {
                         try

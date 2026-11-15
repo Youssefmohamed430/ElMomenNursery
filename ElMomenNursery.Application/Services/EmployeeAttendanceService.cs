@@ -2,26 +2,28 @@ using ElMomenNursery.Application.Abstractions.Persistence;
 using ElMomenNursery.Application.DTOs;
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Domain.Entities;
+using ElMomenNursery.Domain.Abstractions;
 using ElMomenNursery.Domain.Enums;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
 
 namespace ElMomenNursery.Application.Services;
 
-public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<EmployeeAttendanceService> logger, IPermissionService permissions) : IEmployeeAttendanceService
+public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<EmployeeAttendanceService> logger, IPermissionService permissions, ISessionManager sessions) : IEmployeeAttendanceService
 {
-    public async Task<IReadOnlyList<EmployeeDailyAttendanceDto>> GetDailyAttendanceAsync(
+    public async Task<Result<IReadOnlyList<EmployeeDailyAttendanceDto>>> GetDailyAttendanceAsync(
         DateOnly date,
         CancellationToken cancellationToken = default)
     {
-        permissions.EnsurePermission("Attendance.View");
-        var employees = await unitOfWork.Repository<Employee>().ListAsync(cancellationToken: cancellationToken);
+        try { permissions.EnsurePermission("EmployeeAttendance.View"); } catch (UnauthorizedAccessException) { return AttendanceErrors.PermissionDenied; }
+        if (date == default || date > DateOnly.FromDateTime(DateTime.Today)) return AttendanceErrors.InvalidDate;
+        var employees = await unitOfWork.Repository<Employee>().ListAsync(x => x.HireDate <= date, cancellationToken: cancellationToken);
         var attendances = await unitOfWork.Repository<EmployeeAttendance>().ListAsync(
             attendance => attendance.AttendanceDate == date,
             cancellationToken: cancellationToken);
         var byEmployee = attendances.ToDictionary(attendance => attendance.EmployeeId);
 
-        return employees
+        return Result.Success<IReadOnlyList<EmployeeDailyAttendanceDto>>(employees
             .OrderBy(employee => employee.FullName)
             .Select(employee => byEmployee.TryGetValue(employee.Id, out var attendance)
                 ? ToDailyDto(employee, attendance)
@@ -32,18 +34,18 @@ public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<Em
                     JobDesignation = employee.JobDesignation,
                     AttendanceDate = date
                 })
-            .ToList();
+            .ToList());
     }
 
-    public async Task<IReadOnlyList<EmployeeAttendanceDto>> GetEmployeeAttendanceByRangeAsync(
+    public async Task<Result<IReadOnlyList<EmployeeAttendanceDto>>> GetEmployeeAttendanceByRangeAsync(
         Guid employeeId,
         DateOnly startDate,
         DateOnly endDate,
         CancellationToken cancellationToken = default)
     {
-        permissions.EnsurePermission("Attendance.View");
+        try { permissions.EnsurePermission("EmployeeAttendance.View"); } catch (UnauthorizedAccessException) { return AttendanceErrors.PermissionDenied; }
         if (startDate > endDate)
-            throw new ArgumentException("Attendance start date must be before or equal to its end date.");
+            return AttendanceErrors.InvalidRange;
 
         var attendances = await unitOfWork.Repository<EmployeeAttendance>().ListAsync(
             attendance => attendance.EmployeeId == employeeId &&
@@ -51,22 +53,24 @@ public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<Em
                           attendance.AttendanceDate <= endDate,
             includeProperties: [nameof(EmployeeAttendance.Employee)],
             cancellationToken: cancellationToken);
-        return attendances.Select(ToDto).ToList();
+        return Result.Success<IReadOnlyList<EmployeeAttendanceDto>>(attendances.Select(ToDto).ToList());
     }
 
-    public async Task<EmployeeAttendanceDto> MarkManualAttendanceAsync(
+    public async Task<Result<EmployeeAttendanceDto>> MarkManualAttendanceAsync(
         CreateEmployeeAttendanceDto dto,
         CancellationToken cancellationToken = default)
     {
-        permissions.EnsurePermission("Attendance.Record");
+        try { permissions.EnsurePermission("EmployeeAttendance.Record"); } catch (UnauthorizedAccessException) { return AttendanceErrors.PermissionDenied; }
         ArgumentNullException.ThrowIfNull(dto);
-        ValidateAttendance(dto.AttendanceDate, dto.Status, dto.CheckInTime, dto.CheckOutTime);
+        var validationError = AttendanceRules.Validate(dto.AttendanceDate, dto.Status, dto.CheckInTime, dto.CheckOutTime);
+        if (validationError is not null) return validationError;
 
         var employee = await unitOfWork.Repository<Employee>().FirstOrDefaultAsync(
             item => item.Id == dto.EmployeeId,
+            asNoTracking: false,
             cancellationToken: cancellationToken);
         if (employee is null)
-            throw new KeyNotFoundException($"Employee '{dto.EmployeeId}' was not found.");
+            return AttendanceErrors.PersonNotFound;
 
         var alreadyMarked = await unitOfWork.Repository<EmployeeAttendance>().AnyAsync(
             attendance => attendance.EmployeeId == dto.EmployeeId && attendance.AttendanceDate == dto.AttendanceDate,
@@ -74,7 +78,7 @@ public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<Em
         if (alreadyMarked)
         {
             logger.LogWarning("Manual attendance rejected because a record already exists; employeeId={EmployeeId}", dto.EmployeeId);
-            throw new InvalidOperationException("Attendance has already been recorded for this employee and date.");
+            return AttendanceErrors.AlreadyRecorded;
         }
 
         var attendance = new EmployeeAttendance
@@ -86,14 +90,14 @@ public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<Em
             CheckOutTime = dto.CheckOutTime,
             Status = dto.Status,
             EntryMethod = AttendanceEntryMethod.Manual,
-            RecordedByUserId = dto.RecordedByUserId,
+            RecordedByUserId = sessions.CurrentUser?.UserId,
             Notes = NormalizeNotes(dto.Notes)
         };
 
         await unitOfWork.Repository<EmployeeAttendance>().AddAsync(attendance, cancellationToken);
         await AddAuditLogAsync(
             "EmployeeAttendance.Created",
-            dto.RecordedByUserId,
+            sessions.CurrentUser?.UserId,
             attendance,
             $"Status={attendance.Status}; CheckIn={FormatTime(attendance.CheckInTime)}; CheckOut={FormatTime(attendance.CheckOutTime)}");
         try
@@ -102,20 +106,20 @@ public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<Em
         }
         catch (DbUpdateException exception) when (IsEmployeeDateUniqueViolation(exception))
         {
-            logger.LogWarning(exception, "Manual attendance raced with another insert; employeeId={EmployeeId}; constraint={ConstraintName}",
+            logger.LogWarning("Manual attendance raced with another insert; employeeId={EmployeeId}; constraint={ConstraintName}",
                 dto.EmployeeId, "UX_EmployeeAttendances_Employee_Date");
-            throw new InvalidOperationException("تم تسجيل الحضور لهذا الموظف في هذا التاريخ بالفعل.", exception);
+            return AttendanceErrors.AlreadyRecorded;
         }
         logger.LogInformation("Recorded manual employee attendance; attendanceId={AttendanceId}; employeeId={EmployeeId}", attendance.Id, dto.EmployeeId);
-        return ToDto(attendance);
+        return Result.Success(ToDto(attendance));
     }
 
-    public async Task<EmployeeAttendanceDto> UpdateEmployeeAttendanceAsync(
+    public async Task<Result<EmployeeAttendanceDto>> UpdateEmployeeAttendanceAsync(
         Guid id,
         UpdateEmployeeAttendanceDto dto,
         CancellationToken cancellationToken = default)
     {
-        permissions.EnsurePermission("Attendance.Edit");
+        try { permissions.EnsurePermission("EmployeeAttendance.Edit"); } catch (UnauthorizedAccessException) { return AttendanceErrors.PermissionDenied; }
         ArgumentNullException.ThrowIfNull(dto);
         var attendance = await unitOfWork.Repository<EmployeeAttendance>().FirstOrDefaultAsync(
             item => item.Id == id,
@@ -123,22 +127,23 @@ public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<Em
             asNoTracking: false,
             cancellationToken: cancellationToken);
         if (attendance is null)
-            throw new KeyNotFoundException($"Employee attendance '{id}' was not found.");
+            return AttendanceErrors.NotFound;
 
-        ValidateAttendance(dto.AttendanceDate, dto.Status, dto.CheckInTime, dto.CheckOutTime);
+        if (!AttendanceRules.HasCorrectionReason(dto.Reason)) return AttendanceErrors.CorrectionReasonRequired;
+        var validationError = AttendanceRules.Validate(attendance.AttendanceDate, dto.Status, dto.CheckInTime, dto.CheckOutTime);
+        if (validationError is not null) return validationError;
         var duplicateDate = await unitOfWork.Repository<EmployeeAttendance>().AnyAsync(
             item => item.Id != id &&
                     item.EmployeeId == attendance.EmployeeId &&
-                    item.AttendanceDate == dto.AttendanceDate,
+                    item.AttendanceDate == attendance.AttendanceDate,
             cancellationToken);
         if (duplicateDate)
         {
             logger.LogWarning("Attendance correction rejected because another record exists for the selected date; attendanceId={AttendanceId}; employeeId={EmployeeId}", id, attendance.EmployeeId);
-            throw new InvalidOperationException("Attendance is already recorded for this employee and date.");
+            return AttendanceErrors.AlreadyRecorded;
         }
 
-        var oldValues = $"Date={attendance.AttendanceDate}; Status={attendance.Status}; CheckIn={FormatTime(attendance.CheckInTime)}; CheckOut={FormatTime(attendance.CheckOutTime)}";
-        attendance.AttendanceDate = dto.AttendanceDate;
+        var oldValues = $"Date={attendance.AttendanceDate:yyyy-MM-dd}; Status={attendance.Status}; CheckIn={FormatTime(attendance.CheckInTime)}; CheckOut={FormatTime(attendance.CheckOutTime)}";
         attendance.CheckInTime = dto.CheckInTime;
         attendance.CheckOutTime = dto.CheckOutTime;
         attendance.Status = dto.Status;
@@ -148,21 +153,39 @@ public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<Em
         unitOfWork.Repository<EmployeeAttendance>().Update(attendance);
         await AddAuditLogAsync(
             "EmployeeAttendance.Corrected",
-            dto.RecordedByUserId,
+            sessions.CurrentUser?.UserId,
             attendance,
-            $"Before: {oldValues}; After: Date={attendance.AttendanceDate}; Status={attendance.Status}; CheckIn={FormatTime(attendance.CheckInTime)}; CheckOut={FormatTime(attendance.CheckOutTime)}");
+            $"قبل: {oldValues}; بعد: Date={attendance.AttendanceDate:yyyy-MM-dd}; Status={attendance.Status}; CheckIn={FormatTime(attendance.CheckInTime)}; CheckOut={FormatTime(attendance.CheckOutTime)}; السبب: {dto.Reason!.Trim()}; المستخدم: {sessions.CurrentUser?.FullName ?? "مستخدم غير معروف"}");
         try
         {
             await unitOfWork.SaveChangesAsync(cancellationToken);
         }
         catch (DbUpdateException exception) when (IsEmployeeDateUniqueViolation(exception))
         {
-            logger.LogWarning(exception, "Attendance correction raced with another insert; attendanceId={AttendanceId}; employeeId={EmployeeId}; constraint={ConstraintName}",
+            logger.LogWarning("Attendance correction raced with another insert; attendanceId={AttendanceId}; employeeId={EmployeeId}; constraint={ConstraintName}",
                 id, attendance.EmployeeId, "UX_EmployeeAttendances_Employee_Date");
-            throw new InvalidOperationException("تم تسجيل الحضور لهذا الموظف في هذا التاريخ بالفعل.", exception);
+            return AttendanceErrors.AlreadyRecorded;
         }
         logger.LogInformation("Corrected employee attendance; attendanceId={AttendanceId}; employeeId={EmployeeId}", id, attendance.EmployeeId);
-        return ToDto(attendance);
+        return Result.Success(ToDto(attendance));
+    }
+
+    public async Task<Result<EmployeeAttendanceDto>> RecordCheckOutAsync(Guid employeeId, DateOnly date, DateTimeOffset checkOutTime, CancellationToken cancellationToken = default)
+    {
+        try { permissions.EnsurePermission("EmployeeAttendance.Record"); } catch (UnauthorizedAccessException) { return AttendanceErrors.PermissionDenied; }
+        if (date == default || date > DateOnly.FromDateTime(DateTime.Today)) return AttendanceErrors.InvalidDate;
+        var attendance = await unitOfWork.Repository<EmployeeAttendance>().FirstOrDefaultAsync(
+            x => x.EmployeeId == employeeId && x.AttendanceDate == date, asNoTracking: false, cancellationToken: cancellationToken);
+        if (attendance is null || !attendance.CheckInTime.HasValue || attendance.CheckOutTime.HasValue)
+            return AttendanceErrors.CheckOutUnavailable;
+        if (checkOutTime < attendance.CheckInTime) return AttendanceErrors.CheckOutBeforeCheckIn;
+        var before = $"Date={attendance.AttendanceDate:yyyy-MM-dd};Status={attendance.Status};CheckIn={FormatTime(attendance.CheckInTime)};CheckOut=—";
+        attendance.CheckOutTime = checkOutTime;
+        attendance.UpdatedAt = DateTimeOffset.UtcNow;
+        await AddAuditLogAsync("EmployeeAttendance.CheckOut", sessions.CurrentUser?.UserId, attendance,
+            $"قبل: {before}; بعد: Date={date:yyyy-MM-dd}; Status={attendance.Status}; CheckIn={FormatTime(attendance.CheckInTime)}; CheckOut={FormatTime(checkOutTime)}");
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        return Result.Success(ToDto(attendance));
     }
 
     private async Task AddAuditLogAsync(string action, Guid? userId, EmployeeAttendance attendance, string summary)
