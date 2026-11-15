@@ -3,17 +3,22 @@ using ElMomenNursery.Application.Mappings;
 using ElMomenNursery.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Mapster;
+using Microsoft.Extensions.Logging;
 
 namespace ElMomenNursery.Infrastructure.Security;
 
-public sealed class LocalPermissionService(NurseryDbContext db, ISessionManager sessions) : IPermissionService
+public sealed class LocalPermissionService(NurseryDbContext db, ISessionManager sessions, ILogger<LocalPermissionService> logger) : IPermissionService
 {
     public bool HasPermission(string code) => sessions.CurrentUser?.HasPermission(code) == true;
     public bool HasAnyPermission(params string[] codes) => codes.Any(HasPermission);
     public bool HasAllPermissions(params string[] codes) => codes.All(HasPermission);
     public void EnsurePermission(string code)
     {
-        if (!HasPermission(code)) throw new UnauthorizedAccessException($"الصلاحية المطلوبة غير متاحة: {code}");
+        if (!HasPermission(code))
+        {
+            logger.LogWarning("Permission denied; userId={UserId}; permissionCode={PermissionCode}", sessions.CurrentUser?.UserId, code);
+            throw new UnauthorizedAccessException($"الصلاحية المطلوبة غير متاحة: {code}");
+        }
     }
 
     public async Task RefreshCurrentUserAsync(CancellationToken cancellationToken = default)
@@ -22,6 +27,7 @@ public sealed class LocalPermissionService(NurseryDbContext db, ISessionManager 
         if (current is null) return;
         var user = await db.UserAccounts.AsNoTracking().Include(x => x.Role).ThenInclude(x => x.RolePermissions).ThenInclude(x => x.Permission)
             .Include(x => x.UserRoles).ThenInclude(x => x.Role).ThenInclude(x => x.RolePermissions).ThenInclude(x => x.Permission)
+            .AsSplitQuery()
             .SingleOrDefaultAsync(x => x.Id == current.UserId, cancellationToken);
         if (user is null || !user.IsActive) { sessions.Logout(); return; }
         var roles = user.UserRoles.Select(x => x.Role).Append(user.Role).DistinctBy(x => x.Id).ToArray();

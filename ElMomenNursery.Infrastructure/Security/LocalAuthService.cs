@@ -8,16 +8,21 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using ElMomenNursery.Infrastructure.Configuration;
 using Mapster;
+using Microsoft.Extensions.Logging;
 
 namespace ElMomenNursery.Infrastructure.Security;
 
-public sealed class LocalAuthService(NurseryDbContext db, ISessionManager sessions, IOptions<AuthSecurityOptions> options) : IAuthService
+public sealed class LocalAuthService(NurseryDbContext db, ISessionManager sessions, IOptions<AuthSecurityOptions> options, ILogger<LocalAuthService> logger) : IAuthService
 {
     private readonly PasswordHasher<UserAccount> _hasher = new();
     private readonly AuthSecurityOptions _options = options.Value;
 
-    public async Task<bool> NeedsInitialAdministratorSetupAsync(CancellationToken cancellationToken = default) =>
-        !await db.UserAccounts.AnyAsync(x => x.PasswordHash.StartsWith("AQAAAA"), cancellationToken);
+    public async Task<bool> NeedsInitialAdministratorSetupAsync(CancellationToken cancellationToken = default)
+    {
+        var setupNeeded = !await db.UserAccounts.AnyAsync(x => IsRecognizedPasswordHash(x.PasswordHash), cancellationToken);
+        if (setupNeeded) logger.LogInformation("Initial administrator setup mode entered");
+        return setupNeeded;
+    }
 
     public async Task<Result<UserSession>> LoginAsync(string username, string password, CancellationToken cancellationToken = default)
     {
@@ -27,23 +32,27 @@ public sealed class LocalAuthService(NurseryDbContext db, ISessionManager sessio
         var normalized = username.ToUpperInvariant();
         var user = await db.UserAccounts.Include(x => x.Role).Include(x => x.UserRoles).ThenInclude(x => x.Role)
             .ThenInclude(x => x.RolePermissions).ThenInclude(x => x.Permission)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(x => x.UsernameNormalized == normalized, cancellationToken);
         if (user is null)
         {
-            db.AuthenticationAuditLogs.Add(Audit(null, username, "LoginFailed", false, "InvalidCredentials"));
-            await db.SaveChangesAsync(cancellationToken);
+            logger.LogWarning("Login rejected for unknown user");
+            db.AuthenticationAuditLogs.Add(Audit(null, string.Empty, "LoginFailed", false, "InvalidCredentials"));
+            await SaveChangesWithLoggingAsync("UnknownUserLogin", null, cancellationToken);
             return CommonErrors.InvalidCredentials;
         }
         if (!user.IsActive)
         {
+            logger.LogWarning("Login rejected for inactive account; userId={UserId}", user.Id);
             db.AuthenticationAuditLogs.Add(Audit(user.Id, user.Username, "LoginFailed", false, "InactiveAccount"));
-            await db.SaveChangesAsync(cancellationToken);
+            await SaveChangesWithLoggingAsync("InactiveAccountLogin", user.Id, cancellationToken);
             return CommonErrors.InvalidCredentials;
         }
         if (user.LockoutEnd > DateTimeOffset.UtcNow)
         {
+            logger.LogWarning("Login rejected while account is locked; userId={UserId}", user.Id);
             db.AuthenticationAuditLogs.Add(Audit(user.Id, user.Username, "LoginFailed", false, "LockedOut"));
-            await db.SaveChangesAsync(cancellationToken);
+            await SaveChangesWithLoggingAsync("LockedOutLogin", user.Id, cancellationToken);
             return CommonErrors.InvalidCredentials;
         }
 
@@ -52,7 +61,10 @@ public sealed class LocalAuthService(NurseryDbContext db, ISessionManager sessio
         var verification = passwordValidation.Verification;
 
         if (verification == PasswordVerificationResult.SuccessRehashNeeded)
+        {
             user.PasswordHash = _hasher.HashPassword(user, password);
+            logger.LogInformation("Password hash rehashed; userId={UserId}", user.Id);
+        }
         user.FailedLoginAttempts = 0;
         user.LockoutEnd = null;
         user.LastLoginAt = DateTimeOffset.UtcNow;
@@ -65,7 +77,7 @@ public sealed class LocalAuthService(NurseryDbContext db, ISessionManager sessio
             user.EmployeeId, roleNames, permissionCodes, DateTimeOffset.UtcNow);
         var session = sessionData.Adapt<UserSession>(AccountMappingConfig.Config);
         db.AuthenticationAuditLogs.Add(Audit(user.Id, user.Username, "LoginSucceeded", true));
-        await db.SaveChangesAsync(cancellationToken);
+        await SaveChangesWithLoggingAsync("LoginSucceeded", user.Id, cancellationToken);
         sessions.Login(session);
         return Result<UserSession>.Success(session);
     }
@@ -81,9 +93,12 @@ public sealed class LocalAuthService(NurseryDbContext db, ISessionManager sessio
             {
                 user.LockoutEnd = DateTimeOffset.UtcNow.AddMinutes(Math.Max(1, _options.LockoutMinutes));
                 db.AuthenticationAuditLogs.Add(Audit(user.Id, user.Username, "AccountLocked", false, "TooManyFailedAttempts"));
+                logger.LogWarning("Account locked after reaching the failed login limit; userId={UserId}", user.Id);
             }
             db.AuthenticationAuditLogs.Add(Audit(user.Id, user.Username, "LoginFailed", false, "InvalidCredentials"));
-            await db.SaveChangesAsync(cancellationToken);
+            if (user.FailedLoginAttempts < Math.Max(1, _options.MaxFailedAttempts))
+                logger.LogWarning("Login rejected because credentials were invalid; userId={UserId}", user.Id);
+            await SaveChangesWithLoggingAsync("InvalidPasswordLogin", user.Id, cancellationToken);
             return (verification, CommonErrors.InvalidCredentials);
         }
 
@@ -104,7 +119,8 @@ public sealed class LocalAuthService(NurseryDbContext db, ISessionManager sessio
         user.UserRoles.Add(new UserRoleMapping(user, role).Adapt<UserRole>(AccountMappingConfig.Config));
         db.UserAccounts.Add(user);
         db.AuthenticationAuditLogs.Add(Audit(user.Id, username, "InitialAdministratorCreated", true));
-        await db.SaveChangesAsync(cancellationToken);
+        await SaveChangesWithLoggingAsync("InitialAdministratorCreated", user.Id, cancellationToken);
+        logger.LogInformation("Initial administrator created; userId={UserId}", user.Id);
         return Result.Success();
     }
 
@@ -113,7 +129,7 @@ public sealed class LocalAuthService(NurseryDbContext db, ISessionManager sessio
     {
         if (username.Length is < 3 or > 64 || fullName.Length is < 2 or > 200 || !ValidPassword(password))
             return (null, CommonErrors.InvalidRequest);
-        if (await db.UserAccounts.AnyAsync(x => x.PasswordHash.StartsWith("AQAAAA"), cancellationToken))
+        if (await db.UserAccounts.AnyAsync(x => IsRecognizedPasswordHash(x.PasswordHash), cancellationToken))
             return (null, CommonErrors.Conflict);
         var role = await db.Roles.SingleOrDefaultAsync(x => x.Name == "Admin", cancellationToken);
         if (role is null) return (null, CommonErrors.Conflict);
@@ -126,7 +142,7 @@ public sealed class LocalAuthService(NurseryDbContext db, ISessionManager sessio
         if (current is not null)
         {
             db.AuthenticationAuditLogs.Add(Audit(current.UserId, current.Username, "Logout", true));
-            await db.SaveChangesAsync(cancellationToken);
+            await SaveChangesWithLoggingAsync("Logout", current.UserId, cancellationToken);
         }
         sessions.Logout();
     }
@@ -142,12 +158,42 @@ public sealed class LocalAuthService(NurseryDbContext db, ISessionManager sessio
         user.PasswordHash = _hasher.HashPassword(user, newPassword);
         user.UpdatedAt = DateTimeOffset.UtcNow;
         db.AuthenticationAuditLogs.Add(Audit(user.Id, user.Username, "PasswordChanged", true));
-        await db.SaveChangesAsync(cancellationToken);
+        await SaveChangesWithLoggingAsync("PasswordChanged", user.Id, cancellationToken);
+        logger.LogInformation("Password changed; userId={UserId}", user.Id);
         return Result.Success();
     }
 
     private static bool ValidPassword(string? password) => password is { Length: >= 12 and <= 256 }
         && password.Any(char.IsLetter) && password.Any(char.IsDigit);
+
+    // Decode the Identity hash marker instead of coupling setup detection to its Base64 text prefix.
+    // Version 2 and version 3 markers are both recognized so existing accounts keep setup mode disabled.
+    private static bool IsRecognizedPasswordHash(string passwordHash)
+    {
+        try
+        {
+            var bytes = Convert.FromBase64String(passwordHash);
+            return (bytes[0] == 0 && bytes.Length == 49) || (bytes[0] == 1 && bytes.Length >= 26);
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
+    private async Task SaveChangesWithLoggingAsync(string operation, Guid? userId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "Authentication persistence failed; operation={Operation}; userId={UserId}", operation, userId);
+            throw;
+        }
+    }
+
     private static AuthenticationAuditLog Audit(Guid? userId, string username, string action, bool success, string? reason = null) =>
         new AuthenticationAuditMapping(userId, username, action, success, reason)
             .Adapt<AuthenticationAuditLog>(AccountMappingConfig.Config);
