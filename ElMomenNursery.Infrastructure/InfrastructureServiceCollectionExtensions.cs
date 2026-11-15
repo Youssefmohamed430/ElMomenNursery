@@ -6,6 +6,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Infrastructure.Security;
+using Microsoft.Data.Sqlite;
+using Serilog;
 
 namespace ElMomenNursery.Infrastructure;
 
@@ -27,6 +29,33 @@ public static class InfrastructureServiceCollectionExtensions
         else
         {
             connectionString = Environment.ExpandEnvironmentVariables(connectionString);
+        }
+
+        var sqliteConnection = new SqliteConnectionStringBuilder(connectionString);
+        if (!string.IsNullOrWhiteSpace(sqliteConnection.DataSource) && sqliteConnection.DataSource != ":memory:")
+        {
+            var databasePath = Path.GetFullPath(sqliteConnection.DataSource);
+            var databaseDirectory = Path.GetDirectoryName(databasePath);
+            if (!string.IsNullOrWhiteSpace(databaseDirectory) && !Directory.Exists(databaseDirectory))
+            {
+                try
+                {
+                    Directory.CreateDirectory(databaseDirectory);
+                }
+                catch (Exception exception)
+                {
+                    Log.Error(exception, "Could not create directory for configured database path");
+                    throw new InvalidOperationException("The configured database directory could not be created.", exception);
+                }
+            }
+
+            Log.Information("Resolved nursery data directory; dataDirectory={DataDirectory}; databasePath={DatabasePath}; databaseExists={DatabaseExists}",
+                dataDirectory, databasePath, File.Exists(databasePath));
+        }
+        else
+        {
+            Log.Information("Resolved nursery data directory; dataDirectory={DataDirectory}; databaseExists={DatabaseExists}",
+                dataDirectory, false);
         }
 
         services.AddDbContext<NurseryDbContext>(db => db.UseSqlite(
