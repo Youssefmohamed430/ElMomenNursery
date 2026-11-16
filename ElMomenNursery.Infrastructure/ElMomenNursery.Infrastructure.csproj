@@ -11,9 +11,14 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.10" />
     <PackageReference Include="ClosedXML" Version="0.105.1" />
     <PackageReference Include="Serilog" Version="4.4.0" />
+    <PackageReference Include="QuestPDF" Version="2026.9.2" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ElMomenNursery.Domain\ElMomenNursery.Domain.csproj" />
     <ProjectReference Include="..\ElMomenNursery.Application\ElMomenNursery.Application.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="Resources\Fonts\OFL-NotoNaskhArabic.txt" CopyToOutputDirectory="PreserveNewest" />
+    <EmbeddedResource Include="Resources\Fonts\NotoNaskhArabic.ttf" />
   </ItemGroup>
 </Project>

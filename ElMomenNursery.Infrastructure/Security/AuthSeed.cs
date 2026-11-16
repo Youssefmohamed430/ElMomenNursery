@@ -13,7 +13,7 @@ public static class AuthSeed
         "Employees.View", "Employees.Manage", "Payments.View", "Payments.Create", "Payments.Edit",
         "Expenses.View", "Expenses.Manage", "Inventory.View", "Inventory.Manage",
         "Subscriptions.View", "Subscriptions.Manage", "Users.View", "Users.Manage", "Roles.Manage", "Permissions.Manage", "Settings.View", "Settings.Manage",
-        "Students.Export", "Employees.Export", "Classes.Export", "Attendance.Export", "EmployeeAttendance.Export", "Users.Export"
+        "Students.Export", "Employees.Export", "Classes.Export", "Attendance.Export", "EmployeeAttendance.Export", "Users.Export", "Subscriptions.Export"
     ];
 
     public static async Task InitializeAsync(NurseryDbContext db, CancellationToken ct = default)
@@ -97,6 +97,21 @@ public static class AuthSeed
                 Value = "true",
                 Description = "Initial list export permission seed completed without replacing administrator-edited mappings."
             });
+            await db.SaveChangesAsync(ct);
+        }
+
+        var v4Seeded = await db.AppSettings.AnyAsync(x => x.Key == "Authentication.RolePermissionsSeeded.V4", ct);
+        if (!v4Seeded)
+        {
+            var permission = await db.Permissions.SingleAsync(x => x.Code == "Subscriptions.Export", ct);
+            foreach (var roleName in new[] { "Admin", "Manager" })
+            {
+                var role = await db.Roles.SingleAsync(x => x.Name == roleName, ct);
+                if (!await db.RolePermissions.AnyAsync(x => x.RoleId == role.Id && x.PermissionId == permission.Id, ct))
+                    db.RolePermissions.Add(new RolePermission { RoleId = role.Id, PermissionId = permission.Id });
+            }
+            db.AppSettings.Add(new AppSetting { Key = "Authentication.RolePermissionsSeeded.V4", Value = "true",
+                Description = "Subscription export permission added to Admin and Manager without replacing existing mappings." });
             await db.SaveChangesAsync(ct);
         }
     }

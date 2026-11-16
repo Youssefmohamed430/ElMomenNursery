@@ -1,14 +1,20 @@
 using ElMomenNursery.Application.DTOs;
+using ElMomenNursery.Domain.Abstractions;
 
 namespace ElMomenNursery.Application.IServices;
 
 public interface ISubscriptionService
 {
-    Task<List<SubscriptionDto>> GetAllSubscriptions();
-    Task<List<SubscriptionDto>> GetAllSubscriptionsForChild(Guid childId);
-    Task<List<SubscriptionDto>> GetAllSubscriptionsForChildByRangeOfDate(Guid ChildId, DateOnly Startdate, DateOnly EndDate);
-    Task<List<SubscriptionDto>> GetAllSubscriptionsByRangeOfDate(DateOnly Startdate, DateOnly EndDate);
-    Task<SubscriptionDto> AddSubscription(CreateSubscriptionDto createSubscription);
-    Task<SubscriptionDto> UpdateSubscription(UpdateSubscriptionDto updateSubscription, Guid ChildId);
-    Task<bool> DeleteSubscription(Guid subscriptionId);
+    Task<Result<IReadOnlyList<SubscriptionDto>>> GetSubscriptionsAsync(SubscriptionFilter filter, CancellationToken cancellationToken = default);
+    Task<Result<SubscriptionDto>> GetSubscriptionByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<Result<IReadOnlyList<SubscriptionDto>>> GetSubscriptionsForChildAsync(Guid childId, CancellationToken cancellationToken = default);
+    Task<Result<IReadOnlyList<ChildLookupDto>>> GetChildLookupAsync(string? search, CancellationToken cancellationToken = default);
+    Task<Result<IReadOnlyList<SubscriptionPlanOptionDto>>> GetPlansAsync(CancellationToken cancellationToken = default);
+    Task<Result<SubscriptionDto>> CreateSubscriptionAsync(CreateSubscriptionDto dto, CancellationToken cancellationToken = default);
+    Task<Result<SubscriptionDto>> UpdateSubscriptionAsync(Guid id, UpdateSubscriptionDto dto, CancellationToken cancellationToken = default);
+    Task<Result> CancelSubscriptionAsync(Guid id, string reason, CancellationToken cancellationToken = default);
+    Task<Result> DeleteSubscriptionAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<Result<PaymentReceiptDto>> RecordPaymentAsync(Guid subscriptionId, RecordPaymentDto dto, CancellationToken cancellationToken = default);
+    Task<Result<PaymentReceiptDto>> GetReceiptAsync(Guid paymentId, CancellationToken cancellationToken = default);
+    Task<Result<IReadOnlyList<PaymentReceiptDto>>> GetPaymentsForSubscriptionAsync(Guid id, CancellationToken cancellationToken = default);
 }

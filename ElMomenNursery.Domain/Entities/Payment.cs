@@ -10,6 +10,7 @@ public sealed class Payment
     public DateTimeOffset PaidAt { get; set; }
     public PaymentMethod PaymentMethod { get; set; }
     public string? Reference { get; set; }
+    public string? ReceiptNumber { get; set; }
     public Guid? ReceivedByUserId { get; set; }
     public PaymentStatus Status { get; set; } = PaymentStatus.Posted;
     public string? Notes { get; set; }

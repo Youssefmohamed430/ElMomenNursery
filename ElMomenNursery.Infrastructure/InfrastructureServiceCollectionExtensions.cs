@@ -7,6 +7,8 @@ using Microsoft.Extensions.DependencyInjection;
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Infrastructure.Security;
 using ElMomenNursery.Infrastructure.Spreadsheet;
+using ElMomenNursery.Infrastructure.Documents;
+using QuestPDF.Infrastructure;
 using Microsoft.Data.Sqlite;
 using Serilog;
 
@@ -73,6 +75,8 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IPermissionService, LocalPermissionService>();
         services.AddScoped<IAccountManagementService, LocalAccountManagementService>();
         services.AddSingleton<IExcelExportService, ExcelExportService>();
+        QuestPDF.Settings.License = LicenseType.Community;
+        services.AddSingleton<IReceiptPdfService>(_ => new ReceiptPdfService(dataDirectory));
         services.AddSingleton<ISessionManager, SessionManager>();
         return services;
     }

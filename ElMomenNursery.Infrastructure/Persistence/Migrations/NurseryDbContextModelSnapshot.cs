@@ -855,6 +855,9 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ReceiptNumber")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ReceivedByUserId")
                         .HasColumnType("TEXT");
 
@@ -876,6 +879,10 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("PaidAt")
                         .HasDatabaseName("IX_Payments_PaidAt");
+
+                    b.HasIndex("ReceiptNumber")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Payments_ReceiptNumber");
 
                     b.HasIndex("ReceivedByUserId");
 

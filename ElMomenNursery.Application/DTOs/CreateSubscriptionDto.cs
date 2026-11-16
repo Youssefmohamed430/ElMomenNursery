@@ -1,4 +1,3 @@
-using ElMomenNursery.Domain.Enums;
 using System.ComponentModel.DataAnnotations;
 
 namespace ElMomenNursery.Application.DTOs;
@@ -12,9 +11,8 @@ public class CreateSubscriptionDto
     public required DateOnly PeriodStart { get; set; }
     [Required(ErrorMessage = "PeriodEnd is required.")]
     public required DateOnly PeriodEnd { get; set; }
-    [Required(ErrorMessage = "AmountDue is required.")]
-    public required decimal AmountDue { get; set; }
-    [Required(ErrorMessage = "Status is required.")]
-    public required SubscriptionStatus Status { get; set; } = SubscriptionStatus.Pending;
+    public decimal? AmountDue { get; set; }
     public string? Notes { get; set; }
+    public InitialPaymentDto? InitialPayment { get; set; }
+    public bool ConfirmOverlappingPeriod { get; set; }
 }

@@ -280,6 +280,7 @@ public sealed class MainForm : Form
                 "الأطفال" => BuildChildrenPage(),
                 "الموظفون" => BuildEmployeesPage(),
                 "الحضور" => new AttendancePage(_scopeFactory, _session, _excelExportService),
+                "الاشتراكات والمدفوعات" => new SubscriptionsPage(_scopeFactory, _session, _excelExportService),
                 "الفصول" => BuildClassesPage(),
                 "إدارة المستخدمين" => new UserManagementForm(_accountManagement, _session, _excelExportService),
                 _ => BuildSectionPage(section)

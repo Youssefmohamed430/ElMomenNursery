@@ -1,13 +1,11 @@
-using ElMomenNursery.Domain.Enums;
-
 namespace ElMomenNursery.Application.DTOs;
 
 public class UpdateSubscriptionDto
 {
-    public Guid? SubscriptionPlanId { get; set; }
-    public DateOnly PeriodStart { get; set; }
-    public DateOnly PeriodEnd { get; set; }
-    public decimal AmountDue { get; set; }
-    public SubscriptionStatus Status { get; set; } = SubscriptionStatus.Pending;
-    public string? Notes { get; set; }
+    public Guid? SubscriptionPlanId { get; init; }
+    public DateOnly PeriodStart { get; init; }
+    public DateOnly PeriodEnd { get; init; }
+    public decimal AmountDue { get; init; }
+    public string? Notes { get; init; }
+    public required string Reason { get; init; }
 }

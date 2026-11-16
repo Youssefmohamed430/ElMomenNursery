@@ -244,6 +244,7 @@ internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         b.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
         b.HasIndex(x => x.ChildId).HasDatabaseName("IX_Payments_ChildId");
         b.HasIndex(x => x.PaidAt).HasDatabaseName("IX_Payments_PaidAt");
+        b.HasIndex(x => x.ReceiptNumber).IsUnique().HasDatabaseName("UX_Payments_ReceiptNumber");
         b.HasOne(x => x.Child).WithMany(x => x.Payments).HasForeignKey(x => x.ChildId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.Subscription).WithMany().HasForeignKey(x => x.SubscriptionId).IsRequired(false).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.ReceivedByUser).WithMany().HasForeignKey(x => x.ReceivedByUserId).IsRequired(false).OnDelete(DeleteBehavior.SetNull);

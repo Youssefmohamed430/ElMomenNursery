@@ -135,13 +135,13 @@ This roadmap breaks the approved product scope into an ordered, end-to-end task 
 
 - [ ] Confirm fee/subscription rules, payment methods, invoice numbering, and correction/refund policy with the nursery.
 - [ ] Define domain entities and invariants for charges, payments, balances, and payment history.
-- [ ] Implement transactional payment recording so a partial failure cannot leave inconsistent balances.
-- [ ] Build a prominent child search-to-payment flow with minimal navigation.
-- [ ] Support paid, partially paid, and unpaid states with due, paid, and remaining amounts shown clearly.
+- [x] Implement transactional payment recording so a partial failure cannot leave inconsistent balances. (Subscription + initial payment + allocation + audit are committed together.)
+- [x] Build a prominent child search-to-payment flow with minimal navigation. (Subscriptions page supports child search and payment actions.)
+- [x] Support paid, partially paid, and unpaid states with due, paid, and remaining amounts shown clearly.
 - [ ] Preserve payment history; implement only the owner-approved correction/refund/void workflow with authorization and audit trail.
-- [ ] Define an invoice/receipt document model and versioned Arabic template.
-- [ ] Generate and save/print PDF invoices for registration/subscription payments, including logo and approved document fields.
-- [ ] Make invoice reprint/history access appropriately permission-controlled.
+- [x] Define an invoice/receipt document model and Arabic PDF template.
+- [x] Generate and save/print PDF receipts for subscription payments, including logo and locally configured nursery identity fields.
+- [x] Make invoice reprint/history access appropriately permission-controlled. (`Payments.View`)
 - [ ] Keep physical receipt-printer support behind an adapter and defer model-specific work until selected.
 
 **Gate:** full and partial payments remain consistent and traceable; staff can print a readable PDF without special hardware.
