@@ -1,0 +1,371 @@
+2026-11-16 08:17:48.027 +02:00 [INF]  Application starting { AppVersion: "1.0.0.0" }
+2026-11-16 08:17:48.213 +02:00 [INF]  Resolved nursery data directory; dataDirectory=C:\Users\Gaber\AppData\Local\AlMoumenNursery; databasePath=C:\Users\Gaber\AppData\Local\AlMoumenNursery\nursery.db; databaseExists=true { AppVersion: "1.0.0.0" }
+2026-11-16 08:17:49.883 +02:00 [INF]  Database startup check; databasePath=C:\Users\Gaber\AppData\Local\AlMoumenNursery\nursery.db; pendingMigrations=[] { AppVersion: "1.0.0.0" }
+2026-11-16 08:17:50.097 +02:00 [INF]  Database migration completed; durationMs=211 { AppVersion: "1.0.0.0" }
+2026-11-16 08:17:50.388 +02:00 [INF]  Authentication seed completed; durationMs=290 { AppVersion: "1.0.0.0" }
+2026-11-16 08:18:19.172 +02:00 [INF]  User logged in; UserId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 08:18:19.293 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرئيسية; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 08:18:28.708 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الأطفال; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 08:18:31.764 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الموظفون; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 08:18:35.809 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الفصول; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 08:18:38.070 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الحضور; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 08:18:56.440 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الاشتراكات والمدفوعات; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 08:18:57.987 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=المخزن; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 08:19:00.768 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=إدارة المستخدمين; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 08:19:07.297 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الحضور; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 08:19:09.158 +02:00 [INF]  User logged out; UserId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 08:19:24.825 +02:00 [INF]  User logged in; UserId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 08:19:24.892 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرئيسية; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 08:19:28.030 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الأطفال; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 08:19:43.276 +02:00 [ERR] Microsoft.EntityFrameworkCore.Database.Command Failed executing DbCommand (12ms) [Parameters=[@p0='?' (Size = 36)], CommandType='"Text"', CommandTimeout='30']
+DELETE FROM "Children"
+WHERE "Id" = @p0
+RETURNING 1; { EventId: { Id: 20102, Name: "Microsoft.EntityFrameworkCore.Database.Command.CommandError" }, UserId: 0c0c8ff4-59bb-4963-8ef9-7252e0a804d6, AppVersion: "1.0.0.0" }
+2026-11-16 08:19:43.301 +02:00 [ERR] Microsoft.EntityFrameworkCore.Update An exception occurred in the database while saving changes for context type 'ElMomenNursery.Infrastructure.Persistence.NurseryDbContext'.
+Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: 'FOREIGN KEY constraint failed'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken) { EventId: { Id: 10000, Name: "Microsoft.EntityFrameworkCore.Update.SaveChangesFailed" }, UserId: 0c0c8ff4-59bb-4963-8ef9-7252e0a804d6, AppVersion: "1.0.0.0" }
+Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: 'FOREIGN KEY constraint failed'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+2026-11-16 08:19:43.346 +02:00 [WRN] ElMomenNursery.Infrastructure.Persistence.EfUnitOfWork Database constraint rejected save; constraintKind=CONSTRAINT { UserId: 0c0c8ff4-59bb-4963-8ef9-7252e0a804d6, AppVersion: "1.0.0.0" }
+Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: 'FOREIGN KEY constraint failed'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at ElMomenNursery.Infrastructure.Persistence.EfUnitOfWork.SaveChangesAsync(CancellationToken cancellationToken) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Infrastructure\Persistence\EfUnitOfWork.cs:line 31
+2026-11-16 08:19:43.382 +02:00 [WRN] ElMomenNursery.Application.Services.ChildService Child deletion rejected by database constraint; childId="7edd5362-c2b3-4be1-b79b-9af017abdb1b"; constraintKind=FOREIGN KEY { UserId: 0c0c8ff4-59bb-4963-8ef9-7252e0a804d6, AppVersion: "1.0.0.0" }
+Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: 'FOREIGN KEY constraint failed'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at ElMomenNursery.Infrastructure.Persistence.EfUnitOfWork.SaveChangesAsync(CancellationToken cancellationToken) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Infrastructure\Persistence\EfUnitOfWork.cs:line 31
+   at ElMomenNursery.Application.Services.ChildService.DeleteChildAsync(Guid childId) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Application\Services\ChildService.cs:line 81
+2026-11-16 08:19:43.415 +02:00 [WRN] ElMomenNursery.Forms.MainForm Child deletion could not be completed; childId="7edd5362-c2b3-4be1-b79b-9af017abdb1b" { UserId: 0c0c8ff4-59bb-4963-8ef9-7252e0a804d6, AppVersion: "1.0.0.0" }
+Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: 'FOREIGN KEY constraint failed'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at ElMomenNursery.Infrastructure.Persistence.EfUnitOfWork.SaveChangesAsync(CancellationToken cancellationToken) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Infrastructure\Persistence\EfUnitOfWork.cs:line 31
+   at ElMomenNursery.Application.Services.ChildService.DeleteChildAsync(Guid childId) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Application\Services\ChildService.cs:line 81
+   at ElMomenNursery.Forms.MainForm.<>c__DisplayClass20_0.<<BuildChildrenPage>b__32>d.MoveNext() in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery\Forms\MainForm.cs:line 608
+2026-11-16 08:20:12.638 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الموظفون; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 08:20:19.386 +02:00 [ERR] Microsoft.EntityFrameworkCore.Database.Command Failed executing DbCommand (2ms) [Parameters=[@p0='?' (Size = 36)], CommandType='"Text"', CommandTimeout='30']
+DELETE FROM "Children"
+WHERE "Id" = @p0
+RETURNING 1; { EventId: { Id: 20102, Name: "Microsoft.EntityFrameworkCore.Database.Command.CommandError" }, UserId: 0c0c8ff4-59bb-4963-8ef9-7252e0a804d6, AppVersion: "1.0.0.0" }
+2026-11-16 08:20:19.389 +02:00 [ERR] Microsoft.EntityFrameworkCore.Update An exception occurred in the database while saving changes for context type 'ElMomenNursery.Infrastructure.Persistence.NurseryDbContext'.
+Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: 'FOREIGN KEY constraint failed'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken) { EventId: { Id: 10000, Name: "Microsoft.EntityFrameworkCore.Update.SaveChangesFailed" }, UserId: 0c0c8ff4-59bb-4963-8ef9-7252e0a804d6, AppVersion: "1.0.0.0" }
+Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: 'FOREIGN KEY constraint failed'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+2026-11-16 08:20:19.420 +02:00 [WRN] ElMomenNursery.Infrastructure.Persistence.EfUnitOfWork Database constraint rejected save; constraintKind=CONSTRAINT { UserId: 0c0c8ff4-59bb-4963-8ef9-7252e0a804d6, AppVersion: "1.0.0.0" }
+Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: 'FOREIGN KEY constraint failed'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at ElMomenNursery.Infrastructure.Persistence.EfUnitOfWork.SaveChangesAsync(CancellationToken cancellationToken) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Infrastructure\Persistence\EfUnitOfWork.cs:line 31
+2026-11-16 08:20:19.472 +02:00 [WRN] ElMomenNursery.Application.Services.EmployeeService Employee deletion rejected by database constraint; employeeId="f6acd1fe-5242-4ba4-bbd2-eeaf59e80dfb"; constraintKind=FOREIGN KEY { UserId: 0c0c8ff4-59bb-4963-8ef9-7252e0a804d6, AppVersion: "1.0.0.0" }
+Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: 'FOREIGN KEY constraint failed'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at ElMomenNursery.Infrastructure.Persistence.EfUnitOfWork.SaveChangesAsync(CancellationToken cancellationToken) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Infrastructure\Persistence\EfUnitOfWork.cs:line 31
+   at ElMomenNursery.Application.Services.EmployeeService.DeleteEmployee(Guid id) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Application\Services\EmployeeService.cs:line 58
+2026-11-16 08:20:19.518 +02:00 [ERR] ElMomenNursery.Forms.MainForm Failed to delete employee; employeeId="f6acd1fe-5242-4ba4-bbd2-eeaf59e80dfb" { UserId: 0c0c8ff4-59bb-4963-8ef9-7252e0a804d6, AppVersion: "1.0.0.0" }
+Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: 'FOREIGN KEY constraint failed'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at ElMomenNursery.Infrastructure.Persistence.EfUnitOfWork.SaveChangesAsync(CancellationToken cancellationToken) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Infrastructure\Persistence\EfUnitOfWork.cs:line 31
+   at ElMomenNursery.Application.Services.EmployeeService.DeleteEmployee(Guid id) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Application\Services\EmployeeService.cs:line 58
+   at ElMomenNursery.Forms.MainForm.<>c__DisplayClass21_0.<<BuildEmployeesPage>b__14>d.MoveNext() in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery\Forms\MainForm.cs:line 1088
+2026-11-16 08:20:29.895 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الفصول; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 08:20:30.890 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الحضور; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 08:21:23.370 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الاشتراكات والمدفوعات; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 08:21:26.037 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الفصول; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 08:21:28.153 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الأطفال; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 08:21:40.678 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الاشتراكات والمدفوعات; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 08:21:53.902 +02:00 [ERR] Microsoft.EntityFrameworkCore.Database.Command Failed executing DbCommand (2ms) [Parameters=[@p0='?' (Size = 36)], CommandType='"Text"', CommandTimeout='30']
+DELETE FROM "Children"
+WHERE "Id" = @p0
+RETURNING 1; { EventId: { Id: 20102, Name: "Microsoft.EntityFrameworkCore.Database.Command.CommandError" }, UserId: 0c0c8ff4-59bb-4963-8ef9-7252e0a804d6, AppVersion: "1.0.0.0" }
+2026-11-16 08:21:53.904 +02:00 [ERR] Microsoft.EntityFrameworkCore.Update An exception occurred in the database while saving changes for context type 'ElMomenNursery.Infrastructure.Persistence.NurseryDbContext'.
+Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: 'FOREIGN KEY constraint failed'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken) { EventId: { Id: 10000, Name: "Microsoft.EntityFrameworkCore.Update.SaveChangesFailed" }, UserId: 0c0c8ff4-59bb-4963-8ef9-7252e0a804d6, AppVersion: "1.0.0.0" }
+Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: 'FOREIGN KEY constraint failed'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+2026-11-16 08:21:53.926 +02:00 [ERR] ElMomenNursery.Infrastructure.Security.LocalAuthService Authentication persistence failed; operation=Logout; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: 'FOREIGN KEY constraint failed'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at ElMomenNursery.Infrastructure.Security.LocalAuthService.SaveChangesWithLoggingAsync(String operation, Nullable`1 userId, CancellationToken cancellationToken) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Infrastructure\Security\LocalAuthService.cs:line 192
+2026-11-16 08:21:54.065 +02:00 [WRN]  Logout audit failed; UserId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: 'FOREIGN KEY constraint failed'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at ElMomenNursery.Infrastructure.Security.LocalAuthService.SaveChangesWithLoggingAsync(String operation, Nullable`1 userId, CancellationToken cancellationToken) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Infrastructure\Security\LocalAuthService.cs:line 192
+   at ElMomenNursery.Infrastructure.Security.LocalAuthService.LogoutAsync(CancellationToken cancellationToken) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Infrastructure\Security\LocalAuthService.cs:line 145
+   at ElMomenNursery.Program.Main() in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery\Program.cs:line 118
+2026-11-16 08:21:54.066 +02:00 [INF]  User logged out; UserId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 08:21:55.837 +02:00 [INF]  Application stopped normally { AppVersion: "1.0.0.0" }
+2026-11-16 18:47:05.902 +02:00 [INF]  Application starting { AppVersion: "1.0.0.0" }
+2026-11-16 18:47:06.197 +02:00 [INF]  Resolved nursery data directory; dataDirectory=C:\Users\Gaber\AppData\Local\AlMoumenNursery; databasePath=C:\Users\Gaber\AppData\Local\AlMoumenNursery\nursery.db; databaseExists=true { AppVersion: "1.0.0.0" }
+2026-11-16 18:47:09.016 +02:00 [INF]  Database startup check; databasePath=C:\Users\Gaber\AppData\Local\AlMoumenNursery\nursery.db; pendingMigrations=[] { AppVersion: "1.0.0.0" }
+2026-11-16 18:47:09.516 +02:00 [INF]  Database migration completed; durationMs=496 { AppVersion: "1.0.0.0" }
+2026-11-16 18:47:10.041 +02:00 [INF]  Authentication seed completed; durationMs=523 { AppVersion: "1.0.0.0" }
+2026-11-16 18:47:24.074 +02:00 [INF]  User logged in; UserId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 18:47:24.188 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرئيسية; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 18:47:28.916 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الأطفال; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 18:47:30.838 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الموظفون; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 18:47:32.227 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الفصول; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 18:47:46.703 +02:00 [INF]  User logged out; UserId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 18:47:51.182 +02:00 [INF]  Application stopped normally { AppVersion: "1.0.0.0" }
+2026-11-16 23:44:15.424 +02:00 [INF]  Application starting { AppVersion: "1.0.0.0" }
+2026-11-16 23:44:15.630 +02:00 [INF]  Resolved nursery data directory; dataDirectory=C:\Users\Gaber\AppData\Local\AlMoumenNursery; databasePath=C:\Users\Gaber\AppData\Local\AlMoumenNursery\nursery.db; databaseExists=true { AppVersion: "1.0.0.0" }
+2026-11-16 23:44:17.498 +02:00 [INF]  Database startup check; databasePath=C:\Users\Gaber\AppData\Local\AlMoumenNursery\nursery.db; pendingMigrations=[] { AppVersion: "1.0.0.0" }
+2026-11-16 23:44:17.720 +02:00 [INF]  Database migration completed; durationMs=219 { AppVersion: "1.0.0.0" }
+2026-11-16 23:44:18.002 +02:00 [INF]  Authentication seed completed; durationMs=281 { AppVersion: "1.0.0.0" }
+2026-11-16 23:44:32.496 +02:00 [INF]  User logged in; UserId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 23:44:32.591 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرئيسية; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 23:44:37.247 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الفصول; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 23:44:38.196 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الموظفون; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 23:44:44.857 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الفصول; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 23:44:46.981 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الحضور; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 23:44:51.596 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الاشتراكات والمدفوعات; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 23:44:52.839 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=المخزن; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 23:44:54.280 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الموظفون; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 23:45:03.499 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الفصول; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 23:45:09.950 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الاشتراكات والمدفوعات; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 23:45:11.197 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الحضور; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 23:45:16.174 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=المخزن; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 23:45:18.459 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=إدارة المستخدمين; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 23:45:19.457 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الاشتراكات والمدفوعات; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 23:45:27.088 +02:00 [INF]  User logged out; UserId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-16 23:45:29.409 +02:00 [INF]  Application stopped normally { AppVersion: "1.0.0.0" }
