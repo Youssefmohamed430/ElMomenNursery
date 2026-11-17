@@ -9,3 +9,4 @@ public sealed record CreateChildAttendanceDto(Guid ChildId, DateOnly Date, Atten
 public sealed record UpdateChildAttendanceDto(AttendanceStatus Status, DateTimeOffset? CheckIn = null,
     DateTimeOffset? CheckOut = null, string? Notes = null, string? Reason = null);
 public sealed record ChildDailyAttendanceQuery(DateOnly Date, Guid? ClassroomId = null);
+public sealed record AttendanceChildOptionDto(Guid Id, string FullName);

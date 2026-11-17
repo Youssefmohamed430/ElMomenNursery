@@ -40,6 +40,7 @@ internal sealed class ChildAttendancePage : UserControl
     private readonly Button _correct = MakeButton("تصحيح السجل");
     private readonly Button _markAll = MakeButton("تسجيل الكل حاضر", true);
     private readonly Button _refresh = MakeButton("تحديث");
+    private readonly Button _history = MakeButton("سجل طفل لفترة");
     private List<ChildDailyAttendanceDto> _rows = [];
     private int _loadVersion;
 
@@ -52,13 +53,14 @@ internal sealed class ChildAttendancePage : UserControl
         _markAll.Visible = session.HasPermission("Attendance.Record");
         _present.Visible = _absent.Visible = _checkout.Visible = session.HasPermission("Attendance.Record");
         _manual.Visible = session.HasPermission("Attendance.Record"); _correct.Visible = session.HasPermission("Attendance.Edit");
+        _history.Visible = session.HasPermission("Attendance.View");
         var filters = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = true, FlowDirection = FlowDirection.RightToLeft, AutoScroll = true };
         var export = MakeButton("تصدير Excel"); export.Visible = session.HasPermission("Attendance.Export");
         export.Click += async (_, _) => await GridExcelExport.SaveAsync((IWin32Window?)FindForm() ?? this, _grid,
             _excelExportService, "تصدير حضور الأطفال", "حضور الأطفال");
         filters.Controls.AddRange([new Label { Text = "التاريخ", AutoSize = true, Padding = new Padding(0, 8, 0, 0) }, _date,
             new Label { Text = "الفصل", AutoSize = true, Padding = new Padding(0, 8, 0, 0) }, _classroom,
-            new Label { Text = "الحالة", AutoSize = true, Padding = new Padding(0, 8, 0, 0) }, _status, _search, _refresh, _manual, _present, _absent, _checkout, _correct, _markAll]);
+            new Label { Text = "الحالة", AutoSize = true, Padding = new Padding(0, 8, 0, 0) }, _status, _search, _refresh, _history, _manual, _present, _absent, _checkout, _correct, _markAll]);
         filters.Controls.Add(export);
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 3, ColumnCount = 1, RightToLeft = RightToLeft.Yes };
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 92)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -70,6 +72,7 @@ internal sealed class ChildAttendancePage : UserControl
         _checkout.Click += async (_, _) => await CheckOutAsync(); _markAll.Click += async (_, _) => await MarkAllAsync();
         _manual.Click += async (_, _) => await OpenEditorAsync(correction: false);
         _correct.Click += async (_, _) => await OpenEditorAsync(correction: true);
+        _history.Click += (_, _) => { using var form = new ChildAttendanceHistoryForm(_scopes); form.ShowDialog(FindForm()); };
         _grid.SelectionChanged += (_, _) => UpdateActions(); _grid.CellDoubleClick += async (_, _) => await OpenEditorAsync(correction: Selected()?.IsMarked == true);
         _grid.KeyDown += async (_, e) => { if (e.KeyCode == Keys.F5) { e.Handled = true; await LoadAsync(); } };
         Load += async (_, _) => { await LoadClassroomsAsync(); await LoadAsync(); };

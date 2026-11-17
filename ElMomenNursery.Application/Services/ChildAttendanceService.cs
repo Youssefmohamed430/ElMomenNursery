@@ -53,6 +53,16 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
         return Result.Success<IReadOnlyList<ChildAttendanceDto>>(rows.Select(ToDto).ToArray());
     }
 
+    public async Task<Result<IReadOnlyList<AttendanceChildOptionDto>>> GetChildrenForHistorySelectionAsync(CancellationToken cancellationToken = default)
+    {
+        try { permissions.EnsurePermission("Attendance.View"); }
+        catch (UnauthorizedAccessException) { return AttendanceErrors.PermissionDenied; }
+        var children = await unitOfWork.Repository<Child>().ListAsync(cancellationToken: cancellationToken);
+        IReadOnlyList<AttendanceChildOptionDto> result = children.OrderBy(x => x.FullName)
+            .Select(x => new AttendanceChildOptionDto(x.Id, x.FullName)).ToArray();
+        return Result.Success(result);
+    }
+
     public async Task<Result<ChildAttendanceDto>> MarkManualAttendanceAsync(CreateChildAttendanceDto dto, CancellationToken cancellationToken = default)
     {
         try { permissions.EnsurePermission("Attendance.Record"); }
