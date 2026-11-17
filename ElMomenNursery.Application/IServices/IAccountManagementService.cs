@@ -7,8 +7,8 @@ public sealed record RoleSummary(Guid Id, string Name, IReadOnlyList<string> Per
 
 public interface IAccountManagementService
 {
-    Task<IReadOnlyList<AccountSummary>> GetAccountsAsync(CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<RoleSummary>> GetRolesAsync(CancellationToken cancellationToken = default);
+    Task<Result<IReadOnlyList<AccountSummary>>> GetAccountsAsync(CancellationToken cancellationToken = default);
+    Task<Result<IReadOnlyList<RoleSummary>>> GetRolesAsync(CancellationToken cancellationToken = default);
     Task<Result> CreateAccountAsync(string username, string fullName, string password, Guid roleId, CancellationToken cancellationToken = default);
     Task<Result> SetAccountActiveAsync(Guid userId, bool isActive, CancellationToken cancellationToken = default);
     Task<Result> ResetPasswordAsync(Guid userId, string newPassword, CancellationToken cancellationToken = default);

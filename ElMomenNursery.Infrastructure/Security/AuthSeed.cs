@@ -13,7 +13,8 @@ public static class AuthSeed
         "Employees.View", "Employees.Manage", "Payments.View", "Payments.Create", "Payments.Edit",
         "Expenses.View", "Expenses.Manage", "Inventory.View", "Inventory.Manage",
         "Subscriptions.View", "Subscriptions.Manage", "Users.View", "Users.Manage", "Roles.Manage", "Permissions.Manage", "Settings.View", "Settings.Manage",
-        "Students.Export", "Employees.Export", "Classes.Export", "Attendance.Export", "EmployeeAttendance.Export", "Users.Export", "Subscriptions.Export"
+        "Students.Export", "Employees.Export", "Classes.Export", "Attendance.Export", "EmployeeAttendance.Export", "Users.Export", "Subscriptions.Export",
+        "Students.Restore", "Employees.Restore"
     ];
 
     public static async Task InitializeAsync(NurseryDbContext db, CancellationToken ct = default)
@@ -112,6 +113,21 @@ public static class AuthSeed
             }
             db.AppSettings.Add(new AppSetting { Key = "Authentication.RolePermissionsSeeded.V4", Value = "true",
                 Description = "Subscription export permission added to Admin and Manager without replacing existing mappings." });
+            await db.SaveChangesAsync(ct);
+        }
+
+        var v5Seeded = await db.AppSettings.AnyAsync(x => x.Key == "Authentication.RolePermissionsSeeded.V5", ct);
+        if (!v5Seeded)
+        {
+            var admin = await db.Roles.Include(x => x.RolePermissions).SingleAsync(x => x.Name == "Admin", ct);
+            var assignedCodes = (await db.RolePermissions.Where(x => x.RoleId == admin.Id)
+                .Select(x => x.Permission.Code).ToListAsync(ct)).ToHashSet(StringComparer.Ordinal);
+            var permissionIds = await db.Permissions.Where(x => new[] { "Students.Restore", "Employees.Restore" }.Contains(x.Code) && !assignedCodes.Contains(x.Code))
+                .Select(x => x.Id).ToListAsync(ct);
+            foreach (var permissionId in permissionIds)
+                db.RolePermissions.Add(new RolePermission { RoleId = admin.Id, PermissionId = permissionId });
+            db.AppSettings.Add(new AppSetting { Key = "Authentication.RolePermissionsSeeded.V5", Value = "true",
+                Description = "Soft-delete restore permissions added to Admin without replacing administrator-edited mappings." });
             await db.SaveChangesAsync(ct);
         }
     }

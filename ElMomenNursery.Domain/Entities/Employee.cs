@@ -1,9 +1,12 @@
 namespace ElMomenNursery.Domain.Entities;
 using ElMomenNursery.Domain.Enums;
 
-public sealed class Employee
+public sealed class Employee : ISoftDeletable
 {
     public Guid Id { get; init; } = Guid.NewGuid();
+    public bool IsDeleted { get; set; }
+    public DateTimeOffset? DeletedAt { get; set; }
+    public Guid? DeletedByUserId { get; set; }
     public required string FullName { get; set; }
     public string? Qualification { get; set; }
     public int? GraduationYear { get; set; }

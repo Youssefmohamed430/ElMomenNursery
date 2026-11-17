@@ -52,7 +52,9 @@ public sealed class LoginForm : Form
     {
         try
         {
-            _setupMode = await auth.NeedsInitialAdministratorSetupAsync();
+            var result = await auth.NeedsInitialAdministratorSetupAsync();
+            if (result.IsFailure) { _note.Text = result.Error.Description; return; }
+            _setupMode = result.Value;
             if (IsDisposed || _note.IsDisposed || _submit.IsDisposed) return;
             Text = _setupMode ? "إعداد المسؤول الأول - حضانة المؤمن" : "تسجيل الدخول - حضانة المؤمن";
             heading.Text = _setupMode ? "إنشاء حساب المسؤول" : "تسجيل الدخول";

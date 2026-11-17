@@ -1,7 +1,9 @@
 using ElMomenNursery.Application.DTOs;
 using ElMomenNursery.Application.IServices;
+using ElMomenNursery.Controls;
 using ElMomenNursery.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 
 namespace ElMomenNursery.Forms;
@@ -9,7 +11,7 @@ namespace ElMomenNursery.Forms;
 public sealed class ChildEditorForm : Form
 {
     private static readonly ILogger _log = Log.ForContext<ChildEditorForm>();
-    private readonly IChildService _childService;
+    private readonly IServiceScopeFactory _scopes;
     private readonly ChildDto? _child;
 
     private readonly TextBox _fullName = CreateTextBox(100);
@@ -30,9 +32,9 @@ public sealed class ChildEditorForm : Form
     private readonly CheckBox _previouslyAttended = CreateCheckBox("سبق له الالتحاق بحضانة");
     private readonly Button _saveButton = CreateButton("حفظ", primary: true);
 
-    public ChildEditorForm(IChildService childService, ChildDto? child = null)
+    public ChildEditorForm(IServiceScopeFactory scopes, ChildDto? child = null)
     {
-        _childService = childService;
+        _scopes = scopes;
         _child = child;
         Text = child is null ? "إضافة طفل" : "تعديل بيانات الطفل";
         StartPosition = FormStartPosition.CenterParent;
@@ -148,10 +150,12 @@ public sealed class ChildEditorForm : Form
         _saveButton.Enabled = false;
         try
         {
+            await using var scope = _scopes.CreateAsyncScope();
+            var childService = scope.ServiceProvider.GetRequiredService<IChildService>();
             var gender = ((GenderOption)_gender.SelectedItem!).Value;
             if (_child is null)
             {
-                await _childService.CreateChildAsync(new CreateChildDTO
+                var result = await childService.CreateChildAsync(new CreateChildDTO
                 {
                     FullName = _fullName.Text.Trim(),
                     Address = _address.Text.Trim(),
@@ -170,10 +174,11 @@ public sealed class ChildEditorForm : Form
                     HasMedicalConditions = _hasMedicalConditions.Checked,
                     PreviouslyAttendedNursery = _previouslyAttended.Checked
                 });
+                if (!ResultPresenter.Present(this, "الأطفال", result)) return;
             }
             else
             {
-                await _childService.UpdateChildAsync(_child.Id, new UpdateChildDTO
+                var result = await childService.UpdateChildAsync(_child.Id, new UpdateChildDTO
                 {
                     FullName = _fullName.Text.Trim(),
                     Address = _address.Text.Trim(),
@@ -192,6 +197,7 @@ public sealed class ChildEditorForm : Form
                     HasMedicalConditions = _hasMedicalConditions.Checked,
                     PreviouslyAttendedNursery = _previouslyAttended.Checked
                 });
+                if (!ResultPresenter.Present(this, "الأطفال", result)) return;
             }
 
             if (IsDisposed) return;

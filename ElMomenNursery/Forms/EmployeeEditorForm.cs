@@ -1,15 +1,17 @@
 using ElMomenNursery.Application.DTOs;
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Domain.Enums;
+using ElMomenNursery.Controls;
 using System.Globalization;
 using Serilog;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ElMomenNursery.Forms;
 
 public sealed class EmployeeEditorForm : Form
 {
     private static readonly ILogger _log = Log.ForContext<EmployeeEditorForm>();
-    private readonly IEmployeeService _employeeService;
+    private readonly IServiceScopeFactory _scopes;
     private readonly EmployeeDto? _employee;
 
     private readonly TextBox _fullName = CreateTextBox(150);
@@ -26,9 +28,9 @@ public sealed class EmployeeEditorForm : Form
     private readonly CheckBox _hasExperience = new() { Text = "لديه خبرة", AutoSize = true, RightToLeft = RightToLeft.Yes };
     private readonly Button _saveButton = CreateButton("حفظ", primary: true);
 
-    public EmployeeEditorForm(IEmployeeService employeeService, EmployeeDto? employee = null)
+    public EmployeeEditorForm(IServiceScopeFactory scopes, EmployeeDto? employee = null)
     {
-        _employeeService = employeeService;
+        _scopes = scopes;
         _employee = employee;
         Text = employee is null ? "إضافة موظف" : "تعديل بيانات الموظف";
         StartPosition = FormStartPosition.CenterParent;
@@ -143,10 +145,12 @@ public sealed class EmployeeEditorForm : Form
         _saveButton.Enabled = false;
         try
         {
+            await using var scope = _scopes.CreateAsyncScope();
+            var employeeService = scope.ServiceProvider.GetRequiredService<IEmployeeService>();
             var maritalStatus = ((MaritalStatusOption)_maritalStatus.SelectedItem!).Value;
             if (_employee is null)
             {
-                await _employeeService.CreateEmployee(new CreateEmployeeDto
+                var result = await employeeService.CreateEmployee(new CreateEmployeeDto
                 {
                     FullName = _fullName.Text.Trim(),
                     Qualification = OptionalText(_qualification.Text),
@@ -161,24 +165,26 @@ public sealed class EmployeeEditorForm : Form
                     HireDate = DateOnly.FromDateTime(_hireDate.Value),
                     Salary = salary
                 });
+                if (!ResultPresenter.Present(this, "الموظفون", result)) return;
             }
             else
             {
-                await _employeeService.UpdateEmployee(_employee.Id, new UpdateEmployeeDto
+                var result = await employeeService.UpdateEmployee(_employee.Id, new UpdateEmployeeDto
                 {
                     FullName = _fullName.Text.Trim(),
-                    Qualification = _qualification.Text.Trim(),
+                    Qualification = OptionalText(_qualification.Text),
                     GraduationYear = graduationYear,
                     HasExperience = _hasExperience.Checked,
                     NationalIdNumber = _nationalId.Text.Trim(),
                     Address = _address.Text.Trim(),
                     MaritalStatus = maritalStatus,
                     Phone = _phone.Text.Trim(),
-                    AlternatePhone = _alternatePhone.Text.Trim(),
+                    AlternatePhone = OptionalText(_alternatePhone.Text),
                     JobDesignation = _jobDesignation.Text.Trim(),
                     HireDate = DateOnly.FromDateTime(_hireDate.Value),
                     Salary = salary
                 });
+                if (!ResultPresenter.Present(this, "الموظفون", result)) return;
             }
 
             if (IsDisposed) return;

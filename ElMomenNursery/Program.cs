@@ -106,9 +106,6 @@ internal static class Program
                 using (LogContext.PushProperty("UserId", userId))
                 {
                     System.Windows.Forms.Application.Run(new MainForm(session.CurrentUser, () => auth.LogoutAsync(),
-                        appScope.ServiceProvider.GetRequiredService<IAccountManagementService>(),
-                        appScope.ServiceProvider.GetRequiredService<IChildService>(),
-                        appScope.ServiceProvider.GetRequiredService<IEmployeeService>(),
                         appScope.ServiceProvider.GetRequiredService<IExcelExportService>(),
                         serviceProvider.GetRequiredService<IServiceScopeFactory>()));
                     if (session.IsAuthenticated)

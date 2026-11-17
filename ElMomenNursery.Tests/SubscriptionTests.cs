@@ -41,6 +41,19 @@ public sealed class SubscriptionTests
     }
 
     [Fact]
+    public async Task Child_lookup_search_reaches_beyond_first_hundred_and_normalizes_arabic()
+    {
+        await using var db = await CreateDb();
+        var children = Enumerable.Range(0, 120).Select(index => Child($"طفل {index:D3}")).ToList();
+        var matching = Child("مدرسة التاء المربوطة");
+        db.Children.AddRange(children.Append(matching)); await db.SaveChangesAsync();
+        var result = await Service(db).GetChildLookupAsync("مدرسه");
+        Assert.True(result.IsSuccess);
+        var selected = Assert.Single(result.Value);
+        Assert.Equal(matching.Id, selected.Id);
+    }
+
+    [Fact]
     public async Task Create_with_initial_payment_creates_receipt_and_allocation_atomically()
     {
         await using var db = await CreateDb(); var child = Child("طفل"); db.Children.Add(child); await db.SaveChangesAsync(); var service = Service(db);
@@ -58,6 +71,8 @@ public sealed class SubscriptionTests
         Assert.Equal(SubscriptionErrors.HasPayments, (await service.DeleteSubscriptionAsync(sub.Id)).Error);
         Assert.True((await service.CancelSubscriptionAsync(sub.Id, "طلب ولي الأمر")).IsSuccess);
         Assert.Equal(SubscriptionStatus.Cancelled, (await db.Subscriptions.AsNoTracking().SingleAsync()).Status);
+        Assert.Equal(SubscriptionErrors.PaymentNotAllowedForStatus,
+            (await service.RecordPaymentAsync(sub.Id, new RecordPaymentDto(10, PaymentMethod.Cash))).Error);
     }
 
     [Fact]
@@ -121,8 +136,23 @@ public sealed class SubscriptionTests
     {
         var service = new ReceiptPdfService(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")));
         var receipt = new PaymentReceiptDto(Guid.NewGuid(), "R-2026-000001", DateTimeOffset.Now, "طفل تجريبي", "اشتراك", new DateOnly(2026, 1, 1), new DateOnly(2026, 2, 1), 100, 0, 20, 80, PaymentMethod.Cash, null, "مستخدم", null);
-        var path = await service.CreateReceiptFileAsync(receipt, false); var bytes = await File.ReadAllBytesAsync(path);
+        var result = await service.CreateReceiptFileAsync(receipt, false); Assert.True(result.IsSuccess); var bytes = await File.ReadAllBytesAsync(result.Value);
         Assert.StartsWith("%PDF", System.Text.Encoding.ASCII.GetString(bytes, 0, 4)); Assert.True(bytes.Length > 0);
+    }
+
+    [Fact]
+    public async Task Receipt_copy_uses_a_separate_file_and_preserves_the_original()
+    {
+        var root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var service = new ReceiptPdfService(root);
+        var receipt = new PaymentReceiptDto(Guid.NewGuid(), "R-2026-000001", DateTimeOffset.Now, "طفل تجريبي", "اشتراك", new DateOnly(2026, 1, 1), new DateOnly(2026, 2, 1), 100, 0, 20, 80, PaymentMethod.Cash, null, "مستخدم", null);
+        var originalResult = await service.CreateReceiptFileAsync(receipt, false); Assert.True(originalResult.IsSuccess); var original = originalResult.Value;
+        var originalBytes = await File.ReadAllBytesAsync(original);
+        var copyResult = await service.CreateReceiptFileAsync(receipt, true); Assert.True(copyResult.IsSuccess); var copy = copyResult.Value;
+        Assert.NotEqual(original, copy);
+        Assert.True(File.Exists(original));
+        Assert.NotEmpty(await File.ReadAllBytesAsync(copy));
+        Assert.Equal(originalBytes, await File.ReadAllBytesAsync(original));
     }
 
     [Fact]

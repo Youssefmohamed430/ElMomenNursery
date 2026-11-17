@@ -21,6 +21,7 @@ Subscriptions and payments need a stable local receipt identifier, a readable Ar
 - Confirm the receipt-number pattern and the annual sequence reset.
 - Confirm QuestPDF Community eligibility based on the nursery's legal form and revenue; choose a paid tier if ineligible.
 - Confirm whether accountants should receive `Subscriptions.Manage`. Current role seed gives accountants payment creation/view and subscription viewing, but does not grant subscription management.
+- Confirm whether managers should receive `Payments.Create`. Managers can manage subscriptions, but do not currently have permission to record the optional initial payment. The editor now hides those fields when the permission is absent.
 - Confirm whether a payment amount should also be printed in words.
 - Confirm overlap policy; the current implementation warns and asks before continuing.
 - Confirm naming and values for optional nursery identity settings.

@@ -10,7 +10,6 @@ namespace ElMomenNursery.Tests;
 internal sealed class TestPermissionService(params string[] denied) : IPermissionService
 {
     public bool HasPermission(string code) => !denied.Contains(code, StringComparer.Ordinal);
-    public void EnsurePermission(string code) { if (!HasPermission(code)) throw new UnauthorizedAccessException(); }
     public bool HasAnyPermission(params string[] codes) => codes.Any(HasPermission);
     public bool HasAllPermissions(params string[] codes) => codes.All(HasPermission);
     public Task RefreshCurrentUserAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;

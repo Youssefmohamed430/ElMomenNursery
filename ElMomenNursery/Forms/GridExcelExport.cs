@@ -1,4 +1,5 @@
 using ElMomenNursery.Application.IServices;
+using ElMomenNursery.Controls;
 using System.Globalization;
 
 namespace ElMomenNursery.Forms;
@@ -42,10 +43,8 @@ internal static class GridExcelExport
         {
             var data = new ExcelExportData(worksheetName,
                 visibleColumns.Select(column => column.HeaderText).ToArray(), rows);
-            await exporter.ExportAsync(data, dialog.FileName);
-            MessageBox.Show(owner, $"تم تصدير {rows.Length} صفًا إلى ملف Excel بنجاح.", title,
-                MessageBoxButtons.OK, MessageBoxIcon.Information, MessageBoxDefaultButton.Button1,
-                MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+            var result = await exporter.ExportAsync(data, dialog.FileName);
+            ResultPresenter.Present(owner, title, result);
         }
         catch (Exception)
         {

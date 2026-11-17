@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using System.Globalization;
+using System.Linq.Expressions;
 
 namespace ElMomenNursery.Infrastructure.Persistence;
 
@@ -51,6 +52,12 @@ public sealed class NurseryDbContext(DbContextOptions<NurseryDbContext> options)
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(NurseryDbContext).Assembly);
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes().Where(x => typeof(ISoftDeletable).IsAssignableFrom(x.ClrType)))
+        {
+            var parameter = Expression.Parameter(entityType.ClrType, "entity");
+            var isDeleted = Expression.Call(typeof(EF), nameof(EF.Property), [typeof(bool)], parameter, Expression.Constant(nameof(ISoftDeletable.IsDeleted)));
+            modelBuilder.Entity(entityType.ClrType).HasQueryFilter(Expression.Lambda(Expression.Equal(isDeleted, Expression.Constant(false)), parameter));
+        }
         base.OnModelCreating(modelBuilder);
     }
 

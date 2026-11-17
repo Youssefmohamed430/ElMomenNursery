@@ -2,7 +2,7 @@ namespace ElMomenNursery.Domain.Abstractions;
 
 public class Result
 {
-    protected internal Result(bool isSuccess, Error error)
+    protected internal Result(bool isSuccess, Error error, string? message = null)
     {
         ArgumentNullException.ThrowIfNull(error);
 
@@ -13,16 +13,18 @@ public class Result
 
         IsSuccess = isSuccess;
         Error = error;
+        Message = message;
     }
 
     public bool IsSuccess { get; }
     public bool IsFailure => !IsSuccess;
     public Error Error { get; }
+    public string? Message { get; }
 
-    public static Result Success() => new(true, Error.None);
+    public static Result Success(string? message = null) => new(true, Error.None, message);
     public static Result Failure(Error error) => new(false, error);
 
-    public static Result<TValue> Success<TValue>(TValue value) => new(value, true, Error.None);
+    public static Result<TValue> Success<TValue>(TValue value, string? message = null) => new(value, true, Error.None, message);
     public static Result<TValue> Failure<TValue>(Error error) => new(default, false, error);
 
     public static implicit operator Result(Error error) => Failure(error);
@@ -32,8 +34,8 @@ public sealed class Result<TValue> : Result
 {
     private readonly TValue? _value;
 
-    internal Result(TValue? value, bool isSuccess, Error error)
-        : base(isSuccess, error)
+    internal Result(TValue? value, bool isSuccess, Error error, string? message = null)
+        : base(isSuccess, error, message)
     {
         _value = value;
     }

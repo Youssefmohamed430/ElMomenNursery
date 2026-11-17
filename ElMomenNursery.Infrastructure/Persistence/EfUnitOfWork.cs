@@ -40,21 +40,25 @@ internal sealed class EfUnitOfWork(NurseryDbContext dbContext, ILogger<EfUnitOfW
         }
         catch (DbUpdateConcurrencyException exception)
         {
+            dbContext.ChangeTracker.Clear();
             logger.LogWarning(exception, "Database concurrency conflict during save");
             throw;
         }
         catch (DbUpdateException exception) when (TryGetSqliteConstraintKind(exception, out var constraintKind))
         {
+            dbContext.ChangeTracker.Clear();
             logger.LogWarning(exception, "Database constraint rejected save; constraintKind={ConstraintKind}", constraintKind);
             throw;
         }
         catch (DbUpdateException exception)
         {
+            dbContext.ChangeTracker.Clear();
             logger.LogError(exception, "Database update failed");
             throw;
         }
         catch (Exception exception)
         {
+            dbContext.ChangeTracker.Clear();
             logger.LogError(exception, "Failed to save database changes");
             throw;
         }
@@ -107,6 +111,7 @@ internal sealed class EfUnitOfWork(NurseryDbContext dbContext, ILogger<EfUnitOfW
         {
             logger.LogError(exception, "Failed to commit database transaction; rolling back");
             await _transaction.RollbackAsync(CancellationToken.None);
+            dbContext.ChangeTracker.Clear();
             throw;
         }
         finally

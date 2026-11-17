@@ -2,167 +2,152 @@ using ElMomenNursery.Application.Abstractions.Persistence;
 using ElMomenNursery.Application.DTOs;
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Application.Mappings;
+using ElMomenNursery.Domain.Abstractions;
 using ElMomenNursery.Domain.Entities;
-using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace ElMomenNursery.Application.Services;
 
-public class EmployeeService(IUnitOfWork unitOfWork, ILogger<EmployeeService> logger, IPermissionService permissions) : IEmployeeService
+public sealed class EmployeeService(IUnitOfWork unitOfWork, ILogger<EmployeeService> logger, IPermissionService permissions) : IEmployeeService
 {
-    public async Task<EmployeeDto> CreateEmployee(CreateEmployeeDto employee)
+    public async Task<Result<EmployeeDto>> CreateEmployee(CreateEmployeeDto employee)
     {
-        permissions.EnsurePermission("Employees.Manage");
-        try
-        {
-        ArgumentNullException.ThrowIfNull(employee);
-        ValidateRequiredFields(employee.FullName, employee.NationalIdNumber, employee.Address, employee.Phone, employee.JobDesignation);
-        if (employee.Salary < 0)
-            throw new ArgumentOutOfRangeException(nameof(employee), "Salary cannot be negative.");
+        var permissionError = PermissionGuard.Check(permissions, "Employees.Manage", EmployeeErrors.PermissionDenied);
+        if (permissionError is not null) return permissionError;
+        if (employee is null || HasMissingRequiredField(employee.FullName, employee.NationalIdNumber, employee.Address, employee.Phone, employee.JobDesignation))
+            return EmployeeErrors.InvalidData;
+        if (employee.Salary < 0) return EmployeeErrors.InvalidSalary;
+
         employee.NationalIdNumber = employee.NationalIdNumber.Trim();
         if (await unitOfWork.Repository<Employee>().AnyAsync(e => e.NationalIdNumber == employee.NationalIdNumber))
-        {
-            logger.LogWarning("Employee creation rejected because the identifier is already registered; errorCode={ErrorCode}", "DuplicateEmployeeIdentifier");
-            throw new InvalidOperationException("An employee with this national ID already exists.");
-        }
+            return EmployeeErrors.DuplicateNationalId;
 
-        var newEmp = employee.Adapt<Employee>();
-        await unitOfWork.Repository<Employee>().AddAsync(newEmp);
-        var affectedRows = await unitOfWork.SaveChangesAsync();
-        if (affectedRows == 0)
-            logger.LogWarning("Employee creation saved no rows; employeeId={EmployeeId}", newEmp.Id);
-        logger.LogInformation("Created employee record; employeeId={EmployeeId}", newEmp.Id);
-        return newEmp.Adapt<EmployeeDto>();
+        var entity = employee.Adapt<Employee>();
+        await unitOfWork.Repository<Employee>().AddAsync(entity);
+        try
+        {
+            await unitOfWork.SaveChangesAsync();
+            logger.LogInformation("Created employee record; employeeId={EmployeeId}", entity.Id);
+            return Result.Success(entity.Adapt<EmployeeDto>(), EmployeeErrors.Created.Description);
         }
         catch (DbUpdateException exception)
         {
-            logger.LogWarning(exception, "Employee creation rejected by database constraint; constraintKind={ConstraintKind}", GetConstraintKind(exception));
-            throw;
-        }
-        catch (Exception exception)
-        {
-            logger.LogError(exception, "EmployeeService failed to create employee record");
-            throw;
+            var error = PersistenceErrorMapper.FromException(exception);
+            if (error == PersistenceErrors.Unique) return EmployeeErrors.DuplicateNationalId;
+            logger.LogWarning(exception, "Employee creation failed; errorCode={ErrorCode}", error.Code);
+            return error;
         }
     }
 
-    public async Task<bool> DeleteEmployee(Guid id)
+    public async Task<Result> DeleteEmployee(Guid id)
     {
-        permissions.EnsurePermission("Employees.Manage");
-        try
-        {
+        var permissionError = PermissionGuard.Check(permissions, "Employees.Manage", EmployeeErrors.PermissionDenied);
+        if (permissionError is not null) return permissionError;
         var employee = await unitOfWork.Repository<Employee>().FirstOrDefaultAsync(e => e.Id == id);
-        if (employee == null) return false;
-
+        if (employee is null) return EmployeeErrors.NotFound;
         unitOfWork.Repository<Employee>().Remove(employee);
-        var affectedRows = await unitOfWork.SaveChangesAsync();
-        if (affectedRows == 0)
-            logger.LogWarning("Employee deletion saved no rows; employeeId={EmployeeId}", id);
-        logger.LogInformation("Deleted employee record; employeeId={EmployeeId}", id);
-        return true;
-        }
-        catch (DbUpdateException exception)
-        {
-            logger.LogWarning(exception, "Employee deletion rejected by database constraint; employeeId={EmployeeId}; constraintKind={ConstraintKind}", id, GetConstraintKind(exception));
-            throw;
-        }
-        catch (Exception exception)
-        {
-            logger.LogError(exception, "EmployeeService failed to delete employee record; employeeId={EmployeeId}", id);
-            throw;
-        }
-    }
-
-    public async Task<EmployeeDto> GetEmployeeById(Guid id)
-    {
-        permissions.EnsurePermission("Employees.View");
-        var employee = await unitOfWork.Repository<Employee>().FirstOrDefaultAsync(e => e.Id == id);
-        if (employee is null) throw new KeyNotFoundException($"Employee '{id}' was not found.");
-        return employee.Adapt<EmployeeDto>();
-    }
-
-    public async Task<EmployeeDto> GetEmployeeByName(string FullName)
-    {
-         permissions.EnsurePermission("Employees.View");
-         var employee = await unitOfWork.Repository<Employee>().FirstOrDefaultAsync(e => e.FullName == FullName);
-        if (employee is null) throw new KeyNotFoundException($"Employee '{FullName}' was not found.");
-        return employee.Adapt<EmployeeDto>();
-    }
-
-    public async Task<IEnumerable<EmployeeDto>> GetEmployees()
-    {
-        permissions.EnsurePermission("Employees.View");
-        var employees = await unitOfWork.Repository<Employee>().ListAsync();
-        return employees.Adapt<IEnumerable<EmployeeDto>>();
-    }
-
-    public async Task<EmployeeDto> UpdateEmployee(Guid id, UpdateEmployeeDto employee)
-    {
-        permissions.EnsurePermission("Employees.Manage");
         try
         {
-        ArgumentNullException.ThrowIfNull(employee);
-        var existingEmployee = await unitOfWork.Repository<Employee>().FirstOrDefaultAsync(e => e.Id == id);
-        if (existingEmployee == null)
-        {
-            throw new KeyNotFoundException($"Employee '{id}' was not found.");
-        }
-
-        ValidateSuppliedRequiredField(employee.FullName, nameof(employee.FullName));
-        ValidateSuppliedRequiredField(employee.NationalIdNumber, nameof(employee.NationalIdNumber));
-        ValidateSuppliedRequiredField(employee.Address, nameof(employee.Address));
-        ValidateSuppliedRequiredField(employee.Phone, nameof(employee.Phone));
-        ValidateSuppliedRequiredField(employee.JobDesignation, nameof(employee.JobDesignation));
-        if (employee.Salary < 0)
-            throw new ArgumentOutOfRangeException(nameof(employee), "Salary cannot be negative.");
-        if (employee.NationalIdNumber is not null && await unitOfWork.Repository<Employee>().AnyAsync(e =>
-                e.Id != id && e.NationalIdNumber == employee.NationalIdNumber.Trim()))
-        {
-            logger.LogWarning("Employee update rejected because the identifier is already registered; employeeId={EmployeeId}; errorCode={ErrorCode}", id, "DuplicateEmployeeIdentifier");
-            throw new InvalidOperationException("An employee with this national ID already exists.");
-        }
-
-        if (employee.NationalIdNumber is not null)
-            employee.NationalIdNumber = employee.NationalIdNumber.Trim();
-        employee.Adapt(existingEmployee, MapsterConfigForEmployee.Config);
-        existingEmployee.UpdatedAt = DateTimeOffset.UtcNow;
-        unitOfWork.Repository<Employee>().Update(existingEmployee);
-        var affectedRows = await unitOfWork.SaveChangesAsync();
-        if (affectedRows == 0)
-            logger.LogWarning("Employee update saved no rows; employeeId={EmployeeId}", id);
-        logger.LogInformation("Updated employee record; employeeId={EmployeeId}", id);
-        return existingEmployee.Adapt<EmployeeDto>();
+            await unitOfWork.SaveChangesAsync();
+            logger.LogInformation("Deleted employee record; employeeId={EmployeeId}", id);
+            return Result.Success(EmployeeErrors.Deleted.Description);
         }
         catch (DbUpdateException exception)
         {
-            logger.LogWarning(exception, "Employee update rejected by database constraint; employeeId={EmployeeId}; constraintKind={ConstraintKind}", id, GetConstraintKind(exception));
-            throw;
+            var error = PersistenceErrorMapper.FromException(exception);
+            logger.LogWarning(exception, "Employee deletion failed; employeeId={EmployeeId}; errorCode={ErrorCode}", id, error.Code);
+            return error;
         }
-        catch (Exception exception)
+    }
+
+    public async Task<Result<EmployeeDto>> GetEmployeeById(Guid id)
+    {
+        var permissionError = PermissionGuard.Check(permissions, "Employees.View", EmployeeErrors.PermissionDenied);
+        if (permissionError is not null) return permissionError;
+        var employee = await unitOfWork.Repository<Employee>().FirstOrDefaultAsync(e => e.Id == id);
+        return employee is null ? EmployeeErrors.NotFound : Result.Success(employee.Adapt<EmployeeDto>());
+    }
+
+    public async Task<Result<EmployeeDto>> GetEmployeeByName(string fullName)
+    {
+        var permissionError = PermissionGuard.Check(permissions, "Employees.View", EmployeeErrors.PermissionDenied);
+        if (permissionError is not null) return permissionError;
+        if (string.IsNullOrWhiteSpace(fullName)) return EmployeeErrors.InvalidData;
+        var employee = await unitOfWork.Repository<Employee>().FirstOrDefaultAsync(e => e.FullName == fullName.Trim());
+        return employee is null ? EmployeeErrors.NotFound : Result.Success(employee.Adapt<EmployeeDto>());
+    }
+
+    public async Task<Result<IReadOnlyList<EmployeeDto>>> GetEmployees()
+    {
+        var permissionError = PermissionGuard.Check(permissions, "Employees.View", EmployeeErrors.PermissionDenied);
+        if (permissionError is not null) return permissionError;
+        var employees = await unitOfWork.Repository<Employee>().ListAsync();
+        return Result.Success<IReadOnlyList<EmployeeDto>>(employees.Adapt<List<EmployeeDto>>());
+    }
+
+    public async Task<Result<IReadOnlyList<EmployeeDto>>> GetDeletedEmployees(CancellationToken cancellationToken = default)
+    {
+        var permissionError = PermissionGuard.Check(permissions, "Employees.Restore", EmployeeErrors.PermissionDenied);
+        if (permissionError is not null) return permissionError;
+        var employees = await unitOfWork.Repository<Employee>().Query().IgnoreQueryFilters().Where(x => x.IsDeleted).ToListAsync(cancellationToken);
+        return Result.Success<IReadOnlyList<EmployeeDto>>(employees.Adapt<List<EmployeeDto>>());
+    }
+
+    public async Task<Result> RestoreEmployee(Guid id, CancellationToken cancellationToken = default)
+    {
+        var permissionError = PermissionGuard.Check(permissions, "Employees.Restore", EmployeeErrors.PermissionDenied);
+        if (permissionError is not null) return permissionError;
+        var employees = unitOfWork.Repository<Employee>();
+        var employee = await employees.Query(asNoTracking: false).IgnoreQueryFilters().SingleOrDefaultAsync(x => x.Id == id && x.IsDeleted, cancellationToken);
+        if (employee is null) return EmployeeErrors.NotFound;
+        if (await employees.AnyAsync(x => x.NationalIdNumber == employee.NationalIdNumber, cancellationToken)) return EmployeeErrors.DuplicateNationalId;
+        employee.IsDeleted = false; employee.DeletedAt = null; employee.DeletedByUserId = null; employee.UpdatedAt = DateTimeOffset.UtcNow;
+        try
         {
-            logger.LogError(exception, "EmployeeService failed to update employee record; employeeId={EmployeeId}", id);
-            throw;
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return Result.Success(EmployeeErrors.Restored.Description);
+        }
+        catch (DbUpdateException exception)
+        {
+            var error = PersistenceErrorMapper.FromException(exception);
+            return error == PersistenceErrors.Unique ? EmployeeErrors.DuplicateNationalId : error;
         }
     }
 
-    private static string GetConstraintKind(DbUpdateException exception)
+    public async Task<Result<EmployeeDto>> UpdateEmployee(Guid id, UpdateEmployeeDto employee)
     {
-        var details = exception.GetBaseException().ToString();
-        if (details.Contains("UNIQUE constraint", StringComparison.OrdinalIgnoreCase)) return "UNIQUE";
-        if (details.Contains("FOREIGN KEY constraint", StringComparison.OrdinalIgnoreCase)) return "FOREIGN KEY";
-        if (details.Contains("CHECK constraint", StringComparison.OrdinalIgnoreCase)) return "CHECK";
-        return "UNKNOWN";
+        var permissionError = PermissionGuard.Check(permissions, "Employees.Manage", EmployeeErrors.PermissionDenied);
+        if (permissionError is not null) return permissionError;
+        if (employee is null) return EmployeeErrors.InvalidData;
+        var existing = await unitOfWork.Repository<Employee>().FirstOrDefaultAsync(e => e.Id == id, asNoTracking: false);
+        if (existing is null) return EmployeeErrors.NotFound;
+
+        if (new[] { employee.FullName, employee.NationalIdNumber, employee.Address, employee.Phone, employee.JobDesignation }
+            .Any(value => value is not null && string.IsNullOrWhiteSpace(value))) return EmployeeErrors.InvalidData;
+        if (employee.Salary < 0) return EmployeeErrors.InvalidSalary;
+        if (employee.NationalIdNumber is not null && await unitOfWork.Repository<Employee>().AnyAsync(e =>
+                e.Id != id && e.NationalIdNumber == employee.NationalIdNumber.Trim())) return EmployeeErrors.DuplicateNationalId;
+
+        if (employee.NationalIdNumber is not null) employee.NationalIdNumber = employee.NationalIdNumber.Trim();
+        employee.Adapt(existing, MapsterConfigForEmployee.Config);
+        existing.Qualification = string.IsNullOrWhiteSpace(employee.Qualification) ? null : employee.Qualification.Trim();
+        existing.AlternatePhone = string.IsNullOrWhiteSpace(employee.AlternatePhone) ? null : employee.AlternatePhone.Trim();
+        existing.UpdatedAt = DateTimeOffset.UtcNow;
+        try
+        {
+            await unitOfWork.SaveChangesAsync();
+            logger.LogInformation("Updated employee record; employeeId={EmployeeId}", id);
+            return Result.Success(existing.Adapt<EmployeeDto>(), EmployeeErrors.Updated.Description);
+        }
+        catch (DbUpdateException exception)
+        {
+            var error = PersistenceErrorMapper.FromException(exception);
+            if (error == PersistenceErrors.Unique) return EmployeeErrors.DuplicateNationalId;
+            logger.LogWarning(exception, "Employee update failed; employeeId={EmployeeId}; errorCode={ErrorCode}", id, error.Code);
+            return error;
+        }
     }
 
-    private static void ValidateRequiredFields(params string[] fields)
-    {
-        if (fields.Any(string.IsNullOrWhiteSpace))
-            throw new ArgumentException("Employee name, national ID, address, phone, and job designation are required.");
-    }
-
-    private static void ValidateSuppliedRequiredField(string? value, string propertyName)
-    {
-        if (value is not null && string.IsNullOrWhiteSpace(value))
-            throw new ArgumentException($"{propertyName} cannot be empty.", propertyName);
-    }
+    private static bool HasMissingRequiredField(params string?[] fields) => fields.Any(string.IsNullOrWhiteSpace);
 }

@@ -1,5 +1,12 @@
 # Implementation Roadmap — Al-Moumen Nursery Management System
 
+## متابعة خطة التنفيذ
+
+- [x] مسار العمل 1: تدقيق وإصلاح آخر commit؛ 33 اختبارًا ناجحًا، بناء بلا تحذيرات، ولا تغييرات EF معلقة. التفاصيل في `WORKSTREAM-1-LAST-COMMIT-AUDIT-AR.md`.
+- [ ] مسار العمل 2: بدأ فصل الصفحات وتوحيد `Result`؛ المتبقي موضح في `WORKSTREAM-2-PROGRESS-AR.md`.
+- [ ] مسار العمل 3: أضيفت بنية الحذف الناعم والهجرة والاستعادة للأطفال والموظفين؛ ما زال دعم الاستعادة وواجهتها ومراجعة الاستعلامات التاريخية غير مكتمل.
+- [ ] مسار العمل 4: تخصيص الشاشة لكل صفحة.
+
 This roadmap breaks the approved product scope into an ordered, end-to-end task plan. It is a planning document; unchecked items are not claims that implementation has happened.
 
 **Product rule:** deliver comprehensive day-to-day functionality through an extremely simple Arabic RTL experience for non-technical nursery staff.

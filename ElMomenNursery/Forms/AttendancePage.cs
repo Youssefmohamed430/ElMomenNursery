@@ -88,10 +88,11 @@ internal sealed class ChildAttendancePage : UserControl
         {
             await using var scope = _scopes.CreateAsyncScope();
             var service = scope.ServiceProvider.GetRequiredService<IChildService>();
-            var values = await service.GetClassroomsForFilterAsync();
+            var result = await service.GetClassroomsForFilterAsync();
             if (IsDisposed) return;
+            if (result.IsFailure) { ShowError(result.Error.Description); return; }
             _classroom.Items.Clear(); _classroom.Items.Add(new ClassroomFilterOptionDto(Guid.Empty, "كل الفصول"));
-            foreach (var value in values) _classroom.Items.Add(value);
+            foreach (var value in result.Value) _classroom.Items.Add(value);
             _classroom.SelectedIndex = 0;
         }
         catch (UnauthorizedAccessException) { ShowError("لا تملك الصلاحية اللازمة لعرض الفصول."); }

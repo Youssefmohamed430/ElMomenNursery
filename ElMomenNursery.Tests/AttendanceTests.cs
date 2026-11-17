@@ -57,15 +57,45 @@ public sealed class AttendanceRulesTests
         };
         db.Children.Add(child); await db.SaveChangesAsync();
         var service = new ChildService(new TestUnitOfWork(db), NullLogger<ChildService>.Instance, new TestPermissionService());
-        await service.UpdateChildAsync(child.Id, new UpdateChildDTO
+        var update = await service.UpdateChildAsync(child.Id, new UpdateChildDTO
         {
             FullName = "اسم محدث", Address = "عنوان محدث", EnrollmentDate = child.EnrollmentDate,
             DateOfBirth = child.DateOfBirth, Gender = ChildGender.Girl,
             FatherName = "الأب", FatherPhone = "01000000000", MotherName = "الأم", MotherPhone = "01100000000"
         });
+        Assert.True(update.IsSuccess);
+        Assert.Equal(ChildErrors.Updated.Description, update.Message);
         var saved = await db.Children.AsNoTracking().SingleAsync(x => x.Id == child.Id);
         Assert.Equal("اسم محدث", saved.FullName);
         Assert.Equal("عنوان محدث", saved.Address);
+    }
+
+    [Fact]
+    public async Task Employee_update_can_clear_optional_fields()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<NurseryDbContext>().UseSqlite(connection).Options;
+        await using var db = new NurseryDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+        var employee = new Employee
+        {
+            FullName = "الموظفة", Qualification = "بكالوريوس", NationalIdNumber = "12345678901234", Address = "عنوان",
+            Phone = "01000000000", AlternatePhone = "01100000000", JobDesignation = "معلمة", HireDate = DateOnly.FromDateTime(DateTime.Today)
+        };
+        db.Employees.Add(employee); await db.SaveChangesAsync();
+        var service = new EmployeeService(new TestUnitOfWork(db), NullLogger<EmployeeService>.Instance, new TestPermissionService());
+        var update = await service.UpdateEmployee(employee.Id, new UpdateEmployeeDto
+        {
+            FullName = employee.FullName, Qualification = null, GraduationYear = null, HasExperience = false,
+            NationalIdNumber = employee.NationalIdNumber, Address = employee.Address, MaritalStatus = employee.MaritalStatus,
+            Phone = employee.Phone, AlternatePhone = null, JobDesignation = employee.JobDesignation, HireDate = employee.HireDate, Salary = employee.Salary
+        });
+        Assert.True(update.IsSuccess);
+        Assert.Equal(EmployeeErrors.Updated.Description, update.Message);
+        var saved = await db.Employees.AsNoTracking().SingleAsync();
+        Assert.Null(saved.Qualification);
+        Assert.Null(saved.AlternatePhone);
     }
 
     [Fact]
@@ -87,6 +117,35 @@ public sealed class AttendanceRulesTests
         Assert.Equal(AttendanceErrors.AlreadyRecorded, second.Error);
         var saved = await db.ChildAttendances.AsNoTracking().SingleAsync();
         Assert.Equal(actor.Id, saved.RecordedByUserId);
+    }
+
+    [Fact]
+    public async Task Employee_attendance_uses_session_actor_and_returns_employee_name()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:"); await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<NurseryDbContext>().UseSqlite(connection).Options;
+        await using var db = new NurseryDbContext(options); await db.Database.EnsureCreatedAsync();
+        var role = new Role { Name = "Tester" };
+        var actor = new UserAccount { Username = "tester", UsernameNormalized = "TESTER", PasswordHash = "hash", Role = role, RoleId = role.Id, FullName = "اسم المستخدم" };
+        var employee = new Employee { FullName = "الموظفة", NationalIdNumber = "12345678901234", Address = "عنوان", Phone = "01000000000", JobDesignation = "معلمة", HireDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-1)) };
+        db.AddRange(role, actor, employee); await db.SaveChangesAsync();
+        var session = new TestSessionManager(new UserSession(actor.Id, "tester", actor.FullName, null, new HashSet<string>(), new HashSet<string>()));
+        var service = new EmployeeAttendanceService(new TestUnitOfWork(db), NullLogger<EmployeeAttendanceService>.Instance, new TestPermissionService(), session);
+        var result = await service.MarkManualAttendanceAsync(new CreateEmployeeAttendanceDto
+        {
+            EmployeeId = employee.Id,
+            AttendanceDate = DateOnly.FromDateTime(DateTime.Today),
+            Status = AttendanceStatus.Present,
+            CheckInTime = DateTimeOffset.Now,
+            Notes = "  ملاحظة  "
+        });
+        Assert.True(result.IsSuccess);
+        Assert.Equal(employee.FullName, result.Value.EmployeeName);
+        Assert.Equal(actor.Id, result.Value.RecordedByUserId);
+        Assert.Equal("ملاحظة", result.Value.Notes);
+        var saved = await db.EmployeeAttendances.AsNoTracking().SingleAsync();
+        Assert.Equal(actor.Id, saved.RecordedByUserId);
+        Assert.Equal(AttendanceEntryMethod.Manual, saved.EntryMethod);
     }
 
     [Fact]

@@ -58,6 +58,7 @@ All projects currently target .NET 9: the desktop project uses `net9.0-windows` 
 ## Desktop shell and brand foundation
 
 - `ElMomenNursery/Forms/MainForm.cs` is the current application shell. It provides a brand header, right-side Arabic navigation, a home task launcher, and neutral empty states for sections whose business features are not implemented yet.
+- The Classes entry currently displays a neutral Arabic unavailable state. Classroom management remains disabled until the owner approves its fields and rules; sample rows are not used.
 - `ElMomenNursery/Styling/BrandPalette.cs` centralizes colors sampled/derived from the supplied logo (green `#80B040`, red `#E00000`, and blue `#0040E0`). The logo's bright green is an accent; a darker derived green (`#376927`) is used for primary actions and readable text. Its white-text contrast is approximately 6.54:1. The bright logo green is reserved for decorative accents. Red and blue tones are reserved for status feedback.
 - The actual logo is kept at `ElMomenNursery/Resources/Branding/AlMoumenNurseryLogo.jpeg` and copied to the output directory for the app header.
 - `ElMomenNursery/Controls/` contains reusable navigation buttons, loading/empty/message states, validation hints, form sections/field rows, and Arabic confirmation/information dialogs.

@@ -1,23 +1,25 @@
 using ClosedXML.Excel;
 using ElMomenNursery.Application.IServices;
+using ElMomenNursery.Domain.Abstractions;
 
 namespace ElMomenNursery.Infrastructure.Spreadsheet;
 
 public sealed class ExcelExportService : IExcelExportService
 {
-    public Task ExportAsync(ExcelExportData data, string filePath, CancellationToken cancellationToken = default)
+    public async Task<Result> ExportAsync(ExcelExportData data, string filePath, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(data);
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
-        if (data.Headers.Count == 0)
-            throw new ArgumentException("At least one column is required to export a worksheet.", nameof(data));
+        if (data.Headers.Count == 0) return CommonErrors.InvalidRequest;
 
-        return Task.Run(() =>
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            using var workbook = new XLWorkbook();
-            var worksheet = workbook.Worksheets.Add(SanitizeWorksheetName(data.WorksheetName));
-            worksheet.RightToLeft = true;
+            await Task.Run(() =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                using var workbook = new XLWorkbook();
+                var worksheet = workbook.Worksheets.Add(SanitizeWorksheetName(data.WorksheetName));
+                worksheet.RightToLeft = true;
 
             for (var column = 0; column < data.Headers.Count; column++)
             {
@@ -42,8 +44,16 @@ public sealed class ExcelExportService : IExcelExportService
             if (data.Rows.Count > 0)
                 worksheet.Range(1, 1, data.Rows.Count + 1, data.Headers.Count).SetAutoFilter();
             worksheet.Columns(1, data.Headers.Count).AdjustToContents(10, 50);
-            workbook.SaveAs(filePath);
-        }, cancellationToken);
+                workbook.SaveAs(filePath);
+            }, cancellationToken);
+            return Result.Success("تم حفظ ملف Excel بنجاح.");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (IOException exception) when ((exception.HResult & 0xFFFF) is 32 or 33) { return FileErrors.FileInUse; }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            return FileErrors.NotWritable;
+        }
     }
 
     private static string SanitizeWorksheetName(string name)

@@ -14,7 +14,7 @@ public static class AttendanceRules
         if (checkIn.HasValue && checkOut.HasValue && checkOut.Value < checkIn.Value) return AttendanceErrors.CheckOutBeforeCheckIn;
         if (status is AttendanceStatus.Absent or AttendanceStatus.Excused)
             return checkIn.HasValue || checkOut.HasValue ? AttendanceErrors.InvalidTimes : null;
-        if (!checkIn.HasValue || checkOut.HasValue && !checkIn.HasValue) return AttendanceErrors.InvalidTimes;
+        if (!checkIn.HasValue) return AttendanceErrors.InvalidTimes;
         return null;
     }
 

@@ -1,5 +1,6 @@
 using ElMomenNursery.Application.Abstractions.Persistence;
 using ElMomenNursery.Application.DTOs;
+using ElMomenNursery.Application.Common;
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Domain.Abstractions;
 using ElMomenNursery.Domain.Entities;
@@ -20,9 +21,10 @@ public sealed class SubscriptionService(IUnitOfWork unitOfWork, ILogger<Subscrip
         if (filter.PlanId is Guid plan) q = q.Where(x => x.SubscriptionPlanId == plan);
         if (filter.PeriodFrom is DateOnly from) q = q.Where(x => x.PeriodEnd >= from);
         if (filter.PeriodTo is DateOnly to) q = q.Where(x => x.PeriodStart <= to);
-        var text = Normalize(filter.SearchText);
-        if (text.Length > 0) q = q.Where(x => x.Child.FullName.Replace("أ", "ا").Replace("إ", "ا").Replace("آ", "ا").Replace("ى", "ي").Contains(text));
         var rows = await q.ToListAsync(ct);
+        var text = ArabicNameNormalizer.Normalize(filter.SearchText);
+        if (text.Length > 0)
+            rows = rows.Where(x => ArabicNameNormalizer.Normalize(x.Child.FullName).Contains(text, StringComparison.Ordinal)).ToList();
         var ids = rows.Select(x => x.Id).ToArray();
         var allocations = await unitOfWork.Repository<PaymentAllocation>().Query()
             .Where(x => ids.Contains(x.SubscriptionId) && x.Payment.Status == PaymentStatus.Posted)
@@ -54,9 +56,12 @@ public sealed class SubscriptionService(IUnitOfWork unitOfWork, ILogger<Subscrip
     public async Task<Result<IReadOnlyList<ChildLookupDto>>> GetChildLookupAsync(string? search, CancellationToken ct = default)
     {
         if (!Allowed("Subscriptions.View")) return SubscriptionErrors.PermissionDenied;
-        var q = unitOfWork.Repository<Child>().Query();
-        if (!string.IsNullOrWhiteSpace(search)) q = q.Where(x => x.FullName.Contains(search.Trim()));
-        var rows = await q.OrderBy(x => x.FullName).Take(100).Select(x => new ChildLookupDto(x.Id, x.FullName)).ToListAsync(ct);
+        var children = await unitOfWork.Repository<Child>().Query().OrderBy(x => x.FullName).ToListAsync(ct);
+        var normalizedSearch = ArabicNameNormalizer.Normalize(search);
+        var rows = children
+            .Where(x => normalizedSearch.Length == 0 || ArabicNameNormalizer.Normalize(x.FullName).Contains(normalizedSearch, StringComparison.Ordinal))
+            .Take(100)
+            .Select(x => new ChildLookupDto(x.Id, x.FullName)).ToList();
         return Result.Success<IReadOnlyList<ChildLookupDto>>(rows);
     }
 
@@ -75,7 +80,7 @@ public sealed class SubscriptionService(IUnitOfWork unitOfWork, ILogger<Subscrip
         if (dto.PeriodStart == default || dto.PeriodEnd < dto.PeriodStart) return SubscriptionErrors.InvalidPeriod;
         var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(x => x.Id == dto.ChildId, asNoTracking: false, cancellationToken: ct);
         if (child is null) return SubscriptionErrors.ChildNotFound;
-        if (dto.PeriodStart < child.EnrollmentDate) return SubscriptionErrors.InvalidPeriod;
+        if (dto.PeriodStart < child.EnrollmentDate) return SubscriptionErrors.PeriodBeforeEnrollment;
         SubscriptionPlan? plan = null;
         if (dto.SubscriptionPlanId is Guid planId)
         {
@@ -114,12 +119,12 @@ public sealed class SubscriptionService(IUnitOfWork unitOfWork, ILogger<Subscrip
         {
             await unitOfWork.RollbackTransactionAsync(CancellationToken.None);
             logger.LogError(ex, "Subscription creation failed; subscriptionId={SubscriptionId}; childId={ChildId}", sub.Id, child.Id);
-            return SubscriptionErrors.PersistenceFailure;
+            return PersistenceErrorMapper.FromException(ex);
         }
         sub.Child = child; sub.SubscriptionPlan = plan;
         var createdDto = ToDto(sub, dto.InitialPayment?.Amount ?? 0);
         if (initialPayment is not null) createdDto.InitialPaymentReceipt = await WithNurserySettings(ToReceipt(initialPayment, sub, 0, initialPayment.Amount), ct);
-        return createdDto;
+        return Result.Success(createdDto, "تم إنشاء الاشتراك.");
     }
 
     public async Task<Result<SubscriptionDto>> UpdateSubscriptionAsync(Guid id, UpdateSubscriptionDto dto, CancellationToken ct = default)
@@ -138,8 +143,9 @@ public sealed class SubscriptionService(IUnitOfWork unitOfWork, ILogger<Subscrip
         if (item.Status is not (SubscriptionStatus.Cancelled or SubscriptionStatus.Waived)) item.Status = ComputeStatus(dto.AmountDue, paid);
         unitOfWork.Repository<Subscription>().Update(item);
         await Audit("Subscription.Updated", id, before, SubscriptionValues(item, paid), dto.Reason, ct);
-        await unitOfWork.SaveChangesAsync(ct);
-        return ToDto(item, paid);
+        var saveError = await SaveChangesErrorAsync(ct);
+        if (saveError is not null) return saveError;
+        return Result.Success(ToDto(item, paid), "تم تحديث الاشتراك.");
     }
 
     public async Task<Result> CancelSubscriptionAsync(Guid id, string reason, CancellationToken ct = default)
@@ -150,8 +156,10 @@ public sealed class SubscriptionService(IUnitOfWork unitOfWork, ILogger<Subscrip
         if (item.Status == SubscriptionStatus.Cancelled) return SubscriptionErrors.AlreadyCancelled;
         var paid = await PaidAsync(id, ct); var before = SubscriptionValues(item, paid);
         item.Status = SubscriptionStatus.Cancelled; unitOfWork.Repository<Subscription>().Update(item);
-        await Audit("Subscription.Cancelled", id, before, SubscriptionValues(item, paid), reason, ct); await unitOfWork.SaveChangesAsync(ct);
-        return Result.Success();
+        await Audit("Subscription.Cancelled", id, before, SubscriptionValues(item, paid), reason, ct);
+        var saveError = await SaveChangesErrorAsync(ct);
+        if (saveError is not null) return saveError;
+        return Result.Success("تم إلغاء الاشتراك.");
     }
 
     public async Task<Result> DeleteSubscriptionAsync(Guid id, CancellationToken ct = default)
@@ -161,7 +169,10 @@ public sealed class SubscriptionService(IUnitOfWork unitOfWork, ILogger<Subscrip
         if (await unitOfWork.Repository<PaymentAllocation>().AnyAsync(x => x.SubscriptionId == id, ct)
             || await unitOfWork.Repository<Payment>().AnyAsync(x => x.SubscriptionId == id, ct)) return SubscriptionErrors.HasPayments;
         await Audit("Subscription.Deleted", id, SubscriptionValues(item, 0), "تم الحذف", null, ct);
-        unitOfWork.Repository<Subscription>().Remove(item); await unitOfWork.SaveChangesAsync(ct); return Result.Success();
+        unitOfWork.Repository<Subscription>().Remove(item);
+        var saveError = await SaveChangesErrorAsync(ct);
+        if (saveError is not null) return saveError;
+        return Result.Success("تم حذف الاشتراك.");
     }
 
     public async Task<Result<PaymentReceiptDto>> RecordPaymentAsync(Guid subscriptionId, RecordPaymentDto dto, CancellationToken ct = default)
@@ -169,6 +180,7 @@ public sealed class SubscriptionService(IUnitOfWork unitOfWork, ILogger<Subscrip
         if (!Allowed("Payments.Create")) return SubscriptionErrors.PermissionDenied;
         if (dto.Amount <= 0) return SubscriptionErrors.InvalidAmount;
         var item = await GetTrackedSubscription(subscriptionId, true, ct); if (item is null) return SubscriptionErrors.NotFound;
+        if (item.Status is SubscriptionStatus.Cancelled or SubscriptionStatus.Waived) return SubscriptionErrors.PaymentNotAllowedForStatus;
         var beforePaid = await PaidAsync(subscriptionId, ct); if (dto.Amount > item.AmountDue - beforePaid) return SubscriptionErrors.OverpaymentNotAllowed;
         var before = SubscriptionValues(item, beforePaid);
         await unitOfWork.BeginTransactionAsync(ct);
@@ -178,7 +190,7 @@ public sealed class SubscriptionService(IUnitOfWork unitOfWork, ILogger<Subscrip
             var afterPaid = beforePaid + dto.Amount; item.Status = ComputeStatus(item.AmountDue, afterPaid);
             await Audit("Payment.Recorded", payment.Id, before, SubscriptionValues(item, afterPaid), dto.Reason, ct, nameof(Payment));
             await unitOfWork.CommitTransactionAsync(ct);
-            return ToReceipt(payment, item, beforePaid, afterPaid);
+            return Result.Success(ToReceipt(payment, item, beforePaid, afterPaid), "تم تسجيل الدفعة.");
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -188,7 +200,7 @@ public sealed class SubscriptionService(IUnitOfWork unitOfWork, ILogger<Subscrip
         {
             await unitOfWork.RollbackTransactionAsync(CancellationToken.None);
             logger.LogError(ex, "Payment recording failed; subscriptionId={SubscriptionId}", subscriptionId);
-            return SubscriptionErrors.PersistenceFailure;
+            return PersistenceErrorMapper.FromException(ex);
         }
     }
 
@@ -217,7 +229,17 @@ public sealed class SubscriptionService(IUnitOfWork unitOfWork, ILogger<Subscrip
         return Result.Success<IReadOnlyList<PaymentReceiptDto>>(rows.OrderByDescending(x => x.PaidAt).Select(x => WithNurserySettings(x, settings)).ToArray());
     }
 
-    private bool Allowed(string code) { try { permissions.EnsurePermission(code); return true; } catch (UnauthorizedAccessException) { return false; } }
+    private bool Allowed(string code) => PermissionGuard.Check(permissions, code) is null;
+    private async Task<Error?> SaveChangesErrorAsync(CancellationToken ct)
+    {
+        try { await unitOfWork.SaveChangesAsync(ct); return null; }
+        catch (DbUpdateException exception)
+        {
+            var error = PersistenceErrorMapper.FromException(exception);
+            logger.LogWarning(exception, "Subscription operation failed during persistence; errorCode={ErrorCode}", error.Code);
+            return error;
+        }
+    }
     private Task<Subscription?> GetTrackedSubscription(Guid id, bool tracked, CancellationToken ct) => unitOfWork.Repository<Subscription>().FirstOrDefaultAsync(x => x.Id == id, asNoTracking: !tracked,
         includeProperties: [nameof(Subscription.Child), nameof(Subscription.SubscriptionPlan)], cancellationToken: ct);
     private async Task<decimal> PaidAsync(Guid id, CancellationToken ct) => (await unitOfWork.Repository<PaymentAllocation>().Query().Where(x => x.SubscriptionId == id && x.Payment.Status == PaymentStatus.Posted).Select(x => x.AmountApplied).ToListAsync(ct)).Sum();
@@ -262,6 +284,5 @@ public sealed class SubscriptionService(IUnitOfWork unitOfWork, ILogger<Subscrip
         p.PaidAt, p.Child.FullName, s.SubscriptionPlan?.Name ?? "اشتراك", s.PeriodStart, s.PeriodEnd, s.AmountDue, paidBefore, p.Amount,
         Math.Max(0, s.AmountDue - paidAfter), p.PaymentMethod, p.Reference, p.ReceivedByUser?.FullName ?? (p.ReceivedByUserId == sessions.CurrentUser?.UserId ? sessions.CurrentUser?.FullName : "—") ?? "—", p.Notes);
     public static SubscriptionStatus ComputeStatus(decimal due, decimal paid) => SubscriptionRules.ComputeStatus(due, paid);
-    private static string Normalize(string? s) => string.IsNullOrWhiteSpace(s) ? string.Empty : s.Trim().Replace("أ", "ا").Replace("إ", "ا").Replace("آ", "ا").Replace("ى", "ي");
     private static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
 }

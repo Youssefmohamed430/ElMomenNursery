@@ -1,21 +1,22 @@
 using ElMomenNursery.Application.DTOs;
+using ElMomenNursery.Domain.Abstractions;
 using ElMomenNursery.Domain.Enums;
 
 namespace ElMomenNursery.Application.IServices;
 
 public interface IChildService
 {
-    Task<List<ChildDto>> GetAllChildrenAsync();
-    Task<List<ChildDto>> GetChildrenAsync(ChildFilter filter, CancellationToken cancellationToken = default);
-    Task<List<ClassroomFilterOptionDto>> GetClassroomsForFilterAsync(CancellationToken cancellationToken = default);
-    Task<List<ChildDto>> GetChildrenWithPaidSubscriptions(int parentId);
-    Task<List<ChildDto>> GetChildrenWithoutPaidSubscriptions(int parentId);
-    Task<List<ChildDto>> GetChildrenByDateOfBirthAsync(DateOnly dateOfBirth);
-    Task<List<ChildDto>> GetChildrenByRangeOfEnrollmentDateAsync(DateOnly startDate, DateOnly endDate);
-    Task<List<ChildDto>> GetChildrenByGenderAsync(ChildGender gender);
-    Task<ChildDto> GetChildByIdAsync(Guid childId);
-    Task<ChildDto> GetChildByNameAsync(string childName);
-    Task<ChildDto> CreateChildAsync(CreateChildDTO childDto);
-    Task<ChildDto> UpdateChildAsync(Guid childId, UpdateChildDTO childDto);
-    Task<bool> DeleteChildAsync(Guid childId);
+    Task<Result<IReadOnlyList<ChildDto>>> GetAllChildrenAsync();
+    Task<Result<IReadOnlyList<ChildDto>>> GetDeletedChildrenAsync(CancellationToken cancellationToken = default);
+    Task<Result> RestoreChildAsync(Guid childId, CancellationToken cancellationToken = default);
+    Task<Result<IReadOnlyList<ChildDto>>> GetChildrenAsync(ChildFilter filter, CancellationToken cancellationToken = default);
+    Task<Result<IReadOnlyList<ClassroomFilterOptionDto>>> GetClassroomsForFilterAsync(CancellationToken cancellationToken = default);
+    Task<Result<IReadOnlyList<ChildDto>>> GetChildrenByDateOfBirthAsync(DateOnly dateOfBirth);
+    Task<Result<IReadOnlyList<ChildDto>>> GetChildrenByRangeOfEnrollmentDateAsync(DateOnly startDate, DateOnly endDate);
+    Task<Result<IReadOnlyList<ChildDto>>> GetChildrenByGenderAsync(ChildGender gender);
+    Task<Result<ChildDto>> GetChildByIdAsync(Guid childId);
+    Task<Result<ChildDto>> GetChildByNameAsync(string childName);
+    Task<Result<ChildDto>> CreateChildAsync(CreateChildDTO childDto);
+    Task<Result<ChildDto>> UpdateChildAsync(Guid childId, UpdateChildDTO childDto);
+    Task<Result> DeleteChildAsync(Guid childId);
 }

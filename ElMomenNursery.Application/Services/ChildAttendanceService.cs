@@ -14,8 +14,8 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
 {
     public async Task<Result<IReadOnlyList<ChildDailyAttendanceDto>>> GetDailyAttendanceAsync(ChildDailyAttendanceQuery query, CancellationToken cancellationToken = default)
     {
-        (bool flowControl, Result<object> value) = EnsureAttendancePermission("Attendance.View");
-        if (!flowControl) return value;
+        var permissionError = PermissionGuard.Check(permissions, "Attendance.View", AttendanceErrors.PermissionDenied);
+        if (permissionError is not null) return permissionError;
 
         if (query.Date == default || query.Date > DateOnly.FromDateTime(DateTime.Today)) return AttendanceErrors.InvalidDate;
 
@@ -59,24 +59,10 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
         return Result.Success(rows);
     }
 
-    private (bool flowControl, object value) EnsureAttendancePermission(string code)
-    {
-        try
-        {
-            permissions.EnsurePermission(code);
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return (flowControl: false, value: AttendanceErrors.PermissionDenied);
-        }
-
-        return (flowControl: true, value: null)!;
-    }
-
     public async Task<Result<IReadOnlyList<ChildAttendanceDto>>> GetChildAttendanceByRangeAsync(Guid childId, DateOnly start, DateOnly end, CancellationToken cancellationToken = default)
     {
-        (bool flowControl, Result<object> value) = EnsureAttendancePermission("Attendance.View");
-        if (!flowControl) return value;
+        var permissionError = PermissionGuard.Check(permissions, "Attendance.View", AttendanceErrors.PermissionDenied);
+        if (permissionError is not null) return permissionError;
 
         if (start > end) return AttendanceErrors.InvalidRange;
         var rows = await unitOfWork.Repository<ChildAttendance>().ListAsync(x => x.ChildId == childId && x.AttendanceDate >= start && x.AttendanceDate <= end, cancellationToken: cancellationToken);
@@ -85,8 +71,8 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
 
     public async Task<Result<IReadOnlyList<AttendanceChildOptionDto>>> GetChildrenForHistorySelectionAsync(CancellationToken cancellationToken = default)
     {
-        (bool flowControl, Result<object> value) = EnsureAttendancePermission("Attendance.View");
-        if (!flowControl) return value;
+        var permissionError = PermissionGuard.Check(permissions, "Attendance.View", AttendanceErrors.PermissionDenied);
+        if (permissionError is not null) return permissionError;
         var children = await unitOfWork.Repository<Child>().ListAsync(cancellationToken: cancellationToken);
         IReadOnlyList<AttendanceChildOptionDto> result = children.OrderBy(x => x.FullName)
             .Select(x => new AttendanceChildOptionDto(x.Id, x.FullName)).ToArray();
@@ -95,8 +81,8 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
 
     public async Task<Result<ChildAttendanceDto>> MarkManualAttendanceAsync(CreateChildAttendanceDto dto, CancellationToken cancellationToken = default)
     {
-        (bool flowControl, Result<object> value) = EnsureAttendancePermission("Attendance.Record");
-        if (!flowControl) return value;
+        var permissionError = PermissionGuard.Check(permissions, "Attendance.Record", AttendanceErrors.PermissionDenied);
+        if (permissionError is not null) return permissionError;
 
         var error = AttendanceRules.Validate(dto.Date, dto.Status, dto.CheckIn, dto.CheckOut);
         if (error is not null) return error;
@@ -106,24 +92,33 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
 
         if (await unitOfWork.Repository<ChildAttendance>().AnyAsync(x => x.ChildId == dto.ChildId && x.AttendanceDate == dto.Date, cancellationToken)) return AttendanceErrors.AlreadyRecorded;
 
-        var item = dto.Adapt<ChildAttendance>();
-        //var item = new ChildAttendance { ChildId = child.Id, Child = child, AttendanceDate = dto.Date,
-        //    Status = dto.Status, CheckInTime = dto.CheckIn, CheckOutTime = dto.CheckOut,
-        //    Notes = Clean(dto.Notes), RecordedByUserId = sessions.CurrentUser?.UserId };
+        var item = new ChildAttendance
+        {
+            ChildId = child.Id,
+            Child = child,
+            AttendanceDate = dto.Date,
+            Status = dto.Status,
+            CheckInTime = dto.CheckIn,
+            CheckOutTime = dto.CheckOut,
+            EntryMethod = AttendanceEntryMethod.Manual,
+            Notes = Clean(dto.Notes),
+            RecordedByUserId = sessions.CurrentUser?.UserId
+        };
 
         await unitOfWork.Repository<ChildAttendance>().AddAsync(item, cancellationToken);
         await AddAuditAsync(item, "ChildAttendance.Created", "—", Values(item), null, cancellationToken);
 
         try { await unitOfWork.SaveChangesAsync(cancellationToken); }
         catch (DbUpdateException ex) when (IsDuplicate(ex)) { logger.LogWarning("Duplicate child attendance rejected; childId={ChildId}", child.Id); return AttendanceErrors.AlreadyRecorded; }
+        catch (DbUpdateException ex) { logger.LogWarning(ex, "Child attendance persistence failed; errorCode={ErrorCode}", PersistenceErrorMapper.FromException(ex).Code); return PersistenceErrorMapper.FromException(ex); }
 
-        return Result.Success(ToDto(item));
+        return Result.Success(ToDto(item), "تم تسجيل الحضور.");
     }
 
     public async Task<Result<ChildAttendanceDto>> UpdateChildAttendanceAsync(Guid id, UpdateChildAttendanceDto dto, CancellationToken cancellationToken = default)
     {
-        (bool flowControl, Result<object> value) = EnsureAttendancePermission("Attendance.Edit");
-        if (!flowControl) return value;
+        var permissionError = PermissionGuard.Check(permissions, "Attendance.Edit", AttendanceErrors.PermissionDenied);
+        if (permissionError is not null) return permissionError;
 
         if (!AttendanceRules.HasCorrectionReason(dto.Reason)) return AttendanceErrors.CorrectionReasonRequired;
 
@@ -138,14 +133,15 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
         item.Notes = Clean(dto.Notes); item.UpdatedAt = DateTimeOffset.UtcNow;
 
         await AddAuditAsync(item, "ChildAttendance.Corrected", before, Values(item), dto.Reason!.Trim(), cancellationToken);
-        await unitOfWork.SaveChangesAsync(cancellationToken);
-        return Result.Success(ToDto(item));
+        try { await unitOfWork.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateException ex) { return PersistenceErrorMapper.FromException(ex); }
+        return Result.Success(ToDto(item), "تم تصحيح سجل الحضور.");
     }
 
     public async Task<Result<ChildAttendanceDto>> RecordCheckOutAsync(Guid childId, DateOnly date, DateTimeOffset checkOut, CancellationToken cancellationToken = default)
     {
-        (bool flowControl, Result<object> value) = EnsureAttendancePermission("Attendance.Record");
-        if (!flowControl) return value;
+        var permissionError = PermissionGuard.Check(permissions, "Attendance.Record", AttendanceErrors.PermissionDenied);
+        if (permissionError is not null) return permissionError;
 
         if (date == default || date > DateOnly.FromDateTime(DateTime.Today)) return AttendanceErrors.InvalidDate;
 
@@ -159,15 +155,16 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
         item.CheckOutTime = checkOut; item.UpdatedAt = DateTimeOffset.UtcNow;
 
         await AddAuditAsync(item, "ChildAttendance.CheckOut", before, Values(item), null, cancellationToken);
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        try { await unitOfWork.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateException ex) { return PersistenceErrorMapper.FromException(ex); }
 
-        return Result.Success(ToDto(item));
+        return Result.Success(ToDto(item), "تم تسجيل الانصراف.");
     }
 
     public async Task<Result<int>> MarkAllPresentAsync(DateOnly date, Guid? classroomId, CancellationToken cancellationToken = default)
     {
-        (bool flowControl, Result<object> value) = EnsureAttendancePermission("Attendance.Record");
-        if (!flowControl) return value;
+        var permissionError = PermissionGuard.Check(permissions, "Attendance.Record", AttendanceErrors.PermissionDenied);
+        if (permissionError is not null) return permissionError;
 
         if (date == default || date > DateOnly.FromDateTime(DateTime.Today)) return AttendanceErrors.InvalidDate;
 
@@ -196,12 +193,17 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
                 await AddAuditAsync(item, "ChildAttendance.Created", "—", Values(item), null, cancellationToken);
             }
             await unitOfWork.CommitTransactionAsync(cancellationToken);
-            return Result.Success(children.Count(x => !existing.Contains(x.Id)));
+            return Result.Success(children.Count(x => !existing.Contains(x.Id)), "تم تسجيل حضور الأطفال غير المسجلين.");
         }
         catch (DbUpdateException ex) when (IsDuplicate(ex))
         {
             await unitOfWork.RollbackTransactionAsync(CancellationToken.None);
             return AttendanceErrors.AlreadyRecorded;
+        }
+        catch (DbUpdateException ex)
+        {
+            await unitOfWork.RollbackTransactionAsync(CancellationToken.None);
+            return PersistenceErrorMapper.FromException(ex);
         }
         catch
         {

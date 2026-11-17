@@ -1,5 +1,6 @@
 using ElMomenNursery.Application.DTOs;
 using ElMomenNursery.Application.IServices;
+using ElMomenNursery.Domain.Abstractions;
 using ElMomenNursery.Domain.Enums;
 using QuestPDF.Fluent;
 using QuestPDF.Drawing;
@@ -16,14 +17,17 @@ public sealed class ReceiptPdfService(string dataDirectory) : IReceiptPdfService
         FontManager.RegisterFontFromEmbeddedResource(typeof(ReceiptPdfService).Assembly, "ElMomenNursery.Infrastructure.Resources.Fonts.NotoNaskhArabic.ttf");
     }
 
-    public Task<string> CreateReceiptFileAsync(PaymentReceiptDto receipt, bool isCopy, CancellationToken cancellationToken = default)
+    public Task<Result<string>> CreateReceiptFileAsync(PaymentReceiptDto receipt, bool isCopy, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
         var year = receipt.PaidAt.LocalDateTime.Year;
         var folder = Path.Combine(dataDirectory, "Receipts", year.ToString(System.Globalization.CultureInfo.InvariantCulture));
         Directory.CreateDirectory(folder);
         var safeNumber = string.Concat(receipt.ReceiptNumber.Where(c => char.IsLetterOrDigit(c) || c == '-'));
-        var path = Path.Combine(folder, $"{safeNumber}.pdf");
+        var suffix = isCopy ? "-نسخة" : string.Empty;
+        var path = Path.Combine(folder, $"{safeNumber}{suffix}.pdf");
         var logo = Path.Combine(AppContext.BaseDirectory, "Resources", "Branding", "AlMoumenNurseryLogo.jpeg");
         Document.Create(document => document.Page(page =>
         {
@@ -58,7 +62,14 @@ public sealed class ReceiptPdfService(string dataDirectory) : IReceiptPdfService
                 column.Item().PaddingTop(20).Text("توقيع المستلم: ____________________");
             });
         })).GeneratePdf(path);
-        return Task.FromResult(path);
+        return Task.FromResult(Result.Success(path, "تم تجهيز ملف الإيصال."));
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (IOException exception) when ((exception.HResult & 0xFFFF) is 32 or 33) { return Task.FromResult(Result.Failure<string>(FileErrors.FileInUse)); }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            return Task.FromResult(Result.Failure<string>(FileErrors.NotWritable));
+        }
     }
 
     private static void Pair(ColumnDescriptor column, string label, string value) =>

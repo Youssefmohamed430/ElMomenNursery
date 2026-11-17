@@ -41,7 +41,7 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         b.Property(x => x.Phone).IsRequired();
         b.Property(x => x.JobDesignation).IsRequired();
         b.Property(x => x.Salary).HasPrecision(18, 2);
-        b.HasIndex(x => x.NationalIdNumber).IsUnique().HasDatabaseName("UX_Employees_NationalIdNumber");
+        b.HasIndex(x => x.NationalIdNumber).IsUnique().HasFilter("\"IsDeleted\" = 0").HasDatabaseName("UX_Employees_NationalIdNumber");
         b.HasIndex(x => x.FullName).HasDatabaseName("IX_Employees_FullName");
         b.HasMany(x => x.TeachingAssignments).WithOne(x => x.Employee).HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Restrict);
         b.HasMany(x => x.Attachments).WithOne(x => x.Employee).HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Restrict);
@@ -57,7 +57,7 @@ internal sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
         b.ToTable("Roles");
         b.HasKey(x => x.Id);
         b.Property(x => x.Name).IsRequired();
-        b.HasIndex(x => x.Name).IsUnique().HasDatabaseName("UX_Roles_Name");
+        b.HasIndex(x => x.Name).IsUnique().HasFilter("\"IsDeleted\" = 0").HasDatabaseName("UX_Roles_Name");
         b.HasMany(x => x.UserAccounts).WithOne(x => x.Role).HasForeignKey(x => x.RoleId).IsRequired().OnDelete(DeleteBehavior.Restrict);
     }
 }
@@ -130,7 +130,7 @@ internal sealed class ClassroomConfiguration : IEntityTypeConfiguration<Classroo
         b.ToTable("Classrooms");
         b.HasKey(x => x.Id);
         b.Property(x => x.Name).IsRequired();
-        b.HasIndex(x => x.Name).IsUnique().HasDatabaseName("UX_Classrooms_Name");
+        b.HasIndex(x => x.Name).IsUnique().HasFilter("\"IsDeleted\" = 0").HasDatabaseName("UX_Classrooms_Name");
         b.HasMany(x => x.ChildEnrollments).WithOne(x => x.Classroom).HasForeignKey(x => x.ClassroomId).OnDelete(DeleteBehavior.Restrict);
         b.HasMany(x => x.TeacherAssignments).WithOne(x => x.Classroom).HasForeignKey(x => x.ClassroomId).OnDelete(DeleteBehavior.Restrict);
     }
@@ -144,7 +144,7 @@ internal sealed class ChildClassEnrollmentConfiguration : IEntityTypeConfigurati
         b.HasKey(x => x.Id);
         b.HasIndex(x => new { x.ChildId, x.StartDate }).HasDatabaseName("IX_ChildClassEnrollments_Child_StartDate");
         b.HasIndex(x => new { x.ClassroomId, x.StartDate }).HasDatabaseName("IX_ChildClassEnrollments_Classroom_StartDate");
-        b.HasIndex(x => new { x.ChildId, x.ClassroomId, x.StartDate }).IsUnique().HasDatabaseName("UX_ChildClassEnrollments_Child_Class_StartDate");
+        b.HasIndex(x => new { x.ChildId, x.ClassroomId, x.StartDate }).IsUnique().HasFilter("\"IsDeleted\" = 0").HasDatabaseName("UX_ChildClassEnrollments_Child_Class_StartDate");
     }
 }
 
@@ -156,7 +156,7 @@ internal sealed class ClassTeacherAssignmentConfiguration : IEntityTypeConfigura
         b.HasKey(x => x.Id);
         b.HasIndex(x => new { x.EmployeeId, x.StartDate }).HasDatabaseName("IX_ClassTeacherAssignments_Employee_StartDate");
         b.HasIndex(x => new { x.ClassroomId, x.StartDate }).HasDatabaseName("IX_ClassTeacherAssignments_Classroom_StartDate");
-        b.HasIndex(x => new { x.EmployeeId, x.ClassroomId, x.StartDate }).IsUnique().HasDatabaseName("UX_ClassTeacherAssignments_Employee_Class_StartDate");
+        b.HasIndex(x => new { x.EmployeeId, x.ClassroomId, x.StartDate }).IsUnique().HasFilter("\"IsDeleted\" = 0").HasDatabaseName("UX_ClassTeacherAssignments_Employee_Class_StartDate");
     }
 }
 
@@ -168,7 +168,7 @@ internal sealed class SubscriptionPlanConfiguration : IEntityTypeConfiguration<S
         b.HasKey(x => x.Id);
         b.Property(x => x.Name).IsRequired();
         b.Property(x => x.DefaultFee).HasPrecision(18, 2);
-        b.HasIndex(x => x.Name).IsUnique().HasDatabaseName("UX_SubscriptionPlans_Name");
+        b.HasIndex(x => x.Name).IsUnique().HasFilter("\"IsDeleted\" = 0").HasDatabaseName("UX_SubscriptionPlans_Name");
         b.HasMany(x => x.Subscriptions).WithOne(x => x.SubscriptionPlan).HasForeignKey(x => x.SubscriptionPlanId).OnDelete(DeleteBehavior.Restrict);
     }
 }
@@ -197,7 +197,7 @@ internal sealed class InventoryCategoryConfiguration : IEntityTypeConfiguration<
         b.ToTable("InventoryCategories");
         b.HasKey(x => x.Id);
         b.Property(x => x.Name).IsRequired();
-        b.HasIndex(x => x.Name).IsUnique().HasDatabaseName("UX_InventoryCategories_Name");
+        b.HasIndex(x => x.Name).IsUnique().HasFilter("\"IsDeleted\" = 0").HasDatabaseName("UX_InventoryCategories_Name");
         b.HasMany(x => x.Items).WithOne(x => x.Category).HasForeignKey(x => x.CategoryId).IsRequired().OnDelete(DeleteBehavior.Restrict);
     }
 }
@@ -274,7 +274,7 @@ internal sealed class ChildAttendanceConfiguration : IEntityTypeConfiguration<Ch
         b.HasKey(x => x.Id);
         b.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
         b.Property(x => x.EntryMethod).HasConversion<string>().HasMaxLength(32).IsRequired();
-        b.HasIndex(x => new { x.ChildId, x.AttendanceDate }).IsUnique().HasDatabaseName("UX_ChildAttendances_Child_Date");
+        b.HasIndex(x => new { x.ChildId, x.AttendanceDate }).IsUnique().HasFilter("\"IsDeleted\" = 0").HasDatabaseName("UX_ChildAttendances_Child_Date");
         b.HasOne(x => x.Child).WithMany(x => x.Attendances).HasForeignKey(x => x.ChildId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.RecordedByUser).WithMany().HasForeignKey(x => x.RecordedByUserId).IsRequired(false).OnDelete(DeleteBehavior.SetNull);
     }
@@ -288,7 +288,7 @@ internal sealed class EmployeeAttendanceConfiguration : IEntityTypeConfiguration
         b.HasKey(x => x.Id);
         b.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
         b.Property(x => x.EntryMethod).HasConversion<string>().HasMaxLength(32).IsRequired();
-        b.HasIndex(x => new { x.EmployeeId, x.AttendanceDate }).IsUnique().HasDatabaseName("UX_EmployeeAttendances_Employee_Date");
+        b.HasIndex(x => new { x.EmployeeId, x.AttendanceDate }).IsUnique().HasFilter("\"IsDeleted\" = 0").HasDatabaseName("UX_EmployeeAttendances_Employee_Date");
         b.HasOne(x => x.Employee).WithMany(x => x.Attendances).HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.RecordedByUser).WithMany().HasForeignKey(x => x.RecordedByUserId).IsRequired(false).OnDelete(DeleteBehavior.SetNull);
     }

@@ -51,6 +51,12 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.Property<long>("CreatedAt")
                         .HasColumnType("INTEGER");
 
+                    b.Property<long?>("DeletedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DeletedByUserId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("DeviceType")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -60,6 +66,9 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
@@ -164,6 +173,12 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<long?>("DeletedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DeletedByUserId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("EnrollmentDate")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -192,6 +207,9 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("HasMedicalConditions")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("MotherName")
@@ -251,10 +269,19 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.Property<long>("CreatedAt")
                         .HasColumnType("INTEGER");
 
+                    b.Property<long?>("DeletedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DeletedByUserId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("EntryMethod")
                         .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Notes")
                         .HasColumnType("TEXT");
@@ -276,7 +303,8 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ChildId", "AttendanceDate")
                         .IsUnique()
-                        .HasDatabaseName("UX_ChildAttendances_Child_Date");
+                        .HasDatabaseName("UX_ChildAttendances_Child_Date")
+                        .HasFilter("\"IsDeleted\" = 0");
 
                     b.ToTable("ChildAttendances", (string)null);
                 });
@@ -295,8 +323,17 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<long?>("DeletedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DeletedByUserId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("EndDate")
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("StartDate")
                         .IsRequired()
@@ -312,7 +349,8 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ChildId", "ClassroomId", "StartDate")
                         .IsUnique()
-                        .HasDatabaseName("UX_ChildClassEnrollments_Child_Class_StartDate");
+                        .HasDatabaseName("UX_ChildClassEnrollments_Child_Class_StartDate")
+                        .HasFilter("\"IsDeleted\" = 0");
 
                     b.ToTable("ChildClassEnrollments", null, t =>
                         {
@@ -330,12 +368,21 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<long?>("DeletedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DeletedByUserId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("EmployeeId")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("EndDate")
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("StartDate")
                         .IsRequired()
@@ -351,7 +398,8 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("EmployeeId", "ClassroomId", "StartDate")
                         .IsUnique()
-                        .HasDatabaseName("UX_ClassTeacherAssignments_Employee_Class_StartDate");
+                        .HasDatabaseName("UX_ClassTeacherAssignments_Employee_Class_StartDate")
+                        .HasFilter("\"IsDeleted\" = 0");
 
                     b.ToTable("ClassTeacherAssignments", null, t =>
                         {
@@ -365,10 +413,19 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<long?>("DeletedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DeletedByUserId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Description")
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
@@ -379,7 +436,8 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Name")
                         .IsUnique()
-                        .HasDatabaseName("UX_Classrooms_Name");
+                        .HasDatabaseName("UX_Classrooms_Name")
+                        .HasFilter("\"IsDeleted\" = 0");
 
                     b.ToTable("Classrooms", (string)null);
                 });
@@ -448,6 +506,12 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.Property<long>("CreatedAt")
                         .HasColumnType("INTEGER");
 
+                    b.Property<long?>("DeletedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DeletedByUserId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -461,6 +525,9 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.Property<string>("HireDate")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("JobDesignation")
                         .IsRequired()
@@ -496,7 +563,8 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("NationalIdNumber")
                         .IsUnique()
-                        .HasDatabaseName("UX_Employees_NationalIdNumber");
+                        .HasDatabaseName("UX_Employees_NationalIdNumber")
+                        .HasFilter("\"IsDeleted\" = 0");
 
                     b.ToTable("Employees", null, t =>
                         {
@@ -523,6 +591,12 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.Property<long>("CreatedAt")
                         .HasColumnType("INTEGER");
 
+                    b.Property<long?>("DeletedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DeletedByUserId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("EmployeeId")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -531,6 +605,9 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Notes")
                         .HasColumnType("TEXT");
@@ -552,7 +629,8 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("EmployeeId", "AttendanceDate")
                         .IsUnique()
-                        .HasDatabaseName("UX_EmployeeAttendances_Employee_Date");
+                        .HasDatabaseName("UX_EmployeeAttendances_Employee_Date")
+                        .HasFilter("\"IsDeleted\" = 0");
 
                     b.ToTable("EmployeeAttendances", (string)null);
                 });
@@ -628,8 +706,17 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.Property<long>("CreatedAt")
                         .HasColumnType("INTEGER");
 
+                    b.Property<long?>("DeletedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DeletedByUserId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("EmployeeId")
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("OriginalFileName")
                         .IsRequired()
@@ -672,10 +759,19 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<long?>("DeletedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DeletedByUserId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Description")
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
@@ -686,7 +782,8 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Name")
                         .IsUnique()
-                        .HasDatabaseName("UX_InventoryCategories_Name");
+                        .HasDatabaseName("UX_InventoryCategories_Name")
+                        .HasFilter("\"IsDeleted\" = 0");
 
                     b.ToTable("InventoryCategories", (string)null);
                 });
@@ -701,7 +798,16 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<long?>("DeletedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DeletedByUserId")
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
@@ -954,9 +1060,18 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
+                    b.Property<long?>("DeletedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DeletedByUserId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("EmployeeId")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsPaid")
                         .HasColumnType("INTEGER");
@@ -1029,8 +1144,17 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<long?>("DeletedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DeletedByUserId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Description")
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsSystemRole")
                         .HasColumnType("INTEGER");
@@ -1043,7 +1167,8 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Name")
                         .IsUnique()
-                        .HasDatabaseName("UX_Roles_Name");
+                        .HasDatabaseName("UX_Roles_Name")
+                        .HasFilter("\"IsDeleted\" = 0");
 
                     b.ToTable("Roles", (string)null);
                 });
@@ -1129,6 +1254,15 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.Property<long>("CreatedAt")
                         .HasColumnType("INTEGER");
 
+                    b.Property<long?>("DeletedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DeletedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Notes")
                         .HasColumnType("TEXT");
 
@@ -1174,10 +1308,19 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
+                    b.Property<long?>("DeletedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DeletedByUserId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Description")
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
@@ -1188,7 +1331,8 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Name")
                         .IsUnique()
-                        .HasDatabaseName("UX_SubscriptionPlans_Name");
+                        .HasDatabaseName("UX_SubscriptionPlans_Name")
+                        .HasFilter("\"IsDeleted\" = 0");
 
                     b.ToTable("SubscriptionPlans", null, t =>
                         {

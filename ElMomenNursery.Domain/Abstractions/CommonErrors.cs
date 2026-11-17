@@ -2,6 +2,7 @@ namespace ElMomenNursery.Domain.Abstractions;
 
 public static class CommonErrors
 {
+    public static readonly Error PermissionDenied = new("Common.PermissionDenied", "لا تملك الصلاحية اللازمة لإتمام هذه العملية.");
     public static readonly Error InvalidRequest = new(
         "Common.InvalidRequest",
         "البيانات المدخلة غير صالحة.");

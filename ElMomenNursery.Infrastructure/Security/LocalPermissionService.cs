@@ -3,24 +3,14 @@ using ElMomenNursery.Application.Mappings;
 using ElMomenNursery.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Mapster;
-using Microsoft.Extensions.Logging;
 
 namespace ElMomenNursery.Infrastructure.Security;
 
-public sealed class LocalPermissionService(NurseryDbContext db, ISessionManager sessions, ILogger<LocalPermissionService> logger) : IPermissionService
+public sealed class LocalPermissionService(NurseryDbContext db, ISessionManager sessions) : IPermissionService
 {
     public bool HasPermission(string code) => sessions.CurrentUser?.HasPermission(code) == true;
     public bool HasAnyPermission(params string[] codes) => codes.Any(HasPermission);
     public bool HasAllPermissions(params string[] codes) => codes.All(HasPermission);
-    public void EnsurePermission(string code)
-    {
-        if (!HasPermission(code))
-        {
-            logger.LogWarning("Permission denied; userId={UserId}; permissionCode={PermissionCode}", sessions.CurrentUser?.UserId, code);
-            throw new UnauthorizedAccessException($"الصلاحية المطلوبة غير متاحة: {code}");
-        }
-    }
-
     public async Task RefreshCurrentUserAsync(CancellationToken cancellationToken = default)
     {
         var current = sessions.CurrentUser;

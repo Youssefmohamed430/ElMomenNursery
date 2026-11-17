@@ -1,3 +1,5 @@
+using ElMomenNursery.Domain.Abstractions;
+
 namespace ElMomenNursery.Application.IServices;
 
 public sealed record ExcelExportData(
@@ -7,5 +9,5 @@ public sealed record ExcelExportData(
 
 public interface IExcelExportService
 {
-    Task ExportAsync(ExcelExportData data, string filePath, CancellationToken cancellationToken = default);
+    Task<Result> ExportAsync(ExcelExportData data, string filePath, CancellationToken cancellationToken = default);
 }

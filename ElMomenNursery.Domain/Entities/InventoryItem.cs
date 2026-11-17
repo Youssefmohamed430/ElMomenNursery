@@ -1,8 +1,11 @@
 namespace ElMomenNursery.Domain.Entities;
 
-public sealed class InventoryItem
+public sealed class InventoryItem : ISoftDeletable
 {
     public Guid Id { get; init; } = Guid.NewGuid();
+    public bool IsDeleted { get; set; }
+    public DateTimeOffset? DeletedAt { get; set; }
+    public Guid? DeletedByUserId { get; set; }
     public required string Name { get; set; }
     public Guid CategoryId { get; set; }
     public decimal UnitPrice { get; set; }

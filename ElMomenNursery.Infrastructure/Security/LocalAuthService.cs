@@ -1,5 +1,6 @@
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Application.Mappings;
+using ElMomenNursery.Application.Services;
 using ElMomenNursery.Domain.Abstractions;
 using ElMomenNursery.Domain.Entities;
 using ElMomenNursery.Infrastructure.Persistence;
@@ -17,11 +18,11 @@ public sealed class LocalAuthService(NurseryDbContext db, ISessionManager sessio
     private readonly PasswordHasher<UserAccount> _hasher = new();
     private readonly AuthSecurityOptions _options = options.Value;
 
-    public async Task<bool> NeedsInitialAdministratorSetupAsync(CancellationToken cancellationToken = default)
+    public async Task<Result<bool>> NeedsInitialAdministratorSetupAsync(CancellationToken cancellationToken = default)
     {
         var setupNeeded = !await HasRecognizedPasswordHashAsync(cancellationToken);
         if (setupNeeded) logger.LogInformation("Initial administrator setup mode entered");
-        return setupNeeded;
+        return Result.Success(setupNeeded);
     }
 
     public async Task<Result<UserSession>> LoginAsync(string username, string password, CancellationToken cancellationToken = default)
@@ -53,7 +54,7 @@ public sealed class LocalAuthService(NurseryDbContext db, ISessionManager sessio
             logger.LogWarning("Login rejected while account is locked; userId={UserId}", user.Id);
             db.AuthenticationAuditLogs.Add(Audit(user.Id, user.Username, "LoginFailed", false, "LockedOut"));
             await SaveChangesWithLoggingAsync("LockedOutLogin", user.Id, cancellationToken);
-            return CommonErrors.InvalidCredentials;
+            return AuthErrors.LockedOut;
         }
 
         var passwordValidation = await ValidatePassword(password, user, cancellationToken);
@@ -112,46 +113,53 @@ public sealed class LocalAuthService(NurseryDbContext db, ISessionManager sessio
         var validation = await ValidateInitialAdministrator(username, fullName, password, cancellationToken);
         if (validation.Failure is not null) return validation.Failure;
         var role = validation.Role!;
-        var user = new UserAccountMapping(username, fullName, string.Empty, role, DateTimeOffset.UtcNow)
-            .Adapt<UserAccount>(AccountMappingConfig.Config);
-
+        var user = new UserAccount { Username = username, UsernameNormalized = username.ToUpperInvariant(), FullName = fullName,
+            Role = role, RoleId = role.Id, PasswordHash = string.Empty, CreatedAt = DateTimeOffset.UtcNow };
         user.PasswordHash = _hasher.HashPassword(user, password);
-        user.UserRoles.Add(new UserRoleMapping(user, role).Adapt<UserRole>(AccountMappingConfig.Config));
+        user.UserRoles.Add(new UserRole { User = user, UserId = user.Id, Role = role, RoleId = role.Id });
         db.UserAccounts.Add(user);
         db.AuthenticationAuditLogs.Add(Audit(user.Id, username, "InitialAdministratorCreated", true));
         await SaveChangesWithLoggingAsync("InitialAdministratorCreated", user.Id, cancellationToken);
         logger.LogInformation("Initial administrator created; userId={UserId}", user.Id);
-        return Result.Success();
+        return Result.Success("تم إنشاء حساب المسؤول.");
     }
 
     private async Task<(Role? Role, Result? Failure)> ValidateInitialAdministrator(
         string username, string fullName, string password, CancellationToken cancellationToken)
     {
-        if (username.Length is < 3 or > 64 || fullName.Length is < 2 or > 200 || !ValidPassword(password))
+        if (username.Length is < 3 or > 64 || fullName.Length is < 2 or > 200)
             return (null, CommonErrors.InvalidRequest);
+        if (!ValidPassword(password)) return (null, AuthErrors.WeakPassword);
         if (await HasRecognizedPasswordHashAsync(cancellationToken))
-            return (null, CommonErrors.Conflict);
+            return (null, AuthErrors.SetupAlreadyComplete);
         var role = await db.Roles.SingleOrDefaultAsync(x => x.Name == "Admin", cancellationToken);
-        if (role is null) return (null, CommonErrors.Conflict);
+        if (role is null) return (null, AuthErrors.SetupUnavailable);
         return (role, null);
     }
 
-    public async Task LogoutAsync(CancellationToken cancellationToken = default)
+    public async Task<Result> LogoutAsync(CancellationToken cancellationToken = default)
     {
         var current = sessions.CurrentUser;
         if (current is not null)
         {
             db.AuthenticationAuditLogs.Add(Audit(current.UserId, current.Username, "Logout", true));
-            await SaveChangesWithLoggingAsync("Logout", current.UserId, cancellationToken);
+            try { await db.SaveChangesAsync(cancellationToken); }
+            catch (DbUpdateException exception)
+            {
+                logger.LogError(exception, "Authentication persistence failed; operation={Operation}; userId={UserId}", "Logout", current.UserId);
+                sessions.Logout();
+                return PersistenceErrorMapper.FromException(exception);
+            }
         }
         sessions.Logout();
+        return Result.Success("تم تسجيل الخروج.");
     }
 
     public async Task<Result> ChangePasswordAsync(string currentPassword, string newPassword, CancellationToken cancellationToken = default)
     {
         var session = sessions.CurrentUser;
         if (session is null) return CommonErrors.InvalidCredentials;
-        if (!ValidPassword(newPassword)) return CommonErrors.InvalidRequest;
+        if (!ValidPassword(newPassword)) return AuthErrors.WeakPassword;
         var user = await db.UserAccounts.SingleOrDefaultAsync(x => x.Id == session.UserId, cancellationToken);
         if (user is null || _hasher.VerifyHashedPassword(user, user.PasswordHash, currentPassword) == PasswordVerificationResult.Failed)
             return CommonErrors.InvalidCredentials;
@@ -160,7 +168,7 @@ public sealed class LocalAuthService(NurseryDbContext db, ISessionManager sessio
         db.AuthenticationAuditLogs.Add(Audit(user.Id, user.Username, "PasswordChanged", true));
         await SaveChangesWithLoggingAsync("PasswordChanged", user.Id, cancellationToken);
         logger.LogInformation("Password changed; userId={UserId}", user.Id);
-        return Result.Success();
+        return Result.Success("تم تغيير كلمة المرور.");
     }
 
     private static bool ValidPassword(string? password) => password is { Length: >= 12 and <= 256 }

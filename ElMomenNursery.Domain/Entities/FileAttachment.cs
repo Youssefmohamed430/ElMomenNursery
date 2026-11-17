@@ -1,9 +1,12 @@
 namespace ElMomenNursery.Domain.Entities;
 using ElMomenNursery.Domain.Enums;
 
-public sealed class FileAttachment
+public sealed class FileAttachment : ISoftDeletable
 {
     public Guid Id { get; init; } = Guid.NewGuid();
+    public bool IsDeleted { get; set; }
+    public DateTimeOffset? DeletedAt { get; set; }
+    public Guid? DeletedByUserId { get; set; }
     public Guid? ChildId { get; set; }
     public Guid? EmployeeId { get; set; }
     public AttachmentType Type { get; set; }

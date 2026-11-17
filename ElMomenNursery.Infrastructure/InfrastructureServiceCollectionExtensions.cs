@@ -61,7 +61,8 @@ public static class InfrastructureServiceCollectionExtensions
                 dataDirectory, false);
         }
 
-        services.AddDbContext<NurseryDbContext>(db => db.UseSqlite(
+        services.AddSingleton<SoftDeleteInterceptor>();
+        services.AddDbContext<NurseryDbContext>((provider, db) => db.AddInterceptors(provider.GetRequiredService<SoftDeleteInterceptor>()).UseSqlite(
             connectionString,
             sqlite => sqlite.MigrationsAssembly(typeof(NurseryDbContext).Assembly.FullName)));
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
