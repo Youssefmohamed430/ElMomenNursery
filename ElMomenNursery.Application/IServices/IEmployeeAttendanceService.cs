@@ -11,6 +11,7 @@ public interface IEmployeeAttendanceService
         DateOnly startDate,
         DateOnly endDate,
         CancellationToken cancellationToken = default);
+    Task<Result<IReadOnlyList<AttendanceEmployeeOptionDto>>> GetEmployeesForHistorySelectionAsync(CancellationToken cancellationToken = default);
     Task<Result<EmployeeAttendanceDto>> MarkManualAttendanceAsync(
         CreateEmployeeAttendanceDto employeeAttendanceDto,
         CancellationToken cancellationToken = default);

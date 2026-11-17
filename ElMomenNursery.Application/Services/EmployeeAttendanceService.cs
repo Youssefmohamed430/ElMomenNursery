@@ -15,8 +15,11 @@ public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<Em
         DateOnly date,
         CancellationToken cancellationToken = default)
     {
-        try { permissions.EnsurePermission("EmployeeAttendance.View"); } catch (UnauthorizedAccessException) { return AttendanceErrors.PermissionDenied; }
+        (bool flowControl, Result<object> value) = ValidatePermission("EmployeeAttendance.View");
+        if (!flowControl) return value;
+
         if (date == default || date > DateOnly.FromDateTime(DateTime.Today)) return AttendanceErrors.InvalidDate;
+
         var employees = await unitOfWork.Repository<Employee>().ListAsync(x => x.HireDate <= date, cancellationToken: cancellationToken);
         var attendances = await unitOfWork.Repository<EmployeeAttendance>().ListAsync(
             attendance => attendance.AttendanceDate == date,
@@ -37,13 +40,22 @@ public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<Em
             .ToList());
     }
 
+    private (bool flowControl, Result<object> value) ValidatePermission(string code)
+    {
+        try { permissions.EnsurePermission(code); } catch (UnauthorizedAccessException) { return (flowControl: false, value: AttendanceErrors.PermissionDenied); }
+
+        return (flowControl: true, value: null)!;
+    }
+
     public async Task<Result<IReadOnlyList<EmployeeAttendanceDto>>> GetEmployeeAttendanceByRangeAsync(
         Guid employeeId,
         DateOnly startDate,
         DateOnly endDate,
         CancellationToken cancellationToken = default)
     {
-        try { permissions.EnsurePermission("EmployeeAttendance.View"); } catch (UnauthorizedAccessException) { return AttendanceErrors.PermissionDenied; }
+        (bool flowControl, Result<object> value) = ValidatePermission("EmployeeAttendance.View");
+        if (!flowControl) return value;
+
         if (startDate > endDate)
             return AttendanceErrors.InvalidRange;
 
@@ -56,11 +68,24 @@ public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<Em
         return Result.Success<IReadOnlyList<EmployeeAttendanceDto>>(attendances.Select(ToDto).ToList());
     }
 
+    public async Task<Result<IReadOnlyList<AttendanceEmployeeOptionDto>>> GetEmployeesForHistorySelectionAsync(CancellationToken cancellationToken = default)
+    {
+        (bool flowControl, Result<object> value) = ValidatePermission("EmployeeAttendance.View");
+        if (!flowControl) return value;
+
+        var employees = await unitOfWork.Repository<Employee>().ListAsync(cancellationToken: cancellationToken);
+        IReadOnlyList<AttendanceEmployeeOptionDto> result = employees.OrderBy(x => x.FullName)
+            .Select(x => new AttendanceEmployeeOptionDto(x.Id, x.FullName, x.JobDesignation)).ToArray();
+        return Result.Success(result);
+    }
+
     public async Task<Result<EmployeeAttendanceDto>> MarkManualAttendanceAsync(
         CreateEmployeeAttendanceDto dto,
         CancellationToken cancellationToken = default)
     {
-        try { permissions.EnsurePermission("EmployeeAttendance.Record"); } catch (UnauthorizedAccessException) { return AttendanceErrors.PermissionDenied; }
+        (bool flowControl, Result<object> value) = ValidatePermission("EmployeeAttendance.Record");
+        if (!flowControl) return value;
+
         ArgumentNullException.ThrowIfNull(dto);
         var validationError = AttendanceRules.Validate(dto.AttendanceDate, dto.Status, dto.CheckInTime, dto.CheckOutTime);
         if (validationError is not null) return validationError;
@@ -81,18 +106,7 @@ public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<Em
             return AttendanceErrors.AlreadyRecorded;
         }
 
-        var attendance = new EmployeeAttendance
-        {
-            EmployeeId = dto.EmployeeId,
-            Employee = employee,
-            AttendanceDate = dto.AttendanceDate,
-            CheckInTime = dto.CheckInTime,
-            CheckOutTime = dto.CheckOutTime,
-            Status = dto.Status,
-            EntryMethod = AttendanceEntryMethod.Manual,
-            RecordedByUserId = sessions.CurrentUser?.UserId,
-            Notes = NormalizeNotes(dto.Notes)
-        };
+        var attendance = dto.Adapt<EmployeeAttendance>();
 
         await unitOfWork.Repository<EmployeeAttendance>().AddAsync(attendance, cancellationToken);
         await AddAuditLogAsync(
@@ -119,7 +133,9 @@ public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<Em
         UpdateEmployeeAttendanceDto dto,
         CancellationToken cancellationToken = default)
     {
-        try { permissions.EnsurePermission("EmployeeAttendance.Edit"); } catch (UnauthorizedAccessException) { return AttendanceErrors.PermissionDenied; }
+        (bool flowControl, Result<object> value) = ValidatePermission("EmployeeAttendance.Edit");
+        if (!flowControl) return value;
+
         ArgumentNullException.ThrowIfNull(dto);
         var attendance = await unitOfWork.Repository<EmployeeAttendance>().FirstOrDefaultAsync(
             item => item.Id == id,
@@ -172,13 +188,19 @@ public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<Em
 
     public async Task<Result<EmployeeAttendanceDto>> RecordCheckOutAsync(Guid employeeId, DateOnly date, DateTimeOffset checkOutTime, CancellationToken cancellationToken = default)
     {
-        try { permissions.EnsurePermission("EmployeeAttendance.Record"); } catch (UnauthorizedAccessException) { return AttendanceErrors.PermissionDenied; }
+        (bool flowControl, Result<object> value) = ValidatePermission("EmployeeAttendance.Record");
+        if (!flowControl) return value;
+
         if (date == default || date > DateOnly.FromDateTime(DateTime.Today)) return AttendanceErrors.InvalidDate;
+
         var attendance = await unitOfWork.Repository<EmployeeAttendance>().FirstOrDefaultAsync(
             x => x.EmployeeId == employeeId && x.AttendanceDate == date, asNoTracking: false, cancellationToken: cancellationToken);
+
         if (attendance is null || !attendance.CheckInTime.HasValue || attendance.CheckOutTime.HasValue)
             return AttendanceErrors.CheckOutUnavailable;
+
         if (checkOutTime < attendance.CheckInTime) return AttendanceErrors.CheckOutBeforeCheckIn;
+
         var before = $"Date={attendance.AttendanceDate:yyyy-MM-dd};Status={attendance.Status};CheckIn={FormatTime(attendance.CheckInTime)};CheckOut=—";
         attendance.CheckOutTime = checkOutTime;
         attendance.UpdatedAt = DateTimeOffset.UtcNow;

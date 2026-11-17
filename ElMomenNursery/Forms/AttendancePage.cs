@@ -72,7 +72,11 @@ internal sealed class ChildAttendancePage : UserControl
         _checkout.Click += async (_, _) => await CheckOutAsync(); _markAll.Click += async (_, _) => await MarkAllAsync();
         _manual.Click += async (_, _) => await OpenEditorAsync(correction: false);
         _correct.Click += async (_, _) => await OpenEditorAsync(correction: true);
-        _history.Click += (_, _) => { using var form = new ChildAttendanceHistoryForm(_scopes); form.ShowDialog(FindForm()); };
+        _history.Click += (_, _) =>
+        {
+            using var form = new ChildAttendanceHistoryForm(_scopes, _excelExportService, session.HasPermission("Attendance.Export"));
+            form.ShowDialog(FindForm());
+        };
         _grid.SelectionChanged += (_, _) => UpdateActions(); _grid.CellDoubleClick += async (_, _) => await OpenEditorAsync(correction: Selected()?.IsMarked == true);
         _grid.KeyDown += async (_, e) => { if (e.KeyCode == Keys.F5) { e.Handled = true; await LoadAsync(); } };
         Load += async (_, _) => { await LoadClassroomsAsync(); await LoadAsync(); };
@@ -221,6 +225,7 @@ internal sealed class EmployeeAttendancePage : UserControl
     private readonly Button _edit = new() { Text = "تصحيح السجل", AutoSize = true };
     private readonly Button _refresh = new() { Text = "تحديث", AutoSize = true };
     private readonly Button _export = new() { Text = "تصدير Excel", AutoSize = true };
+    private readonly Button _history = new() { Text = "سجل موظف لفترة", AutoSize = true };
     private readonly Label _summary = new() { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight };
     private List<EmployeeDailyAttendanceDto> _rows = [];
     private int _version;
@@ -231,8 +236,14 @@ internal sealed class EmployeeAttendancePage : UserControl
         _export.Visible = session.HasPermission("EmployeeAttendance.Export");
         _export.Click += async (_, _) => await GridExcelExport.SaveAsync((IWin32Window?)FindForm() ?? this, _grid,
             _excelExportService, "تصدير حضور الموظفين", "حضور الموظفين");
+        _history.Visible = session.HasPermission("EmployeeAttendance.View");
+        _history.Click += (_, _) =>
+        {
+            using var form = new EmployeeAttendanceHistoryForm(_scopes, _excelExportService, session.HasPermission("EmployeeAttendance.Export"));
+            form.ShowDialog(FindForm());
+        };
         var bar = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = true, FlowDirection = FlowDirection.RightToLeft, AutoScroll = true };
-        bar.Controls.AddRange([new Label { Text = "التاريخ", AutoSize = true, Padding = new Padding(0, 8, 0, 0) }, _date, _search, _refresh, _present, _absent, _checkout, _edit, _export]);
+        bar.Controls.AddRange([new Label { Text = "التاريخ", AutoSize = true, Padding = new Padding(0, 8, 0, 0) }, _date, _search, _refresh, _history, _present, _absent, _checkout, _edit, _export]);
         _present.Visible = _absent.Visible = _checkout.Visible = session.HasPermission("EmployeeAttendance.Record");
         _edit.Visible = session.HasPermission("EmployeeAttendance.Edit");
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 3, ColumnCount = 1 };

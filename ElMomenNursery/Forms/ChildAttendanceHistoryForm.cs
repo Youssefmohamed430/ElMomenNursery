@@ -11,20 +11,23 @@ namespace ElMomenNursery.Forms;
 internal sealed class ChildAttendanceHistoryForm : Form
 {
     private readonly IServiceScopeFactory _scopes;
+    private readonly IExcelExportService _excelExportService;
     private readonly DateTimePicker _start = DatePicker();
     private readonly DateTimePicker _end = DatePicker();
     private readonly TextBox _search = new() { Width = 220, PlaceholderText = "اكتب اسم الطفل" , RightToLeft = RightToLeft.Yes };
     private readonly ComboBox _children = new() { Width = 240, DropDownStyle = ComboBoxStyle.DropDownList, RightToLeft = RightToLeft.Yes };
     private readonly Button _show = new() { Text = "عرض السجل", AutoSize = true, Height = 36 };
+    private readonly Button _export = new() { Text = "تصدير Excel", AutoSize = true, Height = 36 };
     private readonly Label _summary = new() { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight };
     private readonly DataGridView _grid = MakeGrid();
     private List<AttendanceChildOptionDto> _allChildren = [];
     private bool _updatingChildren;
     private int _loadVersion;
 
-    public ChildAttendanceHistoryForm(IServiceScopeFactory scopes)
+    public ChildAttendanceHistoryForm(IServiceScopeFactory scopes, IExcelExportService excelExportService, bool canExport)
     {
         _scopes = scopes;
+        _excelExportService = excelExportService;
         Text = "سجل حضور وغياب طفل خلال فترة";
         StartPosition = FormStartPosition.CenterParent;
         MinimumSize = new Size(850, 600);
@@ -39,7 +42,11 @@ internal sealed class ChildAttendanceHistoryForm : Form
             new Label { Text = "إلى تاريخ", AutoSize = true, Padding = new Padding(0, 8, 0, 0) }, _end]);
         var childFilters = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft, WrapContents = false, Padding = new Padding(8) };
         childFilters.Controls.AddRange([new Label { Text = "اسم الطفل", AutoSize = true, Padding = new Padding(0, 8, 0, 0) }, _search,
-            new Label { Text = "اختر الطفل", AutoSize = true, Padding = new Padding(0, 8, 0, 0) }, _children, _show]);
+            new Label { Text = "اختر الطفل", AutoSize = true, Padding = new Padding(0, 8, 0, 0) }, _children, _show, _export]);
+        _export.Visible = canExport;
+        _export.Enabled = false;
+        _export.Click += async (_, _) => await GridExcelExport.SaveAsync(this, _grid, _excelExportService,
+            "تصدير كشف حضور الطفل", "كشف حضور طفل");
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Padding = new Padding(10), RightToLeft = RightToLeft.Yes };
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
@@ -118,10 +125,11 @@ internal sealed class ChildAttendanceHistoryForm : Form
     {
         _grid.Rows.Clear();
         foreach (var record in records.OrderBy(x => x.Date))
-            _grid.Rows.Add(record.Date.ToString("dd/MM/yyyy"), AttendanceLabels.Status(record.Status), Time(record.CheckIn),
+            _grid.Rows.Add(childName, record.Date.ToString("dd/MM/yyyy"), AttendanceLabels.Status(record.Status), Time(record.CheckIn),
                 Time(record.CheckOut), AttendanceLabels.Method(record.EntryMethod), record.Notes ?? string.Empty);
         var present = records.Count(x => x.Status is AttendanceStatus.Present or AttendanceStatus.Late);
         var absent = records.Count(x => x.Status is AttendanceStatus.Absent or AttendanceStatus.Excused);
+        _export.Enabled = records.Count > 0;
         _summary.Text = $"{childName}  |  المسجل: {records.Count}  |  الحضور: {present}  |  الغياب: {absent}  |  لم يسجل: لا يظهر كسجل غياب";
         if (records.Count == 0) _summary.Text += "  |  لا توجد سجلات في هذه الفترة";
     }
@@ -146,6 +154,7 @@ internal sealed class ChildAttendanceHistoryForm : Form
         BackgroundColor = Color.White, RowHeadersVisible = false,
         Columns =
         {
+            new DataGridViewTextBoxColumn { HeaderText = "الطفل" },
             new DataGridViewTextBoxColumn { HeaderText = "التاريخ" },
             new DataGridViewTextBoxColumn { HeaderText = "الحالة" },
             new DataGridViewTextBoxColumn { HeaderText = "وقت الحضور" },

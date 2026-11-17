@@ -25,9 +25,11 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger, 
                 logger.LogWarning("Child creation rejected by validation; errorCount={ErrorCount}", validationResults.Count);
                 throw new ValidationException("بيانات الطفل غير مكتملة أو غير صحيحة.");
             }
+
             var child = childDto.Adapt<Child>();
             await unitOfWork.Repository<Child>().AddAsync(child);
             var affectedRows = await unitOfWork.SaveChangesAsync();
+
             if (affectedRows == 0)
                 logger.LogWarning("Child creation saved no rows; childId={ChildId}", child.Id);
             logger.LogInformation("Created child record; childId={ChildId}", child.Id);
@@ -77,6 +79,7 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger, 
         {
             var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(c => c.Id == childId);
             if (child == null) return false;
+
             unitOfWork.Repository<Child>().Remove(child);
             var affectedRows = await unitOfWork.SaveChangesAsync();
             if (affectedRows == 0)

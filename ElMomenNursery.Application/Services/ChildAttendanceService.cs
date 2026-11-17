@@ -14,40 +14,70 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
 {
     public async Task<Result<IReadOnlyList<ChildDailyAttendanceDto>>> GetDailyAttendanceAsync(ChildDailyAttendanceQuery query, CancellationToken cancellationToken = default)
     {
-        try { permissions.EnsurePermission("Attendance.View"); }
-        catch (UnauthorizedAccessException) { return AttendanceErrors.PermissionDenied; }
+        (bool flowControl, Result<object> value) = EnsureAttendancePermission("Attendance.View");
+        if (!flowControl) return value;
+
         if (query.Date == default || query.Date > DateOnly.FromDateTime(DateTime.Today)) return AttendanceErrors.InvalidDate;
+
         var children = await unitOfWork.Repository<Child>().ListAsync(x => x.EnrollmentDate <= query.Date, cancellationToken: cancellationToken);
+
         var childIds = children.Select(x => x.Id).ToArray();
+
         var enrollments = await unitOfWork.Repository<ChildClassEnrollment>().ListAsync(
             x => childIds.Contains(x.ChildId) && x.StartDate <= query.Date && (x.EndDate == null || x.EndDate >= query.Date)
                  && (!query.ClassroomId.HasValue || x.ClassroomId == query.ClassroomId.Value),
             includeProperties: [nameof(ChildClassEnrollment.Classroom)], cancellationToken: cancellationToken);
+
         if (query.ClassroomId.HasValue)
             children = children.Where(c => enrollments.Any(e => e.ChildId == c.Id)).ToList();
+
         var attendance = await unitOfWork.Repository<ChildAttendance>().ListAsync(
             x => childIds.Contains(x.ChildId) && x.AttendanceDate == query.Date, cancellationToken: cancellationToken);
+
         var enrollmentsByChild = enrollments.GroupBy(x => x.ChildId).ToDictionary(g => g.Key,
             g => string.Join("، ", g.Select(x => x.Classroom.Name).Distinct().Order(StringComparer.CurrentCulture)));
+
         var attendanceByChild = attendance.ToDictionary(x => x.ChildId);
+
         IReadOnlyList<ChildDailyAttendanceDto> rows = children.OrderBy(x => x.FullName).Select(child =>
         {
             attendanceByChild.TryGetValue(child.Id, out var record);
             return new ChildDailyAttendanceDto
             {
-                ChildId = child.Id, ChildName = child.FullName,
-                ClassroomNames = enrollmentsByChild.GetValueOrDefault(child.Id, "—"), Date = query.Date,
-                AttendanceId = record?.Id, Status = record?.Status, CheckIn = record?.CheckInTime,
-                CheckOut = record?.CheckOutTime, EntryMethod = record?.EntryMethod, Notes = record?.Notes
+                ChildId = child.Id,
+                ChildName = child.FullName,
+                ClassroomNames = enrollmentsByChild.GetValueOrDefault(child.Id, "—"),
+                Date = query.Date,
+                AttendanceId = record?.Id,
+                Status = record?.Status,
+                CheckIn = record?.CheckInTime,
+                CheckOut = record?.CheckOutTime,
+                EntryMethod = record?.EntryMethod,
+                Notes = record?.Notes
             };
         }).ToArray();
         return Result.Success(rows);
     }
 
+    private (bool flowControl, object value) EnsureAttendancePermission(string code)
+    {
+        try
+        {
+            permissions.EnsurePermission(code);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return (flowControl: false, value: AttendanceErrors.PermissionDenied);
+        }
+
+        return (flowControl: true, value: null)!;
+    }
+
     public async Task<Result<IReadOnlyList<ChildAttendanceDto>>> GetChildAttendanceByRangeAsync(Guid childId, DateOnly start, DateOnly end, CancellationToken cancellationToken = default)
     {
-        try { permissions.EnsurePermission("Attendance.View"); }
-        catch (UnauthorizedAccessException) { return AttendanceErrors.PermissionDenied; }
+        (bool flowControl, Result<object> value) = EnsureAttendancePermission("Attendance.View");
+        if (!flowControl) return value;
+
         if (start > end) return AttendanceErrors.InvalidRange;
         var rows = await unitOfWork.Repository<ChildAttendance>().ListAsync(x => x.ChildId == childId && x.AttendanceDate >= start && x.AttendanceDate <= end, cancellationToken: cancellationToken);
         return Result.Success<IReadOnlyList<ChildAttendanceDto>>(rows.Select(ToDto).ToArray());
@@ -55,8 +85,8 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
 
     public async Task<Result<IReadOnlyList<AttendanceChildOptionDto>>> GetChildrenForHistorySelectionAsync(CancellationToken cancellationToken = default)
     {
-        try { permissions.EnsurePermission("Attendance.View"); }
-        catch (UnauthorizedAccessException) { return AttendanceErrors.PermissionDenied; }
+        (bool flowControl, Result<object> value) = EnsureAttendancePermission("Attendance.View");
+        if (!flowControl) return value;
         var children = await unitOfWork.Repository<Child>().ListAsync(cancellationToken: cancellationToken);
         IReadOnlyList<AttendanceChildOptionDto> result = children.OrderBy(x => x.FullName)
             .Select(x => new AttendanceChildOptionDto(x.Id, x.FullName)).ToArray();
@@ -65,35 +95,48 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
 
     public async Task<Result<ChildAttendanceDto>> MarkManualAttendanceAsync(CreateChildAttendanceDto dto, CancellationToken cancellationToken = default)
     {
-        try { permissions.EnsurePermission("Attendance.Record"); }
-        catch (UnauthorizedAccessException) { return AttendanceErrors.PermissionDenied; }
+        (bool flowControl, Result<object> value) = EnsureAttendancePermission("Attendance.Record");
+        if (!flowControl) return value;
+
         var error = AttendanceRules.Validate(dto.Date, dto.Status, dto.CheckIn, dto.CheckOut);
         if (error is not null) return error;
+
         var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(x => x.Id == dto.ChildId, asNoTracking: false, cancellationToken: cancellationToken);
         if (child is null || child.EnrollmentDate > dto.Date) return AttendanceErrors.PersonNotFound;
+
         if (await unitOfWork.Repository<ChildAttendance>().AnyAsync(x => x.ChildId == dto.ChildId && x.AttendanceDate == dto.Date, cancellationToken)) return AttendanceErrors.AlreadyRecorded;
-        var item = new ChildAttendance { ChildId = child.Id, Child = child, AttendanceDate = dto.Date,
-            Status = dto.Status, CheckInTime = dto.CheckIn, CheckOutTime = dto.CheckOut,
-            Notes = Clean(dto.Notes), RecordedByUserId = sessions.CurrentUser?.UserId };
+
+        var item = dto.Adapt<ChildAttendance>();
+        //var item = new ChildAttendance { ChildId = child.Id, Child = child, AttendanceDate = dto.Date,
+        //    Status = dto.Status, CheckInTime = dto.CheckIn, CheckOutTime = dto.CheckOut,
+        //    Notes = Clean(dto.Notes), RecordedByUserId = sessions.CurrentUser?.UserId };
+
         await unitOfWork.Repository<ChildAttendance>().AddAsync(item, cancellationToken);
         await AddAuditAsync(item, "ChildAttendance.Created", "—", Values(item), null, cancellationToken);
+
         try { await unitOfWork.SaveChangesAsync(cancellationToken); }
         catch (DbUpdateException ex) when (IsDuplicate(ex)) { logger.LogWarning("Duplicate child attendance rejected; childId={ChildId}", child.Id); return AttendanceErrors.AlreadyRecorded; }
+
         return Result.Success(ToDto(item));
     }
 
     public async Task<Result<ChildAttendanceDto>> UpdateChildAttendanceAsync(Guid id, UpdateChildAttendanceDto dto, CancellationToken cancellationToken = default)
     {
-        try { permissions.EnsurePermission("Attendance.Edit"); }
-        catch (UnauthorizedAccessException) { return AttendanceErrors.PermissionDenied; }
+        (bool flowControl, Result<object> value) = EnsureAttendancePermission("Attendance.Edit");
+        if (!flowControl) return value;
+
         if (!AttendanceRules.HasCorrectionReason(dto.Reason)) return AttendanceErrors.CorrectionReasonRequired;
+
         var item = await unitOfWork.Repository<ChildAttendance>().FirstOrDefaultAsync(x => x.Id == id, asNoTracking: false, cancellationToken: cancellationToken);
         if (item is null) return AttendanceErrors.NotFound;
+
         var error = AttendanceRules.Validate(item.AttendanceDate, dto.Status, dto.CheckIn, dto.CheckOut);
         if (error is not null) return error;
+
         var before = Values(item);
         item.Status = dto.Status; item.CheckInTime = dto.CheckIn; item.CheckOutTime = dto.CheckOut;
         item.Notes = Clean(dto.Notes); item.UpdatedAt = DateTimeOffset.UtcNow;
+
         await AddAuditAsync(item, "ChildAttendance.Corrected", before, Values(item), dto.Reason!.Trim(), cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success(ToDto(item));
@@ -101,26 +144,36 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
 
     public async Task<Result<ChildAttendanceDto>> RecordCheckOutAsync(Guid childId, DateOnly date, DateTimeOffset checkOut, CancellationToken cancellationToken = default)
     {
-        try { permissions.EnsurePermission("Attendance.Record"); }
-        catch (UnauthorizedAccessException) { return AttendanceErrors.PermissionDenied; }
+        (bool flowControl, Result<object> value) = EnsureAttendancePermission("Attendance.Record");
+        if (!flowControl) return value;
+
         if (date == default || date > DateOnly.FromDateTime(DateTime.Today)) return AttendanceErrors.InvalidDate;
+
         var item = await unitOfWork.Repository<ChildAttendance>().FirstOrDefaultAsync(x => x.ChildId == childId && x.AttendanceDate == date, asNoTracking: false, cancellationToken: cancellationToken);
         if (item is null || !item.CheckInTime.HasValue || item.CheckOutTime.HasValue) return AttendanceErrors.CheckOutUnavailable;
+
         if (checkOut < item.CheckInTime) return AttendanceErrors.CheckOutBeforeCheckIn;
+
         var before = Values(item);
+
         item.CheckOutTime = checkOut; item.UpdatedAt = DateTimeOffset.UtcNow;
+
         await AddAuditAsync(item, "ChildAttendance.CheckOut", before, Values(item), null, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
+
         return Result.Success(ToDto(item));
     }
 
     public async Task<Result<int>> MarkAllPresentAsync(DateOnly date, Guid? classroomId, CancellationToken cancellationToken = default)
     {
-        try { permissions.EnsurePermission("Attendance.Record"); }
-        catch (UnauthorizedAccessException) { return AttendanceErrors.PermissionDenied; }
+        (bool flowControl, Result<object> value) = EnsureAttendancePermission("Attendance.Record");
+        if (!flowControl) return value;
+
         if (date == default || date > DateOnly.FromDateTime(DateTime.Today)) return AttendanceErrors.InvalidDate;
+
         var children = await unitOfWork.Repository<Child>().ListAsync(x => x.EnrollmentDate <= date, asNoTracking: false, cancellationToken: cancellationToken);
         var ids = children.Select(x => x.Id).ToArray();
+
         if (classroomId.HasValue)
         {
             var enrollment = await unitOfWork.Repository<ChildClassEnrollment>().ListAsync(x => ids.Contains(x.ChildId)
