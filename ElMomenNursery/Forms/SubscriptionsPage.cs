@@ -22,6 +22,7 @@ public sealed class SubscriptionsPage : UserControl
     private readonly CheckBox _balance = new() { Text = "عليه متبقي فقط", AutoSize = true };
     private readonly Label _summary = new() { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight };
     private readonly Button _add = Button("إضافة اشتراك");
+    private readonly Button _invoice = Button("فاتورة بيع من المخزن");
     private readonly Button _edit = Button("تعديل");
     private readonly Button _pay = Button("تسجيل دفعة");
     private readonly Button _cancel = Button("إلغاء الاشتراك");
@@ -36,6 +37,8 @@ public sealed class SubscriptionsPage : UserControl
         _scopes = scopes; _session = session; _excel = excel; Dock = DockStyle.Fill; Padding = new Padding(10); RightToLeft = RightToLeft.Yes; BackColor = Color.White;
         _status.Items.AddRange(["الكل", "مستحق", "مدفوع جزئيًا", "مدفوع", "ملغي", "معفى"]); _status.SelectedIndex = 0;
         _plan.Items.Add(new PlanChoice(null, "كل الخطط")); _plan.SelectedIndex = 0;
+        _from.Checked = false;
+        _to.Checked = false;
         _grid.Columns.AddRange([new DataGridViewTextBoxColumn { HeaderText = "الطفل" }, new DataGridViewTextBoxColumn { HeaderText = "الخطة" },
             new DataGridViewTextBoxColumn { HeaderText = "من" }, new DataGridViewTextBoxColumn { HeaderText = "إلى" }, new DataGridViewTextBoxColumn { HeaderText = "المستحق" },
             new DataGridViewTextBoxColumn { HeaderText = "المدفوع" }, new DataGridViewTextBoxColumn { HeaderText = "المتبقي" }, new DataGridViewTextBoxColumn { HeaderText = "الحالة" },
@@ -44,13 +47,15 @@ public sealed class SubscriptionsPage : UserControl
         _pay.Visible = session.HasPermission("Payments.Create"); _receipt.Visible = session.HasPermission("Payments.View"); _export.Visible = session.HasPermission("Subscriptions.Export");
         var filter = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft, WrapContents = true, AutoScroll = true };
         var apply = Button("تطبيق"); var clear = Button("مسح الفلاتر"); var refresh = Button("تحديث");
-        filter.Controls.AddRange([_search, _status, _plan, _from, _to, _balance, apply, clear, refresh, _add, _edit, _pay, _cancel, _delete, _receipt, _export]);
+        _invoice.Visible = session.HasPermission("Payments.Create");
+        filter.Controls.AddRange([_search, _status, _plan, _from, _to, _balance, apply, clear, refresh, _add, _invoice, _edit, _pay, _cancel, _delete, _receipt, _export]);
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 102)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         layout.Controls.Add(filter, 0, 0); layout.Controls.Add(_summary, 0, 1); layout.Controls.Add(_grid, 0, 2); Controls.Add(layout);
         apply.Click += async (_, _) => await LoadAsync(); refresh.Click += async (_, _) => await LoadAsync();
         clear.Click += async (_, _) => { _search.Clear(); _status.SelectedIndex = 0; _plan.SelectedIndex = 0; _from.Checked = _to.Checked = false; _balance.Checked = false; await LoadAsync(); };
         _add.Click += async (_, _) => await EditAsync(null); _edit.Click += async (_, _) => { if (Selected() is { } row) await EditAsync(row); };
+        _invoice.Click += async (_, _) => { using var form = new CashierInvoiceForm(_scopes); if (form.ShowDialog(FindForm()) == DialogResult.OK) await LoadAsync(); };
         _cancel.Click += async (_, _) => await CancelAsync(); _delete.Click += async (_, _) => await DeleteAsync();
         _pay.Click += async (_, _) => await RecordPaymentAsync(); _receipt.Click += async (_, _) => await PrintAsync();
         _export.Click += async (_, _) => await GridExcelExport.SaveAsync((IWin32Window?)FindForm() ?? this, _grid, _excel, "تصدير الاشتراكات", "الاشتراكات");

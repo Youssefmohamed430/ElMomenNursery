@@ -863,6 +863,14 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.Property<string>("Notes")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("PaymentMethod")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PaymentReference")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -901,7 +909,6 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("InventoryItemId")
-                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("InvoiceId")
@@ -1608,8 +1615,7 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.HasOne("ElMomenNursery.Domain.Entities.InventoryItem", "InventoryItem")
                         .WithMany("InvoiceLines")
                         .HasForeignKey("InventoryItemId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("ElMomenNursery.Domain.Entities.Invoice", "Invoice")
                         .WithMany("Lines")

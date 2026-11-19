@@ -321,6 +321,7 @@ internal sealed class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
         b.HasKey(x => x.Id);
         b.Property(x => x.InvoiceNumber).IsRequired();
         b.Property(x => x.TotalAmount).HasPrecision(18, 2);
+        b.Property(x => x.PaymentMethod).HasConversion<string>().HasMaxLength(32).IsRequired();
         b.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
         b.HasIndex(x => x.InvoiceNumber).IsUnique().HasDatabaseName("UX_Invoices_InvoiceNumber");
         b.HasIndex(x => x.InvoiceDate).HasDatabaseName("IX_Invoices_InvoiceDate");
@@ -344,7 +345,7 @@ internal sealed class InvoiceLineConfiguration : IEntityTypeConfiguration<Invoic
         b.Property(x => x.LineTotal).HasPrecision(18, 2);
         b.HasIndex(x => x.InvoiceId).HasDatabaseName("IX_InvoiceLines_InvoiceId");
         b.HasOne(x => x.Invoice).WithMany(x => x.Lines).HasForeignKey(x => x.InvoiceId).OnDelete(DeleteBehavior.Cascade);
-        b.HasOne(x => x.InventoryItem).WithMany(x => x.InvoiceLines).HasForeignKey(x => x.InventoryItemId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(x => x.InventoryItem).WithMany(x => x.InvoiceLines).HasForeignKey(x => x.InventoryItemId).IsRequired(false).OnDelete(DeleteBehavior.Restrict);
     }
 }
 

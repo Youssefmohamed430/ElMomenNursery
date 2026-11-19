@@ -78,6 +78,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSingleton<IExcelExportService, ExcelExportService>();
         QuestPDF.Settings.License = LicenseType.Community;
         services.AddSingleton<IReceiptPdfService>(_ => new ReceiptPdfService(dataDirectory));
+        services.AddSingleton<IInvoicePdfService>(_ => new InvoicePdfService(dataDirectory));
         services.AddSingleton<ISessionManager, SessionManager>();
         return services;
     }

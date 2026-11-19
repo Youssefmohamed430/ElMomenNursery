@@ -9,6 +9,8 @@ public sealed class Invoice
     public Guid? ChildId { get; set; }
     public string? CustomerName { get; set; }
     public decimal TotalAmount { get; set; }
+    public PaymentMethod PaymentMethod { get; set; } = PaymentMethod.Cash;
+    public string? PaymentReference { get; set; }
     public InvoiceStatus Status { get; set; } = InvoiceStatus.Draft;
     public Guid? CreatedByUserId { get; set; }
     public string? Notes { get; set; }

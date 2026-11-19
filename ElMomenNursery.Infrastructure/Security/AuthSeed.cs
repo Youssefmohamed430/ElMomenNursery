@@ -32,7 +32,7 @@ public static class AuthSeed
         var mappings = new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
             ["Admin"] = PermissionCodes,
-            ["Manager"] = ["Students.View", "Students.Create", "Students.Edit", "Classes.View", "Classes.Manage", "Attendance.View", "Attendance.Record", "Attendance.Edit", "Employees.View", "Employees.Manage", "Payments.View", "Expenses.View", "Inventory.View", "Inventory.Manage", "Subscriptions.View", "Subscriptions.Manage"],
+            ["Manager"] = ["Students.View", "Students.Create", "Students.Edit", "Classes.View", "Classes.Manage", "Attendance.View", "Attendance.Record", "Attendance.Edit", "Employees.View", "Employees.Manage", "Payments.View", "Payments.Create", "Expenses.View", "Inventory.View", "Inventory.Manage", "Subscriptions.View", "Subscriptions.Manage"],
             ["Teacher"] = ["Students.View", "Classes.View", "Attendance.View", "Attendance.Record"],
             ["Accountant"] = ["Payments.View", "Payments.Create", "Payments.Edit", "Expenses.View", "Expenses.Manage", "Subscriptions.View"],
             ["Receptionist"] = ["Students.View", "Students.Create", "Classes.View", "Subscriptions.View"]
@@ -98,6 +98,18 @@ public static class AuthSeed
                 Value = "true",
                 Description = "Initial list export permission seed completed without replacing administrator-edited mappings."
             });
+            await db.SaveChangesAsync(ct);
+        }
+
+        // Allow managers to issue cashier invoices without changing other role permissions.
+        var v7Seeded = await db.AppSettings.AnyAsync(x => x.Key == "Authentication.RolePermissionsSeeded.V7", ct);
+        if (!v7Seeded)
+        {
+            var manager = await db.Roles.Include(x => x.RolePermissions).SingleAsync(x => x.Name == "Manager", ct);
+            var createPayment = await db.Permissions.SingleAsync(x => x.Code == "Payments.Create", ct);
+            if (!manager.RolePermissions.Any(x => x.PermissionId == createPayment.Id))
+                db.RolePermissions.Add(new RolePermission { RoleId = manager.Id, PermissionId = createPayment.Id });
+            db.AppSettings.Add(new AppSetting { Key = "Authentication.RolePermissionsSeeded.V7", Value = "true", Description = "Manager cashier permission added without replacing other permissions." });
             await db.SaveChangesAsync(ct);
         }
 
