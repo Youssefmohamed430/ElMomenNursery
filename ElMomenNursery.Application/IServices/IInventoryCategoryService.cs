@@ -1,12 +1,13 @@
 using ElMomenNursery.Application.DTOs;
+using ElMomenNursery.Domain.Abstractions;
 
 namespace ElMomenNursery.Application.IServices;
 
 public interface IInventoryCategoryService
 {
-    Task<InventoryCategoryDto> CreateCategoryAsync(CreateCategoryDto dto);
-    Task<InventoryCategoryDto> GetCategoryByIdAsync(Guid categoryId);
-    Task<IEnumerable<InventoryCategoryDto>> GetAllCategoriesAsync();
-    Task<InventoryCategoryDto> UpdateCategoryAsync(Guid categoryId, UpdateCategoryDto dto);
-    Task DeleteCategoryAsync(Guid categoryId);
+    Task<Result<InventoryCategoryDto>> CreateCategoryAsync(CreateCategoryDto dto);
+    Task<Result<InventoryCategoryDto>> GetCategoryByIdAsync(Guid categoryId);
+    Task<Result<IEnumerable<InventoryCategoryDto>>> GetAllCategoriesAsync();
+    Task<Result<InventoryCategoryDto>> UpdateCategoryAsync(Guid categoryId, UpdateCategoryDto dto);
+    Task<Result> DeleteCategoryAsync(Guid categoryId);
 }
