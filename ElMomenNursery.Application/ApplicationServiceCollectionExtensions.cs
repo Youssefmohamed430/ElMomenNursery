@@ -13,6 +13,8 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<IEmployeeAttendanceService, EmployeeAttendanceService>();
         services.AddScoped<IChildAttendanceService, ChildAttendanceService>();
         services.AddScoped<ISubscriptionService, SubscriptionService>();
+        services.AddScoped<IInventoryItemService, InventoryItemService>();
+        services.AddScoped<IInventoryCategoryService, InventoryCategoryService>();
         return services;
     }
 }

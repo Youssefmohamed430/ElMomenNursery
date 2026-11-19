@@ -156,12 +156,13 @@ This roadmap breaks the approved product scope into an ordered, end-to-end task 
 ## Phase 10 — Inventory and stock issue
 
 - [ ] Confirm inventory tracking rules, units, adjustment policy, and item-issue fields with the nursery.
-- [ ] Implement inventory items and stock movement rules; do not silently overwrite movement history.
-- [ ] Build inventory list, item details, receive/adjust workflows, and clear on-hand quantity display.
+- [x] Implement inventory item and category maintenance with validation, soft deletion, restore, price/quantity audit traceability, and a manually maintained current count in pieces. (Stock movement rules remain unimplemented.)
+- [x] Build inventory list with editable current item count and clear on-hand quantity display. (Receive/adjust movement workflows remain unimplemented.)
 - [ ] Implement item issue recording with recipient/purpose only as approved/configured.
 - [ ] Add low/insufficient-stock feedback if the nursery chooses quantity tracking.
 - [ ] Generate a printable PDF document for inventory items issued.
-- [ ] Add permissions, action traceability, and current-view inventory print/export.
+- [x] Add inventory view/manage/restore permissions and export permission seed; audit create/update/status/restore and soft-delete actions.
+- [x] Build the inventory item/category screen and current-view Excel export.
 
 **Gate:** stock changes are understandable and auditable; issue documents print without receipt-printer hardware.
 

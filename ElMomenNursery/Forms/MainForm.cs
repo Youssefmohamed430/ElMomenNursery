@@ -273,6 +273,7 @@ public sealed class MainForm : Form
                 "الموظفون" => new EmployeesPage(_scopeFactory, _session, _excelExportService),
                 "الحضور" => new AttendancePage(_scopeFactory, _session, _excelExportService),
                 "الاشتراكات والمدفوعات" => new SubscriptionsPage(_scopeFactory, _session, _excelExportService),
+                "المخزن" => new InventoryPage(_scopeFactory, _session, _excelExportService),
                 "الفصول" => new ClassesPage(_scopeFactory, _session, _excelExportService),
                 "إدارة المستخدمين" => new UserManagementForm(_scopeFactory, _session, _excelExportService),
                 _ => BuildSectionPage(section)

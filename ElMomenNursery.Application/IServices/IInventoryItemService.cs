@@ -5,10 +5,12 @@ namespace ElMomenNursery.Application.IServices;
 
 public interface IInventoryItemService
 {
-    Result<Task<InventoryItemDto>> GetItemByIdAsync(Guid itemId);
-    Result<Task<IEnumerable<InventoryItemDto>>> GetAllItemsAsync();
-    Result<Task<IEnumerable<InventoryItemDto>>> GetItemsByCategoryIdAsync(Guid categoryId);
-    Result<Task<InventoryItemDto>> CreateItemAsync(CreateItemDto dto);
-    Result<Task<InventoryItemDto>> UpdateItemAsync(Guid itemId, UpdateItemDto dto);
-    Result<Task> DeleteItemAsync(Guid itemId);
+    Task<Result<IReadOnlyList<InventoryItemDto>>> GetItemsAsync(InventoryItemFilter filter, CancellationToken cancellationToken = default);
+    Task<Result<InventoryItemDto>> GetItemByIdAsync(Guid itemId, CancellationToken cancellationToken = default);
+    Task<Result<InventoryItemDto>> CreateItemAsync(CreateItemDto dto, CancellationToken cancellationToken = default);
+    Task<Result<InventoryItemDto>> UpdateItemAsync(Guid itemId, UpdateItemDto dto, CancellationToken cancellationToken = default);
+    Task<Result> SetItemActiveAsync(Guid itemId, bool isActive, CancellationToken cancellationToken = default);
+    Task<Result> DeleteItemAsync(Guid itemId, CancellationToken cancellationToken = default);
+    Task<Result<IReadOnlyList<InventoryItemDto>>> GetDeletedItemsAsync(CancellationToken cancellationToken = default);
+    Task<Result> RestoreItemAsync(Guid itemId, CancellationToken cancellationToken = default);
 }

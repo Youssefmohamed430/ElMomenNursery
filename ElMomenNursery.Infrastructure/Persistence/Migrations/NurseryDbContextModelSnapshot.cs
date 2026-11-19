@@ -814,6 +814,9 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("Quantity")
+                        .HasColumnType("INTEGER");
+
                     b.Property<decimal>("UnitPrice")
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
@@ -825,6 +828,8 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.ToTable("InventoryItems", null, t =>
                         {
+                            t.HasCheckConstraint("CK_InventoryItems_QuantityNonNegative", "\"Quantity\" >= 0");
+
                             t.HasCheckConstraint("CK_InventoryItems_UnitPriceNonNegative", "\"UnitPrice\" >= 0");
                         });
                 });

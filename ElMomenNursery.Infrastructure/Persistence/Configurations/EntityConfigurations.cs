@@ -206,7 +206,11 @@ internal sealed class InventoryItemConfiguration : IEntityTypeConfiguration<Inve
 {
     public void Configure(EntityTypeBuilder<InventoryItem> b)
     {
-        b.ToTable("InventoryItems", t => t.HasCheckConstraint("CK_InventoryItems_UnitPriceNonNegative", "\"UnitPrice\" >= 0"));
+        b.ToTable("InventoryItems", t =>
+        {
+            t.HasCheckConstraint("CK_InventoryItems_UnitPriceNonNegative", "\"UnitPrice\" >= 0");
+            t.HasCheckConstraint("CK_InventoryItems_QuantityNonNegative", "\"Quantity\" >= 0");
+        });
         b.HasKey(x => x.Id);
         b.Property(x => x.Name).IsRequired();
         b.Property(x => x.UnitPrice).HasPrecision(18, 2);

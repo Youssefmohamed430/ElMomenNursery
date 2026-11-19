@@ -1,8 +1,8 @@
 namespace ElMomenNursery.Application.DTOs;
 
-public class UpdateCategoryDto
+public sealed class UpdateCategoryDto
 {
-    public string? Name { get; set; }
-    public string? Description { get; set; }
-    public bool IsActive { get; set; } = true;
+    public required string Name { get; init; }
+    public string? Description { get; init; }
+    public required bool IsActive { get; init; }
 }

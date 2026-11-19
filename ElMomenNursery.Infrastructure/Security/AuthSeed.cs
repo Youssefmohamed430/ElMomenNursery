@@ -11,7 +11,7 @@ public static class AuthSeed
         "Classes.View", "Classes.Manage", "Attendance.View", "Attendance.Record", "Attendance.Edit",
         "EmployeeAttendance.View", "EmployeeAttendance.Record", "EmployeeAttendance.Edit",
         "Employees.View", "Employees.Manage", "Payments.View", "Payments.Create", "Payments.Edit",
-        "Expenses.View", "Expenses.Manage", "Inventory.View", "Inventory.Manage",
+        "Expenses.View", "Expenses.Manage", "Inventory.View", "Inventory.Manage", "Inventory.Export", "Inventory.Restore",
         "Subscriptions.View", "Subscriptions.Manage", "Users.View", "Users.Manage", "Roles.Manage", "Permissions.Manage", "Settings.View", "Settings.Manage",
         "Students.Export", "Employees.Export", "Classes.Export", "Attendance.Export", "EmployeeAttendance.Export", "Users.Export", "Subscriptions.Export",
         "Students.Restore", "Employees.Restore"
@@ -128,6 +128,21 @@ public static class AuthSeed
                 db.RolePermissions.Add(new RolePermission { RoleId = admin.Id, PermissionId = permissionId });
             db.AppSettings.Add(new AppSetting { Key = "Authentication.RolePermissionsSeeded.V5", Value = "true",
                 Description = "Soft-delete restore permissions added to Admin without replacing administrator-edited mappings." });
+            await db.SaveChangesAsync(ct);
+        }
+
+        var v6Seeded = await db.AppSettings.AnyAsync(x => x.Key == "Authentication.RolePermissionsSeeded.V6", ct);
+        if (!v6Seeded)
+        {
+            foreach (var (roleName, code) in new[] { ("Admin", "Inventory.Export"), ("Manager", "Inventory.Export"), ("Admin", "Inventory.Restore") })
+            {
+                var role = await db.Roles.SingleAsync(x => x.Name == roleName, ct);
+                var permission = await db.Permissions.SingleAsync(x => x.Code == code, ct);
+                if (!await db.RolePermissions.AnyAsync(x => x.RoleId == role.Id && x.PermissionId == permission.Id, ct))
+                    db.RolePermissions.Add(new RolePermission { RoleId = role.Id, PermissionId = permission.Id });
+            }
+            db.AppSettings.Add(new AppSetting { Key = "Authentication.RolePermissionsSeeded.V6", Value = "true",
+                Description = "Inventory export and restore permissions added without replacing administrator-edited mappings." });
             await db.SaveChangesAsync(ct);
         }
     }

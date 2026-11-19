@@ -1,9 +1,10 @@
 namespace ElMomenNursery.Application.DTOs;
 
-public class CreateItemDto
+public sealed class CreateItemDto
 {
-    public required string Name { get; set; }
-    public Guid CategoryId { get; set; }
-    public decimal UnitPrice { get; set; }
-    public bool IsActive { get; set; } = true;
+    public required string Name { get; init; }
+    public Guid CategoryId { get; init; }
+    public decimal UnitPrice { get; init; }
+    public required int Quantity { get; init; }
+    public bool IsActive { get; init; }
 }
