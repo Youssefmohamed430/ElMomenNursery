@@ -945,6 +945,65 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.ManualIncome", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("DeletedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DeletedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("IncomeDate")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RecordedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Reference")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("UpdatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IncomeDate")
+                        .HasDatabaseName("IX_ManualIncomes_IncomeDate");
+
+                    b.HasIndex("RecordedByUserId");
+
+                    b.ToTable("ManualIncomes", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ManualIncomes_AmountPositive", "\"Amount\" > 0");
+                        });
+                });
+
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.Payment", b =>
                 {
                     b.Property<string>("Id")
@@ -1626,6 +1685,16 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.Navigation("InventoryItem");
 
                     b.Navigation("Invoice");
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.ManualIncome", b =>
+                {
+                    b.HasOne("ElMomenNursery.Domain.Entities.UserAccount", "RecordedByUser")
+                        .WithMany()
+                        .HasForeignKey("RecordedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("RecordedByUser");
                 });
 
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.Payment", b =>

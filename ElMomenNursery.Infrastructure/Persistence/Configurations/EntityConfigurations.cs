@@ -430,3 +430,18 @@ internal sealed class DeviceAttendanceEventConfiguration : IEntityTypeConfigurat
         b.HasOne(x => x.Employee).WithMany().HasForeignKey(x => x.EmployeeId).IsRequired(false).OnDelete(DeleteBehavior.SetNull);
     }
 }
+
+internal sealed class ManualIncomeConfiguration : IEntityTypeConfiguration<ManualIncome>
+{
+    public void Configure(EntityTypeBuilder<ManualIncome> b)
+    {
+        b.ToTable("ManualIncomes", t => t.HasCheckConstraint("CK_ManualIncomes_AmountPositive", "\"Amount\" > 0"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Source).IsRequired();
+        b.Property(x => x.Description).IsRequired();
+        b.Property(x => x.Amount).HasPrecision(18, 2);
+        b.HasIndex(x => x.IncomeDate).HasDatabaseName("IX_ManualIncomes_IncomeDate");
+        b.HasOne(x => x.RecordedByUser).WithMany().HasForeignKey(x => x.RecordedByUserId).IsRequired(false).OnDelete(DeleteBehavior.SetNull);
+    }
+}
+

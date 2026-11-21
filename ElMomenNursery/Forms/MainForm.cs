@@ -212,6 +212,7 @@ public sealed class MainForm : Form
             "الحضور",
             "الاشتراكات والمدفوعات",
             "المخزن",
+            "الماليات",
             "إدارة المستخدمين"
         };
 
@@ -274,6 +275,7 @@ public sealed class MainForm : Form
                 "الحضور" => new AttendancePage(_scopeFactory, _session, _excelExportService),
                 "الاشتراكات والمدفوعات" => new SubscriptionsPage(_scopeFactory, _session, _excelExportService),
                 "المخزن" => new InventoryPage(_scopeFactory, _session, _excelExportService),
+                "الماليات" => new FinancePage(_scopeFactory, _session, _excelExportService),
                 "الفصول" => new ClassesPage(_scopeFactory, _session, _excelExportService),
                 "إدارة المستخدمين" => new UserManagementForm(_scopeFactory, _session, _excelExportService),
                 _ => BuildSectionPage(section)
@@ -299,6 +301,7 @@ public sealed class MainForm : Form
         "الموظفون" => _session.HasPermission("Employees.View"),
         "الاشتراكات والمدفوعات" => _session.HasPermission("Subscriptions.View") || _session.HasPermission("Payments.View"),
         "المخزن" => _session.HasPermission("Inventory.View"),
+        "الماليات" => _session.HasPermission("Finance.View") || _session.HasPermission("Payments.View") || _session.HasPermission("Expenses.View"),
         "إدارة المستخدمين" => _session.HasPermission("Users.View"),
         _ => true
     };
@@ -336,6 +339,7 @@ public sealed class MainForm : Form
         shortcuts.Controls.Add(CreateShortcut("الأطفال", "فتح قسم الأطفال", "الأطفال"));
         shortcuts.Controls.Add(CreateShortcut("الحضور", "فتح قسم الحضور", "الحضور"));
         shortcuts.Controls.Add(CreateShortcut("الاشتراكات والمدفوعات", "متابعة الاشتراكات والمدفوعات", "الاشتراكات والمدفوعات"));
+        shortcuts.Controls.Add(CreateShortcut("الماليات", "متابعة المقبوضات والمصروفات والأرصدة", "الماليات"));
         shortcuts.Controls.Add(CreateShortcut("الفصول", "عرض الفصول وإدارتها", "الفصول"));
         shortcuts.Controls.Add(CreateShortcut("المخزن", "فتح قسم المخزن", "المخزن"));
         shortcuts.Controls.Add(CreateShortcut("الموظفون", "فتح قسم الموظفين", "الموظفون"));

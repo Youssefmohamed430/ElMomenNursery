@@ -9,6 +9,7 @@ using ElMomenNursery.Infrastructure.Security;
 using ElMomenNursery.Infrastructure.Spreadsheet;
 using ElMomenNursery.Infrastructure.Documents;
 using QuestPDF.Infrastructure;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Data.Sqlite;
 using Serilog;
 
@@ -62,9 +63,14 @@ public static class InfrastructureServiceCollectionExtensions
         }
 
         services.AddSingleton<SoftDeleteInterceptor>();
-        services.AddDbContext<NurseryDbContext>((provider, db) => db.AddInterceptors(provider.GetRequiredService<SoftDeleteInterceptor>()).UseSqlite(
-            connectionString,
-            sqlite => sqlite.MigrationsAssembly(typeof(NurseryDbContext).Assembly.FullName)));
+        services.AddDbContext<NurseryDbContext>((provider, db) => db
+            .AddInterceptors(provider.GetRequiredService<SoftDeleteInterceptor>())
+            .UseSqlite(
+                connectionString,
+                sqlite => sqlite.MigrationsAssembly(typeof(NurseryDbContext).Assembly.FullName))
+            .ConfigureWarnings(warnings => warnings
+                .Ignore(CoreEventId.PossibleIncorrectRequiredNavigationWithQueryFilterInteractionWarning)
+                .Ignore(RelationalEventId.PendingModelChangesWarning)));
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.Configure<AuthSecurityOptions>(options =>
         {

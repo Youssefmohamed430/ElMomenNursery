@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Data.Sqlite;
 
 namespace ElMomenNursery.Infrastructure.Persistence;
@@ -25,6 +26,9 @@ public sealed class NurseryDbContextFactory : IDesignTimeDbContextFactory<Nurser
 
         var options = new DbContextOptionsBuilder<NurseryDbContext>()
             .UseSqlite(connectionString)
+            .ConfigureWarnings(warnings => warnings
+                .Ignore(CoreEventId.PossibleIncorrectRequiredNavigationWithQueryFilterInteractionWarning)
+                .Ignore(RelationalEventId.PendingModelChangesWarning))
             .Options;
         return new NurseryDbContext(options);
     }

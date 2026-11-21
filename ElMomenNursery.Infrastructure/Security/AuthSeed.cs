@@ -14,7 +14,8 @@ public static class AuthSeed
         "Expenses.View", "Expenses.Manage", "Inventory.View", "Inventory.Manage", "Inventory.Export", "Inventory.Restore",
         "Subscriptions.View", "Subscriptions.Manage", "Users.View", "Users.Manage", "Roles.Manage", "Permissions.Manage", "Settings.View", "Settings.Manage",
         "Students.Export", "Employees.Export", "Classes.Export", "Attendance.Export", "EmployeeAttendance.Export", "Users.Export", "Subscriptions.Export",
-        "Students.Restore", "Employees.Restore"
+        "Students.Restore", "Employees.Restore",
+        "Finance.View", "Finance.ManageExpenses", "Finance.ManageIncome", "Finance.Export"
     ];
 
     public static async Task InitializeAsync(NurseryDbContext db, CancellationToken ct = default)
@@ -32,9 +33,9 @@ public static class AuthSeed
         var mappings = new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
             ["Admin"] = PermissionCodes,
-            ["Manager"] = ["Students.View", "Students.Create", "Students.Edit", "Classes.View", "Classes.Manage", "Attendance.View", "Attendance.Record", "Attendance.Edit", "Employees.View", "Employees.Manage", "Payments.View", "Payments.Create", "Expenses.View", "Inventory.View", "Inventory.Manage", "Subscriptions.View", "Subscriptions.Manage"],
+            ["Manager"] = ["Students.View", "Students.Create", "Students.Edit", "Classes.View", "Classes.Manage", "Attendance.View", "Attendance.Record", "Attendance.Edit", "Employees.View", "Employees.Manage", "Payments.View", "Payments.Create", "Expenses.View", "Inventory.View", "Inventory.Manage", "Subscriptions.View", "Subscriptions.Manage", "Finance.View", "Finance.ManageExpenses", "Finance.ManageIncome", "Finance.Export"],
             ["Teacher"] = ["Students.View", "Classes.View", "Attendance.View", "Attendance.Record"],
-            ["Accountant"] = ["Payments.View", "Payments.Create", "Payments.Edit", "Expenses.View", "Expenses.Manage", "Subscriptions.View"],
+            ["Accountant"] = ["Payments.View", "Payments.Create", "Payments.Edit", "Expenses.View", "Expenses.Manage", "Subscriptions.View", "Finance.View", "Finance.ManageExpenses", "Finance.ManageIncome", "Finance.Export"],
             ["Receptionist"] = ["Students.View", "Students.Create", "Classes.View", "Subscriptions.View"]
         };
         var seeded = await db.AppSettings.AnyAsync(x => x.Key == "Authentication.RolePermissionsSeeded.V1", ct);
