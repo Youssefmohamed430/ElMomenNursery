@@ -1,3 +1,4 @@
+using ElMomenNursery.Application.Abstractions;
 using ElMomenNursery.Application.Abstractions.Persistence;
 using ElMomenNursery.Application.DTOs;
 using ElMomenNursery.Application.IServices;
@@ -87,7 +88,7 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
         var error = AttendanceRules.Validate(dto.Date, dto.Status, dto.CheckIn, dto.CheckOut);
         if (error is not null) return error;
 
-        var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(x => x.Id == dto.ChildId, asNoTracking: false, cancellationToken: cancellationToken);
+        var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(x => x.Id == dto.ChildId, asNoTracking: false, new string[] { "Subscriptions" }, cancellationToken: cancellationToken);
         if (child is null || child.EnrollmentDate > dto.Date) return AttendanceErrors.PersonNotFound;
 
         if (await unitOfWork.Repository<ChildAttendance>().AnyAsync(x => x.ChildId == dto.ChildId && x.AttendanceDate == dto.Date, cancellationToken)) return AttendanceErrors.AlreadyRecorded;
@@ -107,14 +108,14 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
 
         await unitOfWork.Repository<ChildAttendance>().AddAsync(item, cancellationToken);
         await AddAuditAsync(item, "ChildAttendance.Created", "—", Values(item), null, cancellationToken);
-
         try { await unitOfWork.SaveChangesAsync(cancellationToken); }
         catch (DbUpdateException ex) when (IsDuplicate(ex)) { logger.LogWarning("Duplicate child attendance rejected; childId={ChildId}", child.Id); return AttendanceErrors.AlreadyRecorded; }
         catch (DbUpdateException ex) { logger.LogWarning(ex, "Child attendance persistence failed; errorCode={ErrorCode}", PersistenceErrorMapper.FromException(ex).Code); return PersistenceErrorMapper.FromException(ex); }
 
-        return Result.Success(ToDto(item), "تم تسجيل الحضور.");
-    }
-
+        var alert = await GetSubscriptionAndAbsenceAlertAsync(child.Id, dto.Date, cancellationToken);
+        return Result.Success(ToDto(item) with { Alert = alert }, alert ?? "تم تسجيل الحضور.");
+    } 
+    
     public async Task<Result<ChildAttendanceDto>> UpdateChildAttendanceAsync(Guid id, UpdateChildAttendanceDto dto, CancellationToken cancellationToken = default)
     {
         var permissionError = PermissionGuard.Check(permissions, "Attendance.Edit", AttendanceErrors.PermissionDenied);
@@ -218,6 +219,34 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
         var summary = $"قبل: {before}; بعد: {after}" + (reason is null ? string.Empty : $"; السبب: {reason}; المستخدم: {actor}");
         await unitOfWork.Repository<AuditLog>().AddAsync(new AuditLog { UserAccountId = sessions.CurrentUser?.UserId,
             Action = action, EntityType = nameof(ChildAttendance), EntityId = item.Id.ToString("D"), ChangeSummary = summary }, ct);
+    }
+
+    private async Task<string?> GetSubscriptionAndAbsenceAlertAsync(Guid childId, DateOnly attendanceDate, CancellationToken ct)
+    {
+        var messages = new List<string>();
+        var subscription = await unitOfWork.Repository<Subscription>().FirstOrDefaultAsync(
+            x => x.ChildId == childId && x.PeriodStart <= attendanceDate && x.PeriodEnd >= attendanceDate,
+            cancellationToken: ct);
+        if (subscription is not null && subscription.Status is not (SubscriptionStatus.Cancelled or SubscriptionStatus.Waived)
+            && attendanceDate >= subscription.PeriodStart.AddDays(3))
+        {
+            var paid = await unitOfWork.Repository<PaymentAllocation>().Query()
+                .Where(x => x.SubscriptionId == subscription.Id && x.Payment.Status == PaymentStatus.Posted)
+                .SumAsync(x => (decimal?)x.AmountApplied, ct) ?? 0m;
+            if (paid < subscription.AmountDue)
+                messages.Add($"تنبيه: اشتراك الطفل غير مسدد بالكامل بعد مرور 3 أيام من بدايته. المتبقي {subscription.AmountDue - paid:0.##} جنيه.");
+        }
+
+        if (subscription is not null)
+        {
+            var absentDays = await unitOfWork.Repository<ChildAttendance>().Query()
+                .CountAsync(x => x.ChildId == childId && x.AttendanceDate >= subscription.PeriodStart
+                    && x.AttendanceDate <= attendanceDate && x.Status == AttendanceStatus.Absent, ct);
+            if (absentDays >= 15)
+                messages.Add("تنبيه: تم تسجيل غياب الطفل 15 يومًا منذ بداية الاشتراك. الغرامة المستحقة 50 جنيهًا.");
+        }
+
+        return messages.Count == 0 ? null : string.Join(Environment.NewLine, messages);
     }
 
     private static string Values(ChildAttendance x) => $"Date={x.AttendanceDate:yyyy-MM-dd};Status={x.Status};CheckIn={x.CheckInTime?.ToString("O", System.Globalization.CultureInfo.InvariantCulture) ?? "—"};CheckOut={x.CheckOutTime?.ToString("O", System.Globalization.CultureInfo.InvariantCulture) ?? "—"}";

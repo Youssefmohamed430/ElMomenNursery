@@ -13,4 +13,5 @@ public static class AttendanceErrors
     public static readonly Error CheckOutUnavailable = new("Attendance.CheckOutUnavailable", "لا يوجد سجل حضور مفتوح لتسجيل الانصراف.");
     public static readonly Error InvalidRange = new("Attendance.InvalidRange", "نطاق التاريخ غير صالح.");
     public static readonly Error PermissionDenied = new("Attendance.PermissionDenied", "لا تملك الصلاحية اللازمة لإتمام هذه العملية.");
+    public static readonly Error AttendanceCountExceeded = new("Attendance.AttendanceCountExceeded", "عدد مرات الغياب لهذا الشهر قد تجاوز الحد المسموح به.");
 }

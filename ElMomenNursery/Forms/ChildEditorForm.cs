@@ -5,6 +5,7 @@ using ElMomenNursery.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
+using System.Text.RegularExpressions;
 
 namespace ElMomenNursery.Forms;
 
@@ -31,6 +32,7 @@ public sealed class ChildEditorForm : Form
     private readonly CheckBox _hasMedicalConditions = CreateCheckBox("لديه حالة طبية");
     private readonly CheckBox _previouslyAttended = CreateCheckBox("سبق له الالتحاق بحضانة");
     private readonly Button _saveButton = CreateButton("حفظ", primary: true);
+    private readonly Dictionary<AttachmentType, (Label Label, string? Source, string? Destination)> _documents = new();
 
     public ChildEditorForm(IServiceScopeFactory scopes, ChildDto? child = null)
     {
@@ -79,6 +81,12 @@ public sealed class ChildEditorForm : Form
         {
             AddPair(table, "الحالة الطبية", _hasMedicalConditions, "الالتحاق السابق", _previouslyAttended);
             AddSingle(table, "ملاحظات", _notes);
+        }));
+        sections.Controls.Add(CreateSection("وثائق الطفل", table =>
+        {
+            AddDocumentRow(table, AttachmentType.PersonalPhoto, "صورة الطفل");
+            AddDocumentRow(table, AttachmentType.BirthCertificate, "شهادة الميلاد");
+            AddDocumentRow(table, AttachmentType.GuardianIdentityCard, "بطاقة ولي الأمر");
         }));
         content.Controls.Add(sections);
 
@@ -146,6 +154,24 @@ public sealed class ChildEditorForm : Form
             _enrollmentDate.Focus();
             return;
         }
+        foreach (var phone in new[] { (_fatherPhone, "رقم هاتف الأب"), (_motherPhone, "رقم هاتف الأم") })
+        {
+            if (!IsValidEgyptianMobile(phone.Item1.Text))
+            {
+                ShowValidationError($"{phone.Item2} غير صالح. أدخل رقم هاتف محمول مصريًا صحيحًا.");
+                phone.Item1.Focus();
+                return;
+            }
+        }
+        foreach (var phone in new[] { (_fatherWhatsApp, "واتساب الأب"), (_motherWhatsApp, "واتساب الأم") })
+        {
+            if (!string.IsNullOrWhiteSpace(phone.Item1.Text) && !IsValidEgyptianMobile(phone.Item1.Text))
+            {
+                ShowValidationError($"{phone.Item2} غير صالح.");
+                phone.Item1.Focus();
+                return;
+            }
+        }
 
         _saveButton.Enabled = false;
         try
@@ -153,6 +179,7 @@ public sealed class ChildEditorForm : Form
             await using var scope = _scopes.CreateAsyncScope();
             var childService = scope.ServiceProvider.GetRequiredService<IChildService>();
             var gender = ((GenderOption)_gender.SelectedItem!).Value;
+            Guid childId;
             if (_child is null)
             {
                 var result = await childService.CreateChildAsync(new CreateChildDTO
@@ -175,6 +202,7 @@ public sealed class ChildEditorForm : Form
                     PreviouslyAttendedNursery = _previouslyAttended.Checked
                 });
                 if (!ResultPresenter.Present(this, "الأطفال", result)) return;
+                childId = result.Value.Id;
             }
             else
             {
@@ -198,6 +226,24 @@ public sealed class ChildEditorForm : Form
                     PreviouslyAttendedNursery = _previouslyAttended.Checked
                 });
                 if (!ResultPresenter.Present(this, "الأطفال", result)) return;
+                childId = _child.Id;
+            }
+
+            foreach (var (type, document) in _documents)
+            {
+                if (string.IsNullOrWhiteSpace(document.Source) || string.IsNullOrWhiteSpace(document.Destination)) continue;
+                var destination = Path.Combine(document.Destination, "AlMoumenNursery", "Children", childId.ToString("N"), $"{type}_{Path.GetFileName(document.Source)}");
+                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                File.Copy(document.Source, destination, overwrite: true);
+                var saveAttachment = await childService.AddChildAttachmentAsync(childId, new ChildAttachmentDto(
+                    Guid.NewGuid(), type, Path.GetFileName(document.Source), destination,
+                    Path.GetExtension(document.Source).Equals(".pdf", StringComparison.OrdinalIgnoreCase) ? "application/pdf" : $"image/{Path.GetExtension(document.Source).TrimStart('.').ToLowerInvariant()}",
+                    new FileInfo(destination).Length));
+                if (saveAttachment.IsFailure)
+                {
+                    ShowValidationError(saveAttachment.Error.Description);
+                    return;
+                }
             }
 
             if (IsDisposed) return;
@@ -297,6 +343,32 @@ public sealed class ChildEditorForm : Form
         table.Controls.Add(CreateFieldLabel(label), 0, row);
         table.Controls.Add(PrepareField(control), 1, row);
         table.SetColumnSpan(control, table.ColumnCount - 1);
+    }
+
+    private void AddDocumentRow(TableLayoutPanel table, AttachmentType type, string title)
+    {
+        var label = new Label { Text = "لم يتم اختيار ملف", AutoEllipsis = true, TextAlign = ContentAlignment.MiddleRight, Dock = DockStyle.Fill };
+        var button = CreateButton("اختيار ملف");
+        button.Click += (_, _) => RunSafeEvent(async () =>
+        {
+            using var picker = new OpenFileDialog { Title = $"اختيار {title}", Filter = "ملفات PDF وصور|*.pdf;*.png;*.jpg;*.jpeg;*.bmp;*.webp|كل الملفات|*.*", CheckFileExists = true };
+            if (picker.ShowDialog(this) != DialogResult.OK) return;
+            using var folder = new FolderBrowserDialog { Description = "اختر مجلد حفظ وثائق الطفل" };
+            if (folder.ShowDialog(this) != DialogResult.OK) return;
+            _documents[type] = (label, picker.FileName, folder.SelectedPath);
+            label.Text = Path.GetFileName(picker.FileName);
+            label.Tag = folder.SelectedPath;
+            await Task.CompletedTask;
+        }, "Select child document");
+        AddPair(table, title, label, "", button);
+    }
+
+    private static bool IsValidEgyptianMobile(string value)
+    {
+        var digits = new string(value.Trim().Select(c => char.GetNumericValue(c) is >= 0 and <= 9 ? (char)('0' + (int)char.GetNumericValue(c)) : '\0').Where(char.IsDigit).ToArray());
+        if (digits.StartsWith("0020", StringComparison.Ordinal)) digits = digits[4..];
+        else if (digits.StartsWith("20", StringComparison.Ordinal) && digits.Length == 12) digits = digits[2..];
+        return Regex.IsMatch(digits, @"^01[0125][0-9]{8}$", RegexOptions.CultureInvariant);
     }
 
     private static Label CreateFieldLabel(string text) => new()

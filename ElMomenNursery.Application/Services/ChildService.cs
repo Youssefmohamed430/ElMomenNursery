@@ -45,8 +45,7 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger, 
     }
     public async Task<Result<ChildDto>> UpdateChildAsync(Guid childId, UpdateChildDTO childDto)
     {
-        var permissionError = PermissionGuard.Check(permissions, "Students.Edit", ChildErrors.PermissionDenied);
-        if (permissionError is not null) return permissionError;
+        if (!permissions.HasAnyPermission("Students.Edit", "Students.Create")) return ChildErrors.PermissionDenied;
         if (childDto is null) return ChildErrors.InvalidData;
         try
         {
@@ -224,6 +223,45 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger, 
         var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(c => c.FullName == childName);
         if (child is null) return ChildErrors.NotFound;
         return Result.Success(child.Adapt<ChildDto>());
+    }
+
+    public async Task<Result<IReadOnlyList<ChildAttachmentDto>>> GetChildAttachmentsAsync(Guid childId, CancellationToken cancellationToken = default)
+    {
+        var permissionError = PermissionGuard.Check(permissions, "Students.View", ChildErrors.PermissionDenied);
+        if (permissionError is not null) return permissionError;
+        if (!await unitOfWork.Repository<Child>().AnyAsync(x => x.Id == childId, cancellationToken)) return ChildErrors.NotFound;
+        var items = await unitOfWork.Repository<FileAttachment>().ListAsync(x => x.ChildId == childId, cancellationToken: cancellationToken);
+        return Result.Success<IReadOnlyList<ChildAttachmentDto>>(items.OrderBy(x => x.Type)
+            .Select(x => new ChildAttachmentDto(x.Id, x.Type, x.OriginalFileName, x.RelativePath, x.ContentType, x.SizeInBytes)).ToArray());
+    }
+
+    public async Task<Result> AddChildAttachmentAsync(Guid childId, ChildAttachmentDto attachment, CancellationToken cancellationToken = default)
+    {
+        var permissionError = PermissionGuard.Check(permissions, "Students.Edit", ChildErrors.PermissionDenied);
+        if (permissionError is not null) return permissionError;
+        if (attachment is null || !Enum.IsDefined(attachment.Type) || string.IsNullOrWhiteSpace(attachment.RelativePath)) return ChildErrors.InvalidData;
+        if (!await unitOfWork.Repository<Child>().AnyAsync(x => x.Id == childId, cancellationToken)) return ChildErrors.NotFound;
+        try
+        {
+            var repository = unitOfWork.Repository<FileAttachment>();
+            var current = await repository.FirstOrDefaultAsync(x => x.ChildId == childId && x.Type == attachment.Type, asNoTracking: false, cancellationToken: cancellationToken);
+            if (current is null)
+                await repository.AddAsync(new FileAttachment { ChildId = childId, Type = attachment.Type, OriginalFileName = attachment.OriginalFileName, RelativePath = attachment.RelativePath, ContentType = attachment.ContentType, SizeInBytes = attachment.SizeInBytes });
+            else
+            {
+                current.OriginalFileName = attachment.OriginalFileName;
+                current.RelativePath = attachment.RelativePath;
+                current.ContentType = attachment.ContentType;
+                current.SizeInBytes = attachment.SizeInBytes;
+            }
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return Result.Success("تم حفظ الوثيقة.");
+        }
+        catch (DbUpdateException exception)
+        {
+            logger.LogWarning(exception, "Child attachment save failed; childId={ChildId}", childId);
+            return PersistenceErrorMapper.FromException(exception);
+        }
     }
 
     public async Task<Result<IReadOnlyList<ChildDto>>> GetChildrenByDateOfBirthAsync(DateOnly dateOfBirth)

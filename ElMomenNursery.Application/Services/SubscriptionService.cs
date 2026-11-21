@@ -10,9 +10,22 @@ using Microsoft.Extensions.Logging;
 
 namespace ElMomenNursery.Application.Services;
 
-public sealed class SubscriptionService(IUnitOfWork unitOfWork, ILogger<SubscriptionService> logger,
-    IPermissionService permissions, ISessionManager sessions) : ISubscriptionService
+public sealed class SubscriptionService : ISubscriptionService
 {
+    private readonly IUnitOfWork unitOfWork;
+    private readonly ILogger<SubscriptionService> logger;
+    private readonly IPermissionService permissions;
+    private readonly ISessionManager sessions;
+
+    public SubscriptionService(IUnitOfWork unitOfWork, ILogger<SubscriptionService> logger,
+        IPermissionService permissions, ISessionManager sessions)
+    {
+        this.unitOfWork = unitOfWork;
+        this.logger = logger;
+        this.permissions = permissions;
+        this.sessions = sessions;
+    }
+
     public async Task<Result<IReadOnlyList<SubscriptionDto>>> GetSubscriptionsAsync(SubscriptionFilter filter, CancellationToken ct = default)
     {
         if (!Allowed("Subscriptions.View")) return SubscriptionErrors.PermissionDenied;

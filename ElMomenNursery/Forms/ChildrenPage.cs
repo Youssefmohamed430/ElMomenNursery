@@ -239,7 +239,25 @@ internal sealed class ChildrenPage : UserControl
                     MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
             }
         }, "Delete child");
-        detailsButton.Click += (_, _) => { if (!isCustomizing) AppDialog.ShowInformation(this, "ملف الطفل", "هذه الوظيفة ستتاح لاحقًا."); };
+        detailsButton.Click += (_, _) => RunSafeEvent(async () =>
+        {
+            if (isCustomizing) return;
+            if (grid.SelectedRows.Count == 0 || grid.SelectedRows[0].Tag is not Guid childId)
+            {
+                AppDialog.ShowInformation(this, "ملف الطفل", "اختر طفلًا من الجدول أولًا.");
+                return;
+            }
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var childService = scope.ServiceProvider.GetRequiredService<IChildService>();
+            var child = await childService.GetChildByIdAsync(childId);
+            var attachments = await childService.GetChildAttachmentsAsync(childId);
+            var subscriptions = await scope.ServiceProvider.GetRequiredService<ISubscriptionService>().GetSubscriptionsForChildAsync(childId);
+            if (child.IsFailure) { AppDialog.ShowInformation(this, "ملف الطفل", child.Error.Description); return; }
+            if (attachments.IsFailure) { AppDialog.ShowInformation(this, "ملف الطفل", attachments.Error.Description); return; }
+            if (subscriptions.IsFailure) { AppDialog.ShowInformation(this, "ملف الطفل", subscriptions.Error.Description); return; }
+            using var profile = new ChildProfileForm(child.Value, attachments.Value, subscriptions.Value);
+            profile.ShowDialog(this);
+        }, "Open child profile");
         exportButton.Click += async (_, _) =>
         {
             if (!isCustomizing) await GridExcelExport.SaveAsync(this, grid, _excelExportService, "تصدير قائمة الأطفال", "الأطفال");

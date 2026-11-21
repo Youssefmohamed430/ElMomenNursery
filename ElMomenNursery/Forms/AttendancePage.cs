@@ -147,6 +147,7 @@ internal sealed class ChildAttendancePage : UserControl
             var result = await service.MarkManualAttendanceAsync(new CreateChildAttendanceDto(row.ChildId, row.Date, status,
                 status is AttendanceStatus.Present or AttendanceStatus.Late ? now : null));
             if (result.IsFailure) { ShowError(result.Error.Description); return; }
+            if (!string.IsNullOrWhiteSpace(result.Value.Alert)) ShowError(result.Value.Alert);
             await LoadAsync();
         }
         catch { if (!IsDisposed) ShowError("تعذر تسجيل الحضور."); }
@@ -198,6 +199,7 @@ internal sealed class ChildAttendancePage : UserControl
                     return updated.IsFailure ? updated.Error : null;
                 }
                 var created = await service.MarkManualAttendanceAsync(new CreateChildAttendanceDto(row.ChildId, row.Date, values.Status, values.CheckIn, values.CheckOut, values.Notes));
+                if (created.IsSuccess && !string.IsNullOrWhiteSpace(created.Value.Alert)) ShowError(created.Value.Alert);
                 return created.IsFailure ? created.Error : null;
             });
         if (editor.ShowDialog(FindForm()) == DialogResult.OK && !IsDisposed) await LoadAsync();
