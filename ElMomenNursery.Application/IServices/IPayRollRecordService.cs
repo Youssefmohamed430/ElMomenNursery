@@ -15,4 +15,6 @@ public interface IPayRollRecordService
     Task<Result<IReadOnlyList<PayrollRecordDto>>> GetDeletedPayrollRecordsAsync(CancellationToken cancellationToken = default);
     Task<Result<PayrollRecordDto>> MarkRecordAsPaid(Guid payrollRecordId);
     Task<Result<PayrollRecordDto>> CalculateFinalSalary(Guid payrollRecordId);
+    Task<Result<EmployeeAdvanceDto>> CreateEmployeeAdvanceAsync(CreateEmployeeAdvanceDto dto, CancellationToken cancellationToken = default);
+    Task<Result<IReadOnlyList<EmployeeAdvanceDto>>> GetEmployeeAdvancesAsync(Guid? employeeId = null, CancellationToken cancellationToken = default);
 }

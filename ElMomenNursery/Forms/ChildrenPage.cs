@@ -6,6 +6,7 @@ using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Controls;
 using ElMomenNursery.Domain.Abstractions;
 using ElMomenNursery.Domain.Enums;
+using ElMomenNursery.Domain.Entities;
 using ElMomenNursery.Styling;
 using Microsoft.Extensions.DependencyInjection;
 using static ElMomenNursery.Forms.MainForm;
@@ -68,6 +69,7 @@ internal sealed class ChildrenPage : UserControl
         var filterItems = new List<Control>();
         var search = CreateSearchBox("اسم الطفل");
         var genderFilter = CreateFilterCombo(["الكل", "ولد", "بنت"], 116);
+        var shiftFilter = CreateFilterCombo(["كل الفترات", "صباحية", "مسائية", "يوم كامل", "فترة ونصف"], 132);
         var dateOfBirthFrom = CreateOptionalDatePicker();
         var dateOfBirthTo = CreateOptionalDatePicker();
         var enrollmentFrom = CreateOptionalDatePicker();
@@ -95,6 +97,7 @@ internal sealed class ChildrenPage : UserControl
 
         AddFilterField("filter.search", "اسم الطفل", search, 180);
         AddFilterField("filter.gender", "النوع", genderFilter, 128);
+        AddFilterField("filter.shift", "الفترة", shiftFilter, 144);
         AddFilterField("filter.birth-from", "الميلاد من", dateOfBirthFrom, 142);
         AddFilterField("filter.birth-to", "الميلاد إلى", dateOfBirthTo, 142);
         AddFilterField("filter.enrollment-from", "الالتحاق من", enrollmentFrom, 142);
@@ -121,14 +124,14 @@ internal sealed class ChildrenPage : UserControl
         actions.Controls.AddRange([addButton, editButton, deleteButton, detailsButton, exportButton, customizeButton, resetLayoutButton]);
 
         var grid = CreateGrid([
-            "المعرف", "اسم الطفل", "العنوان", "تاريخ الالتحاق", "تاريخ الميلاد", "النوع",
+            "المعرف", "اسم الطفل", "العنوان", "تاريخ الالتحاق", "تاريخ الميلاد", "النوع", "الفترة",
             "اسم الأب", "مهنة الأب", "هاتف الأب", "واتساب الأب", "اسم الأم", "مهنة الأم",
             "هاتف الأم", "واتساب الأم", "ملاحظات", "حالة طبية", "سبق له الالتحاق",
             "تاريخ الإضافة", "آخر تعديل"
         ]);
         grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
         grid.Name = "children.grid";
-        var columnWidths = new[] { 265, 170, 220, 140, 140, 90, 150, 140, 140, 140, 150, 140, 140, 140, 240, 120, 150, 160, 160 };
+        var columnWidths = new[] { 265, 170, 220, 140, 140, 90, 120, 150, 140, 140, 140, 150, 140, 140, 140, 240, 120, 150, 160, 160 };
         for (var columnIndex = 0; columnIndex < grid.Columns.Count; columnIndex++)
             grid.Columns[columnIndex].Width = columnWidths[columnIndex];
         resultCount.Name = "children.count";
@@ -392,6 +395,14 @@ internal sealed class ChildrenPage : UserControl
                     2 => ChildGender.Girl,
                     _ => (ChildGender?)null
                 };
+                var shift = shiftFilter.SelectedIndex switch
+                {
+                    1 => Shift.Morning,
+                    2 => Shift.Afternoon,
+                    3 => Shift.FullDay,
+                    4 => Shift.PeriodAndAHalf,
+                    _ => (Shift?)null
+                };
                 var classroomId = (classroomFilter.SelectedItem as ClassroomFilterOptionDto)?.Id;
                 var hasPaidSubscription = paymentFilter.SelectedIndex switch
                 {
@@ -403,6 +414,7 @@ internal sealed class ChildrenPage : UserControl
                 {
                     SearchText = search.Text,
                     Gender = gender,
+                    Shift = shift,
                     DateOfBirthFrom = dateOfBirthFrom.Checked ? DateOnly.FromDateTime(dateOfBirthFrom.Value) : null,
                     DateOfBirthTo = dateOfBirthTo.Checked ? DateOnly.FromDateTime(dateOfBirthTo.Value) : null,
                     EnrollmentDateFrom = enrollmentFrom.Checked ? DateOnly.FromDateTime(enrollmentFrom.Value) : null,
@@ -435,6 +447,7 @@ internal sealed class ChildrenPage : UserControl
                         child.EnrollmentDate.ToString("dd/MM/yyyy"),
                         child.DateOfBirth.ToString("dd/MM/yyyy"),
                         child.Gender == ChildGender.Boy ? "ولد" : "بنت",
+                        child.Shift switch { Shift.Morning => "صباحية", Shift.Afternoon => "مسائية", Shift.FullDay => "يوم كامل", Shift.PeriodAndAHalf => "فترة ونصف", _ => "—" },
                         child.FatherName,
                         child.FatherOccupation ?? string.Empty,
                         child.FatherPhone,

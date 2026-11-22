@@ -1,4 +1,5 @@
 using ElMomenNursery.Domain.Enums;
+using ElMomenNursery.Domain.Entities;
 
 namespace ElMomenNursery.Application.DTOs;
 
@@ -10,6 +11,7 @@ public sealed class ChildFilter
 {
     public string? SearchText { get; init; }
     public ChildGender? Gender { get; init; }
+    public Shift? Shift { get; init; }
     public DateOnly? DateOfBirthFrom { get; init; }
     public DateOnly? DateOfBirthTo { get; init; }
     public DateOnly? EnrollmentDateFrom { get; init; }

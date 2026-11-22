@@ -26,4 +26,5 @@ public sealed class Employee : ISoftDeletable
     public ICollection<FileAttachment> Attachments { get; } = new List<FileAttachment>();
     public ICollection<EmployeeAttendance> Attendances { get; } = new List<EmployeeAttendance>();
     public ICollection<PayrollRecord> PayrollRecords { get; } = new List<PayrollRecord>();
+    public ICollection<EmployeeAdvance> Advances { get; } = new List<EmployeeAdvance>();
 }

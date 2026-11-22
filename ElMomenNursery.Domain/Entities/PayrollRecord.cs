@@ -15,9 +15,12 @@ public sealed class PayrollRecord : ISoftDeletable
     public decimal AmountPaid { get; set; }
     public DateOnly? PaymentDate { get; set; }
     public bool IsPaid { get; set; }
+    public bool IsCalculated { get; set; }
     public string? Notes { get; set; }
     public decimal Insurancefunds { get; set; }
+    public decimal AdvanceDeduction { get; set; }
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? UpdatedAt { get; set; }
     public required Employee Employee { get; set; }
+    public ICollection<EmployeeAdvanceRepayment> AdvanceRepayments { get; } = new List<EmployeeAdvanceRepayment>();
 }

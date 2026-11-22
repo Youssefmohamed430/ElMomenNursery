@@ -2,6 +2,7 @@ using ElMomenNursery.Application.DTOs;
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Controls;
 using ElMomenNursery.Domain.Enums;
+using ElMomenNursery.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
@@ -20,6 +21,7 @@ public sealed class ChildEditorForm : Form
     private readonly DateTimePicker _dateOfBirth = CreateDatePicker();
     private readonly DateTimePicker _enrollmentDate = CreateDatePicker();
     private readonly ComboBox _gender = CreateGenderPicker();
+    private readonly ComboBox _shift = CreateShiftPicker();
     private readonly TextBox _fatherName = CreateTextBox(100);
     private readonly TextBox _fatherOccupation = CreateTextBox(100);
     private readonly TextBox _fatherPhone = CreateTextBox(50);
@@ -65,6 +67,7 @@ public sealed class ChildEditorForm : Form
         {
             AddPair(table, "اسم الطفل *", _fullName, "النوع *", _gender);
             AddPair(table, "تاريخ الميلاد *", _dateOfBirth, "تاريخ الالتحاق *", _enrollmentDate);
+            AddSingle(table, "الفترة *", _shift);
             AddSingle(table, "العنوان *", _address);
         }));
         sections.Controls.Add(CreateSection("بيانات الأب", table =>
@@ -123,6 +126,7 @@ public sealed class ChildEditorForm : Form
         _dateOfBirth.Value = ToDateTime(child.DateOfBirth);
         _enrollmentDate.Value = ToDateTime(child.EnrollmentDate);
         _gender.SelectedItem = _gender.Items.Cast<GenderOption>().First(option => option.Value == child.Gender);
+        _shift.SelectedItem = _shift.Items.Cast<ShiftOption>().First(option => option.Value == child.Shift);
         _fatherName.Text = child.FatherName;
         _fatherOccupation.Text = child.FatherOccupation;
         _fatherPhone.Text = child.FatherPhone;
@@ -189,6 +193,7 @@ public sealed class ChildEditorForm : Form
                     EnrollmentDate = enrollmentDate,
                     DateOfBirth = dateOfBirth,
                     Gender = gender,
+                    Shift = ((ShiftOption)_shift.SelectedItem!).Value,
                     FatherName = _fatherName.Text.Trim(),
                     FatherOccupation = OptionalText(_fatherOccupation.Text),
                     FatherPhone = _fatherPhone.Text.Trim(),
@@ -213,6 +218,7 @@ public sealed class ChildEditorForm : Form
                     EnrollmentDate = enrollmentDate,
                     DateOfBirth = dateOfBirth,
                     Gender = gender,
+                    Shift = ((ShiftOption)_shift.SelectedItem!).Value,
                     FatherName = _fatherName.Text.Trim(),
                     FatherOccupation = OptionalText(_fatherOccupation.Text),
                     FatherPhone = _fatherPhone.Text.Trim(),
@@ -426,6 +432,15 @@ public sealed class ChildEditorForm : Form
         return combo;
     }
 
+    private static ComboBox CreateShiftPicker()
+    {
+        var combo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 300 };
+        combo.Items.AddRange([new ShiftOption(Shift.Morning, "فترة صباحية"), new ShiftOption(Shift.Afternoon, "فترة مسائية"),
+            new ShiftOption(Shift.FullDay, "يوم كامل"), new ShiftOption(Shift.PeriodAndAHalf, "فترة ونصف")]);
+        combo.SelectedIndex = 0;
+        return combo;
+    }
+
     private static CheckBox CreateCheckBox(string text) => new()
     {
         Text = text,
@@ -455,6 +470,10 @@ public sealed class ChildEditorForm : Form
     private static string? OptionalText(string text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
 
     private sealed record GenderOption(ChildGender Value, string Name)
+    {
+        public override string ToString() => Name;
+    }
+    private sealed record ShiftOption(Shift Value, string Name)
     {
         public override string ToString() => Name;
     }

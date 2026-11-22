@@ -232,6 +232,9 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.Property<bool>("PreviouslyAttendedNursery")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("Shift")
+                        .HasColumnType("INTEGER");
+
                     b.Property<long?>("UpdatedAt")
                         .HasColumnType("INTEGER");
 
@@ -569,6 +572,81 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.ToTable("Employees", null, t =>
                         {
                             t.HasCheckConstraint("CK_Employees_SalaryNonNegative", "\"Salary\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.EmployeeAdvance", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AdvanceDate")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("EmployeeId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("OriginalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("RemainingAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmployeeId", "AdvanceDate")
+                        .HasDatabaseName("IX_EmployeeAdvances_Employee_Date");
+
+                    b.ToTable("EmployeeAdvances", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_EmployeeAdvances_Amounts", "\"OriginalAmount\" > 0 AND \"RemainingAmount\" >= 0 AND \"RemainingAmount\" <= \"OriginalAmount\"");
+                        });
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.EmployeeAdvanceRepayment", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EmployeeAdvanceId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PayrollRecordId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RepaymentDate")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PayrollRecordId");
+
+                    b.HasIndex("EmployeeAdvanceId", "PayrollRecordId")
+                        .IsUnique();
+
+                    b.ToTable("EmployeeAdvanceRepayments", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_EmployeeAdvanceRepayments_Amount", "\"Amount\" > 0");
                         });
                 });
 
@@ -1116,6 +1194,10 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
+                    b.Property<decimal>("AdvanceDeduction")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
                     b.Property<decimal>("AgreedSalary")
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
@@ -1140,6 +1222,12 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.Property<string>("EmployeeId")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Insurancefunds")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsCalculated")
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER");
@@ -1589,6 +1677,36 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.Navigation("Employee");
                 });
 
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.EmployeeAdvance", b =>
+                {
+                    b.HasOne("ElMomenNursery.Domain.Entities.Employee", "Employee")
+                        .WithMany("Advances")
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Employee");
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.EmployeeAdvanceRepayment", b =>
+                {
+                    b.HasOne("ElMomenNursery.Domain.Entities.EmployeeAdvance", "EmployeeAdvance")
+                        .WithMany("Repayments")
+                        .HasForeignKey("EmployeeAdvanceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ElMomenNursery.Domain.Entities.PayrollRecord", "PayrollRecord")
+                        .WithMany("AdvanceRepayments")
+                        .HasForeignKey("PayrollRecordId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("EmployeeAdvance");
+
+                    b.Navigation("PayrollRecord");
+                });
+
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.EmployeeAttendance", b =>
                 {
                     b.HasOne("ElMomenNursery.Domain.Entities.Employee", "Employee")
@@ -1878,6 +1996,8 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.Employee", b =>
                 {
+                    b.Navigation("Advances");
+
                     b.Navigation("Attachments");
 
                     b.Navigation("Attendances");
@@ -1887,6 +2007,11 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.Navigation("TeachingAssignments");
 
                     b.Navigation("UserAccount");
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.EmployeeAdvance", b =>
+                {
+                    b.Navigation("Repayments");
                 });
 
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.InventoryCategory", b =>
@@ -1909,6 +2034,11 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.Payment", b =>
                 {
                     b.Navigation("Allocations");
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.PayrollRecord", b =>
+                {
+                    b.Navigation("AdvanceRepayments");
                 });
 
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.Permission", b =>

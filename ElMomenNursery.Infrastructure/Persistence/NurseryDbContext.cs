@@ -34,6 +34,8 @@ public sealed class NurseryDbContext(DbContextOptions<NurseryDbContext> options)
     public DbSet<InvoiceLine> InvoiceLines => Set<InvoiceLine>();
     public DbSet<Expense> Expenses => Set<Expense>();
     public DbSet<PayrollRecord> PayrollRecords => Set<PayrollRecord>();
+    public DbSet<EmployeeAdvance> EmployeeAdvances => Set<EmployeeAdvance>();
+    public DbSet<EmployeeAdvanceRepayment> EmployeeAdvanceRepayments => Set<EmployeeAdvanceRepayment>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     public DbSet<AttendanceDevice> AttendanceDevices => Set<AttendanceDevice>();

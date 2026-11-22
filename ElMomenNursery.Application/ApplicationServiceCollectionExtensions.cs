@@ -17,6 +17,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<IInventoryCategoryService, InventoryCategoryService>();
         services.AddScoped<IInvoiceService, InvoiceService>();
         services.AddScoped<IFinanceService, FinanceService>();
+        services.AddScoped<IPayRollRecordService, PayRollRecordService>();
         return services;
     }
 }

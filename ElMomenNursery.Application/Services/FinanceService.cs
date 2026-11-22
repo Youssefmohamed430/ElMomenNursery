@@ -73,7 +73,7 @@ public sealed class FinanceService(
 
             // 5. Manual Expenses (Non-voided)
             var expenseQuery = unitOfWork.Repository<Expense>().Query()
-                .Where(x => !x.IsVoided);
+                .Where(x => !x.IsVoided && x.Category != "رواتب");
 
             if (filter.From is DateOnly expFrom)
                 expenseQuery = expenseQuery.Where(x => x.ExpenseDate >= expFrom);
@@ -264,7 +264,7 @@ public sealed class FinanceService(
             // 2. Manual Expenses
             var expenseQuery = unitOfWork.Repository<Expense>().Query()
                 .Include(x => x.RecordedByUser)
-                .Where(x => !x.IsVoided);
+                .Where(x => !x.IsVoided && x.Category != "رواتب");
 
             if (filter.From is DateOnly expFrom)
                 expenseQuery = expenseQuery.Where(x => x.ExpenseDate >= expFrom);
@@ -286,7 +286,7 @@ public sealed class FinanceService(
                     Reference = exp.PaymentReference,
                     RecordedBy = exp.RecordedByUser?.FullName ?? "—",
                     CreatedAt = exp.CreatedAt,
-                    IsEditable = true
+                    IsEditable = exp.Category != "سلف موظفين"
                 });
             }
 
@@ -379,6 +379,7 @@ public sealed class FinanceService(
                 .FirstOrDefaultAsync(x => x.Id == id && !x.IsVoided, asNoTracking: false, cancellationToken: cancellationToken);
 
             if (expense is null) return FinanceErrors.ExpenseNotFound;
+            if (expense.Category == "سلف موظفين") return FinanceErrors.NonManualNotEditable;
 
             var oldSummary = $"تاريخ={expense.ExpenseDate};فئة={expense.Category};مبلغ={expense.Amount};بيان={expense.Description}";
 
@@ -438,6 +439,7 @@ public sealed class FinanceService(
                 .FirstOrDefaultAsync(x => x.Id == id && !x.IsVoided, asNoTracking: false, cancellationToken: cancellationToken);
 
             if (expense is null) return FinanceErrors.ExpenseNotFound;
+            if (expense.Category == "سلف موظفين") return FinanceErrors.NonManualNotEditable;
 
             expense.IsVoided = true;
             expense.UpdatedAt = DateTimeOffset.UtcNow;

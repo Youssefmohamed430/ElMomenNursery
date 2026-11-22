@@ -15,7 +15,7 @@ public static class AuthSeed
         "Subscriptions.View", "Subscriptions.Manage", "Users.View", "Users.Manage", "Roles.Manage", "Permissions.Manage", "Settings.View", "Settings.Manage",
         "Students.Export", "Employees.Export", "Classes.Export", "Attendance.Export", "EmployeeAttendance.Export", "Users.Export", "Subscriptions.Export",
         "Students.Restore", "Employees.Restore",
-        "Finance.View", "Finance.ManageExpenses", "Finance.ManageIncome", "Finance.Export"
+        "Finance.View", "Finance.ManageExpenses", "Finance.ManageIncome", "Finance.Export", "Payroll.Manage"
     ];
 
     public static async Task InitializeAsync(NurseryDbContext db, CancellationToken ct = default)
@@ -33,9 +33,9 @@ public static class AuthSeed
         var mappings = new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
             ["Admin"] = PermissionCodes,
-            ["Manager"] = ["Students.View", "Students.Create", "Students.Edit", "Classes.View", "Classes.Manage", "Attendance.View", "Attendance.Record", "Attendance.Edit", "Employees.View", "Employees.Manage", "Payments.View", "Payments.Create", "Expenses.View", "Inventory.View", "Inventory.Manage", "Subscriptions.View", "Subscriptions.Manage", "Finance.View", "Finance.ManageExpenses", "Finance.ManageIncome", "Finance.Export"],
+            ["Manager"] = ["Students.View", "Students.Create", "Students.Edit", "Classes.View", "Classes.Manage", "Attendance.View", "Attendance.Record", "Attendance.Edit", "Employees.View", "Employees.Manage", "Payments.View", "Payments.Create", "Expenses.View", "Inventory.View", "Inventory.Manage", "Subscriptions.View", "Subscriptions.Manage", "Finance.View", "Finance.ManageExpenses", "Finance.ManageIncome", "Finance.Export", "Payroll.Manage"],
             ["Teacher"] = ["Students.View", "Classes.View", "Attendance.View", "Attendance.Record"],
-            ["Accountant"] = ["Payments.View", "Payments.Create", "Payments.Edit", "Expenses.View", "Expenses.Manage", "Subscriptions.View", "Finance.View", "Finance.ManageExpenses", "Finance.ManageIncome", "Finance.Export"],
+            ["Accountant"] = ["Payments.View", "Payments.Create", "Payments.Edit", "Expenses.View", "Expenses.Manage", "Subscriptions.View", "Finance.View", "Finance.ManageExpenses", "Finance.ManageIncome", "Finance.Export", "Payroll.Manage"],
             ["Receptionist"] = ["Students.View", "Students.Create", "Classes.View", "Subscriptions.View"]
         };
         var seeded = await db.AppSettings.AnyAsync(x => x.Key == "Authentication.RolePermissionsSeeded.V1", ct);
@@ -158,5 +158,15 @@ public static class AuthSeed
                 Description = "Inventory export and restore permissions added without replacing administrator-edited mappings." });
             await db.SaveChangesAsync(ct);
         }
+
+        // Grant the payroll capability to the existing finance roles on databases seeded before payroll support.
+        var payrollPermissionId = await db.Permissions.Where(x => x.Code == "Payroll.Manage").Select(x => x.Id).SingleAsync(ct);
+        foreach (var roleName in new[] { "Manager", "Accountant" })
+        {
+            var roleId = await db.Roles.Where(x => x.Name == roleName).Select(x => x.Id).SingleAsync(ct);
+            if (!await db.RolePermissions.AnyAsync(x => x.RoleId == roleId && x.PermissionId == payrollPermissionId, ct))
+                db.RolePermissions.Add(new RolePermission { RoleId = roleId, PermissionId = payrollPermissionId });
+        }
+        await db.SaveChangesAsync(ct);
     }
 }

@@ -141,6 +141,8 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger, 
             predicate = And(predicate, child => child.FullName.Contains(searchText));
         if (filter.Gender.HasValue)
             predicate = And(predicate, child => child.Gender == filter.Gender.Value);
+        if (filter.Shift.HasValue)
+            predicate = And(predicate, child => child.Shift == filter.Shift.Value);
         if (filter.DateOfBirthFrom.HasValue)
             predicate = And(predicate, child => child.DateOfBirth >= filter.DateOfBirthFrom.Value);
         if (filter.DateOfBirthTo.HasValue)
@@ -294,7 +296,7 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger, 
         if (filter is null) return 0;
         return new[]
         {
-            !string.IsNullOrWhiteSpace(filter.SearchText), filter.Gender.HasValue,
+            !string.IsNullOrWhiteSpace(filter.SearchText), filter.Gender.HasValue, filter.Shift.HasValue,
             filter.DateOfBirthFrom.HasValue, filter.DateOfBirthTo.HasValue,
             filter.EnrollmentDateFrom.HasValue, filter.EnrollmentDateTo.HasValue,
             filter.ClassroomId.HasValue, filter.HasPaidSubscription.HasValue

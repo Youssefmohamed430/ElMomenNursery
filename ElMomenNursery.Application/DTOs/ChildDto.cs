@@ -1,4 +1,5 @@
 using ElMomenNursery.Domain.Enums;
+using ElMomenNursery.Domain.Entities;
 
 namespace ElMomenNursery.Application.DTOs;
 
@@ -10,6 +11,7 @@ public class ChildDto
     public DateOnly EnrollmentDate { get; set; }
     public DateOnly DateOfBirth { get; set; }
     public ChildGender Gender { get; set; }
+    public Shift Shift { get; set; }
     public required string FatherName { get; set; }
     public string? FatherOccupation { get; set; }
     public required string FatherPhone { get; set; }

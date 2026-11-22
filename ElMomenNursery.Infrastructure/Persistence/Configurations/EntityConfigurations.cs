@@ -376,8 +376,38 @@ internal sealed class PayrollRecordConfiguration : IEntityTypeConfiguration<Payr
         b.Property(x => x.Additions).HasPrecision(18, 2);
         b.Property(x => x.Deductions).HasPrecision(18, 2);
         b.Property(x => x.AmountPaid).HasPrecision(18, 2);
+        b.Property(x => x.AdvanceDeduction).HasPrecision(18, 2);
         b.HasIndex(x => new { x.EmployeeId, x.PeriodStart }).HasDatabaseName("IX_PayrollRecords_Employee_PeriodStart");
         b.HasOne(x => x.Employee).WithMany(x => x.PayrollRecords).HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class EmployeeAdvanceConfiguration : IEntityTypeConfiguration<EmployeeAdvance>
+{
+    public void Configure(EntityTypeBuilder<EmployeeAdvance> b)
+    {
+        b.ToTable("EmployeeAdvances", t => {
+            t.HasCheckConstraint("CK_EmployeeAdvances_Amounts", "\"OriginalAmount\" > 0 AND \"RemainingAmount\" >= 0 AND \"RemainingAmount\" <= \"OriginalAmount\"");
+        });
+        b.HasKey(x => x.Id);
+        b.Property(x => x.OriginalAmount).HasPrecision(18, 2);
+        b.Property(x => x.RemainingAmount).HasPrecision(18, 2);
+        b.Property(x => x.Notes).HasMaxLength(1000);
+        b.HasIndex(x => new { x.EmployeeId, x.AdvanceDate }).HasDatabaseName("IX_EmployeeAdvances_Employee_Date");
+        b.HasOne(x => x.Employee).WithMany(x => x.Advances).HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class EmployeeAdvanceRepaymentConfiguration : IEntityTypeConfiguration<EmployeeAdvanceRepayment>
+{
+    public void Configure(EntityTypeBuilder<EmployeeAdvanceRepayment> b)
+    {
+        b.ToTable("EmployeeAdvanceRepayments", t => t.HasCheckConstraint("CK_EmployeeAdvanceRepayments_Amount", "\"Amount\" > 0"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Amount).HasPrecision(18, 2);
+        b.HasIndex(x => new { x.EmployeeAdvanceId, x.PayrollRecordId }).IsUnique();
+        b.HasOne(x => x.EmployeeAdvance).WithMany(x => x.Repayments).HasForeignKey(x => x.EmployeeAdvanceId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(x => x.PayrollRecord).WithMany(x => x.AdvanceRepayments).HasForeignKey(x => x.PayrollRecordId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 

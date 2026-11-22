@@ -1,4 +1,5 @@
 using ElMomenNursery.Domain.Enums;
+using ElMomenNursery.Domain.Entities;
 using System.ComponentModel.DataAnnotations;
 
 namespace ElMomenNursery.Application.DTOs;
@@ -26,6 +27,7 @@ public class CreateChildDTO
 
     [Required(ErrorMessage = "Gender is required.")]
     public ChildGender Gender { get; set; }
+    public Shift Shift { get; set; }
 
     [Required(ErrorMessage = "FatherName is required.")]
     public required string FatherName { get; set; }
