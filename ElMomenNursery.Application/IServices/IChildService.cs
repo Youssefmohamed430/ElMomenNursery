@@ -16,6 +16,7 @@ public interface IChildService
     Task<Result<IReadOnlyList<ChildDto>>> GetChildrenByGenderAsync(ChildGender gender);
     Task<Result<ChildDto>> GetChildByIdAsync(Guid childId);
     Task<Result<ChildDto>> GetChildByNameAsync(string childName);
+    //Task<Result<List<ChildDto>>> GetChildsNearingForSchoolAgeAsync();
     Task<Result<IReadOnlyList<ChildAttachmentDto>>> GetChildAttachmentsAsync(Guid childId, CancellationToken cancellationToken = default);
     Task<Result> AddChildAttachmentAsync(Guid childId, ChildAttachmentDto attachment, CancellationToken cancellationToken = default);
     Task<Result<ChildDto>> CreateChildAsync(CreateChildDTO childDto);

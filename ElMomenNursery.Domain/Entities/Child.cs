@@ -23,6 +23,7 @@ public sealed class Child : ISoftDeletable
     public string? Notes { get; set; }
     public bool HasMedicalConditions { get; set; }
     public bool PreviouslyAttendedNursery { get; set; }
+    public Shift shiftType { get; set; }
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? UpdatedAt { get; set; }
     public ICollection<Subscription> Subscriptions { get; } = new List<Subscription>();
@@ -30,4 +31,11 @@ public sealed class Child : ISoftDeletable
     public ICollection<FileAttachment> Attachments { get; } = new List<FileAttachment>();
     public ICollection<Payment> Payments { get; } = new List<Payment>();
     public ICollection<ChildAttendance> Attendances { get; } = new List<ChildAttendance>();
+}
+
+public enum Shift {
+    Morning,
+    Afternoon,
+    FullDay,
+    PeriodAndAHalf
 }
