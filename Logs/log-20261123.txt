@@ -1,0 +1,10 @@
+2026-11-23 00:25:13.062 +02:00 [INF]  Application starting { AppVersion: "1.0.0.0" }
+2026-11-23 00:25:13.180 +02:00 [INF]  Resolved nursery data directory; dataDirectory=C:\Users\Gaber\AppData\Local\AlMoumenNursery; databasePath=C:\Users\Gaber\AppData\Local\AlMoumenNursery\nursery.db; databaseExists=true { AppVersion: "1.0.0.0" }
+2026-11-23 00:25:14.394 +02:00 [INF]  Database startup check; databasePath=C:\Users\Gaber\AppData\Local\AlMoumenNursery\nursery.db; pendingMigrations=[] { AppVersion: "1.0.0.0" }
+2026-11-23 00:25:14.476 +02:00 [INF]  Database migration completed; durationMs=80 { AppVersion: "1.0.0.0" }
+2026-11-23 00:25:14.742 +02:00 [INF]  Authentication seed completed; durationMs=265 { AppVersion: "1.0.0.0" }
+2026-11-23 00:25:30.728 +02:00 [INF]  User logged in; UserId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-23 00:25:30.814 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرئيسية; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-23 00:25:33.930 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الأطفال; userId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-23 00:26:28.021 +02:00 [INF]  User logged out; UserId="0c0c8ff4-59bb-4963-8ef9-7252e0a804d6" { AppVersion: "1.0.0.0" }
+2026-11-23 00:26:29.913 +02:00 [INF]  Application stopped normally { AppVersion: "1.0.0.0" }

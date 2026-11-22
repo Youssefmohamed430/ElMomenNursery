@@ -18,6 +18,7 @@ internal static class BrandPalette
     internal static readonly Color AppBackground = Color.FromArgb(247, 249, 245);
     internal static readonly Color Surface = Color.White;
     internal static readonly Color Border = Color.FromArgb(222, 230, 218);
+    internal static readonly Color FilterBorderStrong = Color.FromArgb(195, 211, 186);
     internal static readonly Color Text = Color.FromArgb(35, 48, 34);
     internal static readonly Color MutedText = Color.FromArgb(100, 113, 99);
     internal static readonly Color DangerText = Color.FromArgb(165, 24, 24);

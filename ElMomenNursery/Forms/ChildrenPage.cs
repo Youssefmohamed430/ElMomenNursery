@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Text.Json;
 using Serilog;
 using ElMomenNursery.Application.DTOs;
@@ -16,6 +17,19 @@ namespace ElMomenNursery.Forms;
 internal sealed class ChildrenPage : UserControl
 {
     private static readonly ILogger _log = Log.ForContext<ChildrenPage>();
+
+    // Geometry shared by the filter card, its default grid arrangement, and the saved-layout check.
+    private const int FilterCardTop = 120;
+    private const int FilterCardPadding = 18;
+    private const int FilterCardVerticalPadding = 16;
+    private const int FilterFieldGap = 14;
+    private const int FilterFieldHeight = 58;
+    private const int FilterLabelHeight = 18;
+    private const int FilterInputTop = 24;
+    private const int FilterInputHeight = 32;
+    private const int FilterButtonGap = 10;
+    private const int MinGridTop = 370;
+    private const int MaxFilterFieldBottom = 290;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly UserSession _session;
     private readonly IExcelExportService _excelExportService;
@@ -36,55 +50,53 @@ internal sealed class ChildrenPage : UserControl
         var deleteButton = CreateActionButton("حذف طفل");
         var detailsButton = CreateActionButton("عرض الملف");
         var exportButton = CreateActionButton("تصدير القائمة");
+        var schoolAgeButton = CreateActionButton("أطفال سن المدرسة");
         addButton.Visible = _session.HasPermission("Students.Create");
         editButton.Visible = _session.HasPermission("Students.Edit");
         deleteButton.Visible = _session.HasPermission("Students.Delete");
         detailsButton.Visible = _session.HasPermission("Students.View");
         exportButton.Visible = _session.HasPermission("Students.Export");
+        schoolAgeButton.Visible = _session.HasPermission("Students.View");
         addButton.Name = "actions.add";
         editButton.Name = "actions.edit";
         deleteButton.Name = "actions.delete";
         detailsButton.Name = "actions.details";
         exportButton.Name = "actions.export";
+        schoolAgeButton.Name = "actions.school-age";
         addButton.Width = 150;
         editButton.Width = 140;
         deleteButton.Width = 126;
         detailsButton.Width = 142;
         exportButton.Width = 142;
+        schoolAgeButton.Width = 164;
         var actions = new Panel
         {
             BackColor = Color.Transparent,
             Padding = Padding.Empty
         };
 
-        var filterPanel = new Panel
+        var filterPanel = new FilterCard
         {
-            AutoScroll = true,
+            Name = "filter.card",
+            AutoScroll = false,
             RightToLeft = RightToLeft.Yes,
-            BackColor = BrandPalette.Surface,
-            Padding = new Padding(10, 6, 10, 6),
-            BorderStyle = BorderStyle.FixedSingle
+            Padding = new Padding(FilterCardPadding, FilterCardVerticalPadding, FilterCardPadding, FilterCardVerticalPadding)
         };
         var draggableControls = new Dictionary<string, Control>(StringComparer.Ordinal);
         var filterItems = new List<Control>();
-        var search = CreateSearchBox("اسم الطفل");
-        var genderFilter = CreateFilterCombo(["الكل", "ولد", "بنت"], 116);
-        var shiftFilter = CreateFilterCombo(["كل الفترات", "صباحية", "مسائية", "يوم كامل", "فترة ونصف"], 132);
+        var fieldSpans = new Dictionary<string, int>(StringComparer.Ordinal);
+        var search = CreateSearchBox("ابحث باسم الطفل...");
+        search.BorderStyle = BorderStyle.None;
+        search.Font = new Font("Segoe UI", 10.5F);
+        var searchField = CreateSearchField(search);
+        var genderFilter = CreateFilterCombo(["الكل", "ولد", "بنت"]);
+        var shiftFilter = CreateFilterCombo(["كل الفترات", "صباحية", "مسائية", "يوم كامل", "فترة ونصف"]);
         var dateOfBirthFrom = CreateOptionalDatePicker();
         var dateOfBirthTo = CreateOptionalDatePicker();
         var enrollmentFrom = CreateOptionalDatePicker();
         var enrollmentTo = CreateOptionalDatePicker();
-        var classroomFilter = new ComboBox
-        {
-            DropDownStyle = ComboBoxStyle.DropDownList,
-            Font = new Font("Segoe UI", 9.5F),
-            RightToLeft = RightToLeft.Yes,
-            Width = 150,
-            Height = 34
-        };
-        classroomFilter.Items.Add("كل الفصول");
-        classroomFilter.SelectedIndex = 0;
-        var paymentFilter = CreateFilterCombo(["كل الحالات", "دفعوا", "مدفعوش"], 142);
+        var classroomFilter = CreateFilterCombo(["كل الفصول"]);
+        var paymentFilter = CreateFilterCombo(["كل الحالات", "دفعوا", "مدفعوش"]);
         var resultCount = new Label
         {
             AutoSize = false,
@@ -95,24 +107,35 @@ internal sealed class ChildrenPage : UserControl
             RightToLeft = RightToLeft.Yes
         };
 
-        AddFilterField("filter.search", "اسم الطفل", search, 180);
-        AddFilterField("filter.gender", "النوع", genderFilter, 128);
-        AddFilterField("filter.shift", "الفترة", shiftFilter, 144);
-        AddFilterField("filter.birth-from", "الميلاد من", dateOfBirthFrom, 142);
-        AddFilterField("filter.birth-to", "الميلاد إلى", dateOfBirthTo, 142);
-        AddFilterField("filter.enrollment-from", "الالتحاق من", enrollmentFrom, 142);
-        AddFilterField("filter.enrollment-to", "الالتحاق إلى", enrollmentTo, 142);
-        AddFilterField("filter.classroom", "الفصل الحالي", classroomFilter, 158);
-        AddFilterField("filter.payment", "الاشتراك الساري", paymentFilter, 150);
+        AddFilterField("filter.search", "اسم الطفل", searchField, columnSpan: 2);
+        AddFilterField("filter.birth-from", "الميلاد من", dateOfBirthFrom);
+        AddFilterField("filter.birth-to", "الميلاد إلى", dateOfBirthTo);
+        AddFilterField("filter.enrollment-from", "الالتحاق من", enrollmentFrom);
+        AddFilterField("filter.enrollment-to", "الالتحاق إلى", enrollmentTo);
+        AddFilterField("filter.gender", "النوع", genderFilter);
+        AddFilterField("filter.shift", "الفترة", shiftFilter);
+        AddFilterField("filter.payment", "الاشتراك الساري", paymentFilter);
+        AddFilterField("filter.classroom", "الفصل الحالي", classroomFilter);
 
         var applyButton = CreateActionButton("تطبيق", primary: true);
         applyButton.Name = "filter.apply";
-        applyButton.Width = 96;
+        applyButton.Width = 118;
+        applyButton.Height = 36;
         var clearButton = CreateActionButton("مسح الفلاتر");
         clearButton.Name = "filter.clear";
-        clearButton.Width = 112;
-        AddFilterButton(applyButton);
-        AddFilterButton(clearButton);
+        clearButton.Width = 146;
+        clearButton.Height = 36;
+        clearButton.FlatAppearance.BorderColor = BrandPalette.FilterBorderStrong;
+        var filterActions = new Panel
+        {
+            Name = "filter.actions",
+            Height = FilterFieldHeight,
+            BackColor = BrandPalette.Surface
+        };
+        filterActions.Controls.Add(applyButton);
+        filterActions.Controls.Add(clearButton);
+        filterPanel.Controls.Add(filterActions);
+        RegisterDraggable(filterActions);
 
         var customizeButton = CreateActionButton("تخصيص الشاشة");
         customizeButton.Name = "layout.customize";
@@ -121,7 +144,7 @@ internal sealed class ChildrenPage : UserControl
         resetLayoutButton.Name = "layout.reset";
         resetLayoutButton.Width = 150;
         resetLayoutButton.Visible = false;
-        actions.Controls.AddRange([addButton, editButton, deleteButton, detailsButton, exportButton, customizeButton, resetLayoutButton]);
+        actions.Controls.AddRange([addButton, editButton, deleteButton, detailsButton, exportButton, schoolAgeButton, customizeButton, resetLayoutButton]);
 
         var grid = CreateGrid([
             "المعرف", "اسم الطفل", "العنوان", "تاريخ الالتحاق", "تاريخ الميلاد", "النوع", "الفترة",
@@ -146,8 +169,16 @@ internal sealed class ChildrenPage : UserControl
 
         var isCustomizing = false;
         var savedLayout = LoadSavedLayout();
-        var hasCustomLayout = savedLayout.Count > 0;
+        var hasCustomLayout = savedLayout.Count > 0
+            && savedLayout.TryGetValue("children.grid", out var savedGridBounds)
+            && savedGridBounds.Length == 4
+            && savedGridBounds[1] >= MinGridTop
+            && filterItems.All(item => savedLayout.TryGetValue(item.Name, out var bounds)
+                && bounds.Length == 4
+                && bounds[3] >= FilterFieldHeight
+                && bounds[1] + bounds[3] <= MaxFilterFieldBottom);
         var loadInProgress = false;
+        var defaultGridTop = MinGridTop;
         AttachDraggableControls();
 
         addButton.Click += (_, _) => RunSafeEvent(async () =>
@@ -265,6 +296,28 @@ internal sealed class ChildrenPage : UserControl
         {
             if (!isCustomizing) await GridExcelExport.SaveAsync(this, grid, _excelExportService, "تصدير قائمة الأطفال", "الأطفال");
         };
+        schoolAgeButton.Click += (_, _) => RunSafeEvent(async () =>
+        {
+            if (isCustomizing) return;
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            var cutoff = new DateOnly(today.Year, 10, 1);
+            if (today > cutoff) cutoff = cutoff.AddYears(1);
+            var firstBirthDate = cutoff.AddYears(-7).AddDays(1);
+            var lastBirthDate = cutoff.AddYears(-6);
+
+            search.Clear();
+            genderFilter.SelectedIndex = 0;
+            shiftFilter.SelectedIndex = 0;
+            enrollmentFrom.Checked = false;
+            enrollmentTo.Checked = false;
+            classroomFilter.SelectedIndex = 0;
+            paymentFilter.SelectedIndex = 0;
+            dateOfBirthFrom.Value = firstBirthDate.ToDateTime(TimeOnly.MinValue);
+            dateOfBirthFrom.Checked = true;
+            dateOfBirthTo.Value = lastBirthDate.ToDateTime(TimeOnly.MinValue);
+            dateOfBirthTo.Checked = true;
+            await LoadChildrenAsync();
+        }, "Load children turning six by the next October cutoff");
 
         applyButton.Click += (_, _) => RunSafeEvent(async () => { if (!isCustomizing) await LoadChildrenAsync(); }, "Apply child filters");
         clearButton.Click += (_, _) => RunSafeEvent(async () =>
@@ -328,37 +381,55 @@ internal sealed class ChildrenPage : UserControl
         _ = RunSafeAsync(LoadChildrenAsync, "Load children");
         return page;
 
-        void AddFilterField(string controlName, string labelText, Control control, int width)
+        void AddFilterField(string controlName, string labelText, Control control, int columnSpan = 1)
         {
-            var group = new Panel { Name = controlName, Width = width, Height = 56, BackColor = Color.Transparent, Margin = new Padding(3, 0, 3, 0) };
+            var group = new Panel
+            {
+                Name = controlName,
+                Height = FilterFieldHeight,
+                BackColor = BrandPalette.Surface,
+                Margin = Padding.Empty
+            };
             var label = new Label
             {
                 Text = labelText,
                 Location = new Point(0, 0),
-                Width = width,
-                Height = 20,
-                ForeColor = BrandPalette.Text,
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                TextAlign = ContentAlignment.MiddleRight,
-                RightToLeft = RightToLeft.Yes
+                Height = FilterLabelHeight,
+                ForeColor = BrandPalette.MutedText,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                // In an RTL container WinForms mirrors label alignment, so MiddleLeft renders at the physical right edge.
+                TextAlign = ContentAlignment.MiddleLeft,
+                RightToLeft = RightToLeft.Yes,
+                AutoEllipsis = true
             };
-            control.Location = new Point(0, 21);
-            control.Width = width;
-            control.Height = 32;
+            var inputHeight = Math.Min(FilterInputHeight, control.PreferredSize.Height);
+            if (inputHeight <= 0) inputHeight = FilterInputHeight;
+            control.Height = inputHeight;
+            control.Location = new Point(0, FilterInputTop + (FilterInputHeight - inputHeight) / 2);
             group.Controls.Add(control);
             group.Controls.Add(label);
             filterPanel.Controls.Add(group);
             filterItems.Add(group);
+            fieldSpans[controlName] = Math.Max(1, columnSpan);
             RegisterDraggable(group);
         }
 
-        void AddFilterButton(Button button)
+        void ResizeFilterField(Control group)
         {
-            button.Height = 40;
-            button.Margin = new Padding(5, 18, 5, 0);
-            filterPanel.Controls.Add(button);
-            filterItems.Add(button);
-            RegisterDraggable(button);
+            foreach (Control child in group.Controls)
+                child.Width = group.Width;
+        }
+
+        void ArrangeFilterActions(Rectangle block)
+        {
+            filterActions.SetBounds(block.X, block.Y, block.Width, block.Height);
+            // Each action takes one grid cell, so the action row keeps the rhythm of the field rows.
+            var buttonWidth = Math.Max(96, (block.Width - FilterButtonGap) / 2);
+            applyButton.Width = buttonWidth;
+            clearButton.Width = buttonWidth;
+            var buttonTop = FilterInputTop + (FilterInputHeight - applyButton.Height) / 2;
+            applyButton.SetBounds(0, buttonTop, applyButton.Width, applyButton.Height);
+            clearButton.SetBounds(applyButton.Right + FilterButtonGap, buttonTop, clearButton.Width, clearButton.Height);
         }
 
         async Task LoadChildrenAsync()
@@ -490,16 +561,20 @@ internal sealed class ChildrenPage : UserControl
         void LayoutChildrenPage()
         {
             LayoutDataHeader(page);
-            var leftMargin = 34;
-            var rightMargin = 34;
-            filterPanel.SetBounds(leftMargin, 120, Math.Max(300, page.ClientSize.Width - leftMargin - rightMargin), 72);
-            actions.SetBounds(leftMargin, 204, Math.Max(300, page.ClientSize.Width - leftMargin - rightMargin), 44);
-            resultCount.SetBounds(leftMargin, 252, 280, 26);
-            var gridTop = 282;
-            grid.SetBounds(leftMargin, gridTop, Math.Max(300, page.ClientSize.Width - leftMargin - rightMargin), Math.Max(220, page.ClientSize.Height - gridTop - 24));
+            const int leftMargin = 34;
+            const int rightMargin = 34;
+            var contentWidth = Math.Max(300, page.ClientSize.Width - leftMargin - rightMargin);
+            filterPanel.SetBounds(leftMargin, FilterCardTop, contentWidth, filterPanel.Height);
+            if (!isCustomizing)
+                ArrangeDefaultFilterItems();
+            var actionsTop = filterPanel.Bottom + 16;
+            actions.SetBounds(leftMargin, actionsTop, contentWidth, 44);
+            resultCount.SetBounds(leftMargin, actionsTop + 50, 280, 26);
+            var gridTop = actionsTop + 84;
+            defaultGridTop = gridTop;
+            grid.SetBounds(leftMargin, gridTop, contentWidth, Math.Max(220, page.ClientSize.Height - gridTop - 24));
             if (!isCustomizing)
             {
-                ArrangeDefaultFilterItems();
                 ArrangeDefaultActions();
                 if (hasCustomLayout)
                     ApplySavedLayout();
@@ -511,19 +586,54 @@ internal sealed class ChildrenPage : UserControl
 
         void ArrangeDefaultFilterItems()
         {
-            var x = 10;
+            // Fields flow from right to left (RTL reading order), one row at a time.
+            var innerWidth = Math.Max(240, filterPanel.ClientSize.Width - filterPanel.Padding.Horizontal);
+            var columns = innerWidth >= 1000 ? 6 : innerWidth >= 800 ? 4 : innerWidth >= 620 ? 3 : 2;
+            var cellWidth = (innerWidth - FilterFieldGap * (columns - 1)) / columns;
+            var column = 0;
+            var row = 0;
+            var lastRow = 0;
+
+            Point PlaceSlot(int span, out int slotWidth)
+            {
+                if (column + span > columns)
+                {
+                    row++;
+                    column = 0;
+                }
+                slotWidth = cellWidth * span + FilterFieldGap * (span - 1);
+                var location = new Point(
+                    filterPanel.Padding.Left + (columns - column - span) * (cellWidth + FilterFieldGap),
+                    filterPanel.Padding.Top + row * (FilterFieldHeight + FilterFieldGap));
+                column += span;
+                lastRow = Math.Max(lastRow, row);
+                if (column >= columns)
+                {
+                    row++;
+                    column = 0;
+                }
+                return location;
+            }
+
             foreach (var item in filterItems)
             {
-                item.SetBounds(x, Math.Max(0, (filterPanel.ClientSize.Height - item.Height) / 2), item.Width, item.Height);
-                x += item.Width + 6;
+                var span = fieldSpans.TryGetValue(item.Name, out var configuredSpan) ? Math.Min(configuredSpan, columns) : 1;
+                var location = PlaceSlot(span, out var slotWidth);
+                item.SetBounds(location.X, location.Y, slotWidth, FilterFieldHeight);
+                ResizeFilterField(item);
             }
-            filterPanel.AutoScrollMinSize = new Size(x + 10, 0);
+
+            var actionsLocation = PlaceSlot(Math.Min(2, columns), out var actionsWidth);
+            ArrangeFilterActions(new Rectangle(actionsLocation.X, actionsLocation.Y, actionsWidth, FilterFieldHeight));
+
+            var rows = lastRow + 1;
+            filterPanel.Height = filterPanel.Padding.Vertical + rows * FilterFieldHeight + (rows - 1) * FilterFieldGap;
         }
 
         void ArrangeDefaultActions()
         {
             var right = actions.ClientSize.Width - 8;
-            foreach (var button in new[] { addButton, editButton, deleteButton, detailsButton, exportButton })
+            foreach (var button in new[] { addButton, editButton, deleteButton, detailsButton, exportButton, schoolAgeButton })
             {
                 right -= button.Width;
                 button.SetBounds(right, 1, button.Width, 42);
@@ -577,7 +687,7 @@ internal sealed class ChildrenPage : UserControl
                     ? Math.Min(resetLayoutButton.Visible ? resetLayoutButton.Right + 8 : customizeButton.Right + 8,
                         Math.Max(0, actions.ClientSize.Width - root.Width))
                     : 0;
-                var minY = root == grid ? Math.Min(282, Math.Max(0, page.ClientSize.Height - root.Height)) : 0;
+                var minY = root == grid ? Math.Min(defaultGridTop, Math.Max(0, page.ClientSize.Height - root.Height)) : 0;
                 var x = Math.Clamp(point.X - offset.X, minX, Math.Max(minX, root.Parent.ClientSize.Width - root.Width));
                 var y = Math.Clamp(point.Y - offset.Y, minY, Math.Max(minY, root.Parent.ClientSize.Height - root.Height));
                 root.Location = new Point(x, y);
@@ -645,15 +755,15 @@ internal sealed class ChildrenPage : UserControl
             "تخصيص شاشة الأطفال", MessageBoxButtons.OK, MessageBoxIcon.Error,
             MessageBoxDefaultButton.Button1, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
 
-        static ComboBox CreateFilterCombo(string[] options, int width)
+        static ComboBox CreateFilterCombo(string[] options)
         {
             var combo = new ComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 9.5F),
+                BackColor = BrandPalette.Surface,
+                Font = new Font("Segoe UI", 10.5F),
                 RightToLeft = RightToLeft.Yes,
-                Width = width,
-                Height = 34
+                Height = FilterInputHeight
             };
             combo.Items.AddRange(options);
             combo.SelectedIndex = 0;
@@ -666,11 +776,88 @@ internal sealed class ChildrenPage : UserControl
             CustomFormat = "dd/MM/yyyy",
             ShowCheckBox = true,
             Checked = false,
-            Font = new Font("Segoe UI", 8.5F),
+            Font = new Font("Segoe UI", 10F),
             Width = 142,
-            Height = 30
+            Height = FilterInputHeight
         };
+
+        static Control CreateSearchField(TextBox textBox)
+        {
+            var host = new Panel
+            {
+                BorderStyle = BorderStyle.FixedSingle,
+                BackColor = BrandPalette.Surface,
+                Height = FilterInputHeight
+            };
+            var icon = new Panel { BackColor = BrandPalette.Surface, Width = 30, Height = FilterInputHeight };
+            icon.Paint += (_, eventArgs) => PaintSearchIcon(eventArgs.Graphics, icon.ClientSize);
+            host.Controls.Add(icon);
+            host.Controls.Add(textBox);
+
+            void ArrangeChildren()
+            {
+                icon.SetBounds(Math.Max(0, host.ClientSize.Width - icon.Width), 0, icon.Width, host.ClientSize.Height);
+                var textHeight = Math.Min(textBox.PreferredHeight, host.ClientSize.Height);
+                textBox.SetBounds(4, Math.Max(0, (host.ClientSize.Height - textHeight) / 2),
+                    Math.Max(40, host.ClientSize.Width - icon.Width - 8), textHeight);
+            }
+
+            host.Resize += (_, _) => ArrangeChildren();
+            ArrangeChildren();
+            return host;
+        }
+
+        static void PaintSearchIcon(Graphics graphics, Size area)
+        {
+            graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using var pen = new Pen(BrandPalette.MutedText, 1.6F) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+            const int diameter = 11;
+            var x = (area.Width - diameter) / 2 - 1;
+            var y = (area.Height - diameter) / 2 - 1;
+            graphics.DrawEllipse(pen, x, y, diameter, diameter);
+            graphics.DrawLine(pen, x + diameter - 1, y + diameter - 1, x + diameter + 3, y + diameter + 3);
+        }
     }
+
+    /// <summary>
+    /// Rounded filter surface used only by the children screen filter section.
+    /// </summary>
+    private sealed class FilterCard : Panel
+    {
+        private const int CornerRadius = 12;
+
+        public FilterCard()
+        {
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint
+                | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+            BackColor = BrandPalette.AppBackground;
+        }
+
+        protected override void OnPaint(PaintEventArgs eventArgs)
+        {
+            var bounds = new Rectangle(0, 0, Math.Max(1, Width - 1), Math.Max(1, Height - 1));
+            using var path = CreateRoundedRectangle(bounds, CornerRadius);
+            eventArgs.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using var fill = new SolidBrush(BrandPalette.Surface);
+            eventArgs.Graphics.FillPath(fill, path);
+            using var border = new Pen(BrandPalette.Border);
+            eventArgs.Graphics.DrawPath(border, path);
+            base.OnPaint(eventArgs);
+        }
+
+        private static GraphicsPath CreateRoundedRectangle(Rectangle bounds, int radius)
+        {
+            var diameter = radius * 2;
+            var path = new GraphicsPath();
+            path.AddArc(bounds.Left, bounds.Top, diameter, diameter, 180, 90);
+            path.AddArc(bounds.Right - diameter, bounds.Top, diameter, diameter, 270, 90);
+            path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90);
+            path.AddArc(bounds.Left, bounds.Bottom - diameter, diameter, diameter, 90, 90);
+            path.CloseFigure();
+            return path;
+        }
+    }
+
     private static async Task RunSafeAsync(Func<Task> work, string operation)
     {
         try { await work(); }
