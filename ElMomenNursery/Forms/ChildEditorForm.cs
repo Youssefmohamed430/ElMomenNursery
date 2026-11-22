@@ -3,6 +3,7 @@ using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Controls;
 using ElMomenNursery.Domain.Enums;
 using ElMomenNursery.Domain.Entities;
+using ElMomenNursery.Application.Abstractions.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
@@ -22,6 +23,7 @@ public sealed class ChildEditorForm : Form
     private readonly DateTimePicker _enrollmentDate = CreateDatePicker();
     private readonly ComboBox _gender = CreateGenderPicker();
     private readonly ComboBox _shift = CreateShiftPicker();
+    private readonly ComboBox _classroom = new() { DropDownStyle = ComboBoxStyle.DropDownList, Height = 34 };
     private readonly TextBox _fatherName = CreateTextBox(100);
     private readonly TextBox _fatherOccupation = CreateTextBox(100);
     private readonly TextBox _fatherPhone = CreateTextBox(50);
@@ -68,6 +70,7 @@ public sealed class ChildEditorForm : Form
             AddPair(table, "اسم الطفل *", _fullName, "النوع *", _gender);
             AddPair(table, "تاريخ الميلاد *", _dateOfBirth, "تاريخ الالتحاق *", _enrollmentDate);
             AddSingle(table, "الفترة *", _shift);
+            AddSingle(table, "الفصل (اختياري)", _classroom);
             AddSingle(table, "العنوان *", _address);
         }));
         sections.Controls.Add(CreateSection("بيانات الأب", table =>
@@ -117,6 +120,7 @@ public sealed class ChildEditorForm : Form
 
         if (child is not null)
             Populate(child);
+        Shown += async (_, _) => await LoadClassroomsAsync();
     }
 
     private void Populate(ChildDto child)
@@ -252,6 +256,8 @@ public sealed class ChildEditorForm : Form
                 }
             }
 
+            await SaveClassroomAssignmentAsync(childId, enrollmentDate);
+
             if (IsDisposed) return;
             DialogResult = DialogResult.OK;
             Close();
@@ -285,6 +291,61 @@ public sealed class ChildEditorForm : Form
                 _saveButton.Enabled = true;
         }
     }
+
+    private async Task LoadClassroomsAsync()
+    {
+        try
+        {
+            await using var scope = _scopes.CreateAsyncScope();
+            var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+            _classroom.Items.Clear();
+            _classroom.Items.Add(new ClassroomOption(null, "بدون فصل"));
+            foreach (var room in await uow.Repository<Classroom>().Query().Where(x => x.IsActive).OrderBy(x => x.Name).ToListAsync())
+                _classroom.Items.Add(new ClassroomOption(room.Id, room.Name));
+            _classroom.SelectedIndex = 0;
+            if (_child is not null)
+            {
+                var enrollment = await uow.Repository<ChildClassEnrollment>().Query()
+                    .Where(x => x.ChildId == _child.Id && x.StartDate <= DateOnly.FromDateTime(DateTime.Today) && (x.EndDate == null || x.EndDate >= DateOnly.FromDateTime(DateTime.Today)))
+                    .OrderByDescending(x => x.StartDate).FirstOrDefaultAsync();
+                for (var index = 0; index < _classroom.Items.Count; index++)
+                    if (_classroom.Items[index] is ClassroomOption option && option.Id == enrollment?.ClassroomId) _classroom.SelectedIndex = index;
+            }
+        }
+        catch (Exception exception) { _log.Warning(exception, "Unable to load classroom choices for child form"); }
+    }
+
+    private async Task SaveClassroomAssignmentAsync(Guid childId, DateOnly startDate)
+    {
+        var requestedId = (_classroom.SelectedItem as ClassroomOption)?.Id;
+        await using var scope = _scopes.CreateAsyncScope();
+        var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var current = await uow.Repository<ChildClassEnrollment>().Query(false)
+            .Where(x => x.ChildId == childId && x.StartDate <= today && (x.EndDate == null || x.EndDate >= today)).ToListAsync();
+        if (current.Any(x => x.ClassroomId == requestedId)) return;
+        foreach (var enrollment in current) enrollment.EndDate = today;
+        if (requestedId.HasValue)
+        {
+            var room = await uow.Repository<Classroom>().FirstOrDefaultAsync(x => x.Id == requestedId.Value, asNoTracking: false);
+            var child = await uow.Repository<Child>().FirstOrDefaultAsync(x => x.Id == childId, asNoTracking: false);
+            if (room is not null && child is not null)
+            {
+                var effectiveStartDate = _child is null ? startDate : today;
+                var repository = uow.Repository<ChildClassEnrollment>();
+                var sameDayEnrollment = await repository.FirstOrDefaultAsync(
+                    x => x.ChildId == childId && x.ClassroomId == room.Id && x.StartDate == effectiveStartDate,
+                    asNoTracking: false);
+                if (sameDayEnrollment is not null)
+                    sameDayEnrollment.EndDate = null;
+                else
+                    await repository.AddAsync(new ChildClassEnrollment { ChildId = childId, ClassroomId = room.Id, StartDate = effectiveStartDate, Child = child, Classroom = room });
+            }
+        }
+        await uow.SaveChangesAsync();
+    }
+
+    private sealed record ClassroomOption(Guid? Id, string Name) { public override string ToString() => Name; }
 
     private async void RunSafeEvent(Func<Task> work, string operation)
     {

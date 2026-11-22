@@ -17,6 +17,7 @@ public sealed class SubscriptionsPage : UserControl
     private readonly TextBox _search = new() { Width = 170, PlaceholderText = "بحث باسم الطفل", RightToLeft = RightToLeft.Yes };
     private readonly ComboBox _status = new() { Width = 130, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly ComboBox _plan = new() { Width = 150, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly ComboBox _classroom = new() { Width = 150, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly DateTimePicker _from = new() { Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy", ShowCheckBox = true, Width = 135 };
     private readonly DateTimePicker _to = new() { Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy", ShowCheckBox = true, Width = 135 };
     private readonly CheckBox _balance = new() { Text = "عليه متبقي فقط", AutoSize = true };
@@ -37,6 +38,7 @@ public sealed class SubscriptionsPage : UserControl
         _scopes = scopes; _session = session; _excel = excel; Dock = DockStyle.Fill; Padding = new Padding(10); RightToLeft = RightToLeft.Yes; BackColor = Color.White;
         _status.Items.AddRange(["الكل", "مستحق", "مدفوع جزئيًا", "مدفوع", "ملغي", "معفى"]); _status.SelectedIndex = 0;
         _plan.Items.Add(new PlanChoice(null, "كل الخطط")); _plan.SelectedIndex = 0;
+        _classroom.Items.Add(new ClassroomFilterOptionDto(Guid.Empty, "كل الفصول")); _classroom.SelectedIndex = 0;
         _from.Checked = false;
         _to.Checked = false;
         _grid.Columns.AddRange([new DataGridViewTextBoxColumn { HeaderText = "الطفل" }, new DataGridViewTextBoxColumn { HeaderText = "الخطة" },
@@ -48,19 +50,19 @@ public sealed class SubscriptionsPage : UserControl
         var filter = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft, WrapContents = true, AutoScroll = true };
         var apply = Button("تطبيق"); var clear = Button("مسح الفلاتر"); var refresh = Button("تحديث");
         _invoice.Visible = session.HasPermission("Payments.Create");
-        filter.Controls.AddRange([_search, _status, _plan, _from, _to, _balance, apply, clear, refresh, _add, _invoice, _edit, _pay, _cancel, _delete, _receipt, _export]);
+        filter.Controls.AddRange([_search, _status, _plan, _classroom, _from, _to, _balance, apply, clear, refresh, _add, _invoice, _edit, _pay, _cancel, _delete, _receipt, _export]);
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 102)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         layout.Controls.Add(filter, 0, 0); layout.Controls.Add(_summary, 0, 1); layout.Controls.Add(_grid, 0, 2); Controls.Add(layout);
         apply.Click += async (_, _) => await LoadAsync(); refresh.Click += async (_, _) => await LoadAsync();
-        clear.Click += async (_, _) => { _search.Clear(); _status.SelectedIndex = 0; _plan.SelectedIndex = 0; _from.Checked = _to.Checked = false; _balance.Checked = false; await LoadAsync(); };
+        clear.Click += async (_, _) => { _search.Clear(); _status.SelectedIndex = 0; _plan.SelectedIndex = 0; _classroom.SelectedIndex = 0; _from.Checked = _to.Checked = false; _balance.Checked = false; await LoadAsync(); };
         _add.Click += async (_, _) => await EditAsync(null); _edit.Click += async (_, _) => { if (Selected() is { } row) await EditAsync(row); };
         _invoice.Click += async (_, _) => { using var form = new CashierInvoiceForm(_scopes); if (form.ShowDialog(FindForm()) == DialogResult.OK) await LoadAsync(); };
         _cancel.Click += async (_, _) => await CancelAsync(); _delete.Click += async (_, _) => await DeleteAsync();
         _pay.Click += async (_, _) => await RecordPaymentAsync(); _receipt.Click += async (_, _) => await PrintAsync();
         _export.Click += async (_, _) => await GridExcelExport.SaveAsync((IWin32Window?)FindForm() ?? this, _grid, _excel, "تصدير الاشتراكات", "الاشتراكات");
         _grid.SelectionChanged += (_, _) => UpdateActions(); _grid.KeyDown += async (_, e) => { if (e.KeyCode == Keys.F5) { e.Handled = true; await LoadAsync(); } };
-        Load += async (_, _) => { await LoadPlansAsync(); await LoadAsync(); };
+        Load += async (_, _) => { await LoadPlansAsync(); await LoadClassroomsAsync(); await LoadAsync(); };
     }
 
     private async Task LoadPlansAsync()
@@ -68,6 +70,22 @@ public sealed class SubscriptionsPage : UserControl
         try { await using var s = _scopes.CreateAsyncScope(); var svc = s.ServiceProvider.GetRequiredService<ISubscriptionService>(); var res = await svc.GetPlansAsync();
             if (res.IsFailure) return; foreach (var plan in res.Value) _plan.Items.Add(new PlanChoice(plan.Id, plan.Name)); }
         catch { ShowError("تعذر تحميل خطط الاشتراك."); }
+    }
+
+    private async Task LoadClassroomsAsync()
+    {
+        try
+        {
+            await using var scope = _scopes.CreateAsyncScope();
+            var service = scope.ServiceProvider.GetRequiredService<ISubscriptionService>();
+            var result = await service.GetClassroomsForFilterAsync();
+            if (result.IsFailure) return;
+            _classroom.Items.Clear();
+            _classroom.Items.Add(new ClassroomFilterOptionDto(Guid.Empty, "كل الفصول"));
+            foreach (var classroom in result.Value) _classroom.Items.Add(classroom);
+            _classroom.SelectedIndex = 0;
+        }
+        catch { ShowError("تعذر تحميل قائمة الفصول."); }
     }
 
     private async Task LoadAsync()
@@ -78,6 +96,7 @@ public sealed class SubscriptionsPage : UserControl
             var status = _status.SelectedItem?.ToString() switch { "مستحق" => SubscriptionStatus.Pending, "مدفوع جزئيًا" => SubscriptionStatus.PartiallyPaid, "مدفوع" => SubscriptionStatus.Paid, "ملغي" => SubscriptionStatus.Cancelled, "معفى" => SubscriptionStatus.Waived, _ => (SubscriptionStatus?)null };
             await using var scope = _scopes.CreateAsyncScope(); var svc = scope.ServiceProvider.GetRequiredService<ISubscriptionService>();
             var result = await svc.GetSubscriptionsAsync(new SubscriptionFilter { SearchText = _search.Text, Status = status, PlanId = (_plan.SelectedItem as PlanChoice)?.Id,
+                ClassroomId = (_classroom.SelectedItem as ClassroomFilterOptionDto)?.Id is Guid id && id != Guid.Empty ? id : null,
                 PeriodFrom = _from.Checked ? DateOnly.FromDateTime(_from.Value) : null, PeriodTo = _to.Checked ? DateOnly.FromDateTime(_to.Value) : null, OnlyWithBalance = _balance.Checked });
             if (IsDisposed || version != _loadVersion) return;
             if (result.IsFailure) { ShowError(result.Error.Description); return; } _rows = result.Value.ToList(); Render(selected);

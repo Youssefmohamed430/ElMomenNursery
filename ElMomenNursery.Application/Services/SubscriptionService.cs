@@ -30,6 +30,12 @@ public sealed class SubscriptionService : ISubscriptionService
     {
         if (!Allowed("Subscriptions.View")) return SubscriptionErrors.PermissionDenied;
         IQueryable<Subscription> q = unitOfWork.Repository<Subscription>().Query().Include(x => x.Child).Include(x => x.SubscriptionPlan);
+        if (filter.ClassroomId is Guid classroomId)
+        {
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            q = q.Where(x => x.Child.ClassEnrollments.Any(enrollment => enrollment.ClassroomId == classroomId &&
+                enrollment.StartDate <= today && (enrollment.EndDate == null || enrollment.EndDate >= today)));
+        }
         if (filter.Status is not null) q = q.Where(x => x.Status == filter.Status);
         if (filter.PlanId is Guid plan) q = q.Where(x => x.SubscriptionPlanId == plan);
         if (filter.PeriodFrom is DateOnly from) q = q.Where(x => x.PeriodEnd >= from);
@@ -47,6 +53,15 @@ public sealed class SubscriptionService : ISubscriptionService
             .Where(x => !filter.OnlyWithBalance || x.RemainingAmount > 0)
             .OrderBy(x => x.PeriodStart).ThenBy(x => x.ChildName, StringComparer.CurrentCulture).ToArray();
         return Result.Success<IReadOnlyList<SubscriptionDto>>(result);
+    }
+
+    public async Task<Result<IReadOnlyList<ClassroomFilterOptionDto>>> GetClassroomsForFilterAsync(CancellationToken cancellationToken = default)
+    {
+        if (!Allowed("Subscriptions.View")) return SubscriptionErrors.PermissionDenied;
+        var rows = await unitOfWork.Repository<Classroom>().Query()
+            .Where(x => x.IsActive).OrderBy(x => x.Name)
+            .Select(x => new ClassroomFilterOptionDto(x.Id, x.Name)).ToListAsync(cancellationToken);
+        return Result.Success<IReadOnlyList<ClassroomFilterOptionDto>>(rows);
     }
 
     public async Task<Result<SubscriptionDto>> GetSubscriptionByIdAsync(Guid id, CancellationToken ct = default)

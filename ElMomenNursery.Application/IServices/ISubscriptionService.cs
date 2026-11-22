@@ -6,6 +6,7 @@ namespace ElMomenNursery.Application.IServices;
 public interface ISubscriptionService
 {
     Task<Result<IReadOnlyList<SubscriptionDto>>> GetSubscriptionsAsync(SubscriptionFilter filter, CancellationToken cancellationToken = default);
+    Task<Result<IReadOnlyList<ClassroomFilterOptionDto>>> GetClassroomsForFilterAsync(CancellationToken cancellationToken = default);
     Task<Result<SubscriptionDto>> GetSubscriptionByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<Result<IReadOnlyList<SubscriptionDto>>> GetSubscriptionsForChildAsync(Guid childId, CancellationToken cancellationToken = default);
     Task<Result<IReadOnlyList<ChildLookupDto>>> GetChildLookupAsync(string? search, CancellationToken cancellationToken = default);
