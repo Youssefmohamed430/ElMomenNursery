@@ -30,6 +30,8 @@ internal sealed class EmployeesPage : UserControl
     {
         var page = CreateDataPage("الموظفون", "إدارة بيانات الموظفين والبحث فيها.", includePrototypeBanner: false);
         var search = CreateSearchBox("بحث بالاسم أو الرقم القومي أو الوظيفة");
+        var filters = new FilterCard { Name = "employees.filters" };
+        filters.AddField("employees.search", "بحث عن موظف", search, columnSpan: 3);
         var addButton = CreateActionButton("إضافة موظف", primary: true);
         var editButton = CreateActionButton("تعديل البيانات");
         var deleteButton = CreateActionButton("حذف موظف");
@@ -119,7 +121,9 @@ internal sealed class EmployeesPage : UserControl
             }
         }, "Delete employee");
 
-        page.Controls.AddRange([search, addButton, editButton, deleteButton, exportButton, resultCount, grid]);
+        var toolbar = new ActionToolbar { Name = "employees.actions" };
+        toolbar.Add(addButton, editButton, deleteButton, exportButton);
+        page.Controls.AddRange([filters, toolbar, resultCount, grid]);
         page.Resize += (_, _) => LayoutEmployeesPage();
         LayoutEmployeesPage();
         _ = RunSafeAsync(LoadEmployeesAsync, "Load employees");
@@ -216,14 +220,10 @@ internal sealed class EmployeesPage : UserControl
         {
             LayoutDataHeader(page);
             var width = page.ClientSize.Width - 68;
-            var y = 190;
-            search.SetBounds(34, y, Math.Max(220, width - 720), 42);
-            addButton.SetBounds(page.ClientSize.Width - 34 - 145, y, 145, 42);
-            editButton.SetBounds(addButton.Left - 150, y, 142, 42);
-            deleteButton.SetBounds(editButton.Left - 142, y, 134, 42);
-            exportButton.SetBounds(deleteButton.Left - 142, y, 134, 42);
-            resultCount.SetBounds(34, 236, 300, 26);
-            grid.SetBounds(34, 266, width, Math.Max(220, page.ClientSize.Height - 300));
+            filters.SetBounds(34, 120, width, filters.Height); filters.Arrange();
+            toolbar.SetBounds(34, filters.Bottom + 10, width, toolbar.ArrangeItems(width));
+            resultCount.SetBounds(34, toolbar.Bottom + 2, width, 26);
+            grid.SetBounds(34, resultCount.Bottom + 4, width, Math.Max(160, page.ClientSize.Height - resultCount.Bottom - 34));
         }
 
         static string GetMaritalStatusName(MaritalStatus status) => status switch

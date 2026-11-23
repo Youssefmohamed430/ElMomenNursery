@@ -4,6 +4,7 @@ using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Domain.Enums;
 using ElMomenNursery.Domain.Abstractions;
 using ElMomenNursery.Controls;
+using ElMomenNursery.Styling;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ElMomenNursery.Forms;
@@ -35,7 +36,7 @@ public sealed class SubscriptionsPage : UserControl
 
     public SubscriptionsPage(IServiceScopeFactory scopes, UserSession session, IExcelExportService excel)
     {
-        _scopes = scopes; _session = session; _excel = excel; Dock = DockStyle.Fill; Padding = new Padding(10); RightToLeft = RightToLeft.Yes; BackColor = Color.White;
+        _scopes = scopes; _session = session; _excel = excel; Dock = DockStyle.Fill; Padding = new Padding(10); RightToLeft = RightToLeft.Yes; BackColor = BrandPalette.AppBackground;
         _status.Items.AddRange(["الكل", "مستحق", "مدفوع جزئيًا", "مدفوع", "ملغي", "معفى"]); _status.SelectedIndex = 0;
         _plan.Items.Add(new PlanChoice(null, "كل الخطط")); _plan.SelectedIndex = 0;
         _classroom.Items.Add(new ClassroomFilterOptionDto(Guid.Empty, "كل الفصول")); _classroom.SelectedIndex = 0;
@@ -47,13 +48,29 @@ public sealed class SubscriptionsPage : UserControl
             new DataGridViewTextBoxColumn { HeaderText = "ملاحظات" }, new DataGridViewTextBoxColumn { HeaderText = "تاريخ الإضافة" }, new DataGridViewTextBoxColumn { Visible = false }]);
         _add.Visible = session.HasPermission("Subscriptions.Manage"); _edit.Visible = _cancel.Visible = _delete.Visible = session.HasPermission("Subscriptions.Manage");
         _pay.Visible = session.HasPermission("Payments.Create"); _receipt.Visible = session.HasPermission("Payments.View"); _export.Visible = session.HasPermission("Subscriptions.Export");
-        var filter = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft, WrapContents = true, AutoScroll = true };
         var apply = Button("تطبيق"); var clear = Button("مسح الفلاتر"); var refresh = Button("تحديث");
         _invoice.Visible = session.HasPermission("Payments.Create");
-        filter.Controls.AddRange([_search, _status, _plan, _classroom, _from, _to, _balance, apply, clear, refresh, _add, _invoice, _edit, _pay, _cancel, _delete, _receipt, _export]);
-        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 102)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        layout.Controls.Add(filter, 0, 0); layout.Controls.Add(_summary, 0, 1); layout.Controls.Add(_grid, 0, 2); Controls.Add(layout);
+        var filter = new FilterCard { Name = "subscriptions.filters" };
+        filter.AddField("subscriptions.search", "اسم الطفل", _search, 2);
+        filter.AddField("subscriptions.status", "حالة الاشتراك", _status);
+        filter.AddField("subscriptions.plan", "الخطة", _plan);
+        filter.AddField("subscriptions.classroom", "الفصل", _classroom);
+        filter.AddGroup("subscriptions.period", "فترة الاشتراك", 2, _from, _to);
+        filter.AddField("subscriptions.balance", "الرصيد", _balance);
+        filter.AddActions(apply, clear);
+        var toolbar = new ActionToolbar { Name = "subscriptions.actions" };
+        toolbar.Add(refresh, _add, _invoice, _edit, _pay, _cancel, _delete, _receipt, _export);
+        _grid.Dock = DockStyle.None; _summary.Dock = DockStyle.None;
+        Controls.Add(_grid); Controls.Add(_summary); Controls.Add(toolbar); Controls.Add(filter);
+        Resize += (_, _) => LayoutContent(); LayoutContent();
+        void LayoutContent()
+        {
+            var margin = 8; var width = Math.Max(240, ClientSize.Width - margin * 2);
+            filter.SetBounds(margin, margin, width, filter.Height); filter.Arrange();
+            toolbar.SetBounds(margin, filter.Bottom + 10, width, toolbar.ArrangeItems(width));
+            _summary.SetBounds(margin, toolbar.Bottom + 4, width, 34);
+            _grid.SetBounds(margin, _summary.Bottom + 4, width, Math.Max(140, ClientSize.Height - _summary.Bottom - margin));
+        }
         apply.Click += async (_, _) => await LoadAsync(); refresh.Click += async (_, _) => await LoadAsync();
         clear.Click += async (_, _) => { _search.Clear(); _status.SelectedIndex = 0; _plan.SelectedIndex = 0; _classroom.SelectedIndex = 0; _from.Checked = _to.Checked = false; _balance.Checked = false; await LoadAsync(); };
         _add.Click += async (_, _) => await EditAsync(null); _edit.Click += async (_, _) => { if (Selected() is { } row) await EditAsync(row); };

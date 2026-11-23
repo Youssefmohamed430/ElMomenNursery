@@ -4,6 +4,7 @@ using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Controls;
 using ElMomenNursery.Domain.Abstractions;
 using ElMomenNursery.Domain.Enums;
+using ElMomenNursery.Styling;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ElMomenNursery.Forms;
@@ -27,10 +28,10 @@ internal sealed class ChildAttendancePage : UserControl
 {
     private readonly IServiceScopeFactory _scopes;
     private readonly IExcelExportService _excelExportService;
-    private readonly DateTimePicker _date = new() { Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy", MaxDate = DateTime.Today, Width = 140 };
-    private readonly ComboBox _classroom = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 190 };
-    private readonly ComboBox _status = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
-    private readonly TextBox _search = new() { PlaceholderText = "بحث باسم الطفل", Width = 220, RightToLeft = RightToLeft.Yes };
+    private readonly DateTimePicker _date = FilterTheme.CreateDatePicker();
+    private readonly ComboBox _classroom = FilterTheme.CreateComboBox();
+    private readonly ComboBox _status = FilterTheme.CreateComboBox();
+    private readonly FilterSearchBox _search = new("بحث باسم الطفل");
     private readonly DataGridView _grid = MakeGrid();
     private readonly Label _summary = new() { AutoSize = false, Height = 34, TextAlign = ContentAlignment.MiddleRight };
     private readonly Button _present = MakeButton("حاضر الآن");
@@ -47,26 +48,56 @@ internal sealed class ChildAttendancePage : UserControl
     public ChildAttendancePage(IServiceScopeFactory scopes, UserSession session, IExcelExportService excelExportService)
     {
         _scopes = scopes; _excelExportService = excelExportService;
-        Dock = DockStyle.Fill; RightToLeft = RightToLeft.Yes; BackColor = Color.White; Padding = new Padding(14);
+        Dock = DockStyle.Fill; RightToLeft = RightToLeft.Yes; BackColor = BrandPalette.AppBackground;
+        _date.MaxDate = DateTime.Today;
         _status.Items.AddRange(["الكل", "لم يسجل", "حاضر", "غائب", "متأخر", "غياب بعذر"]); _status.SelectedIndex = 0;
         _classroom.Items.Add(new ClassroomFilterOptionDto(Guid.Empty, "كل الفصول")); _classroom.SelectedIndex = 0;
         _markAll.Visible = session.HasPermission("Attendance.Record");
         _present.Visible = _absent.Visible = _checkout.Visible = session.HasPermission("Attendance.Record");
         _manual.Visible = session.HasPermission("Attendance.Record"); _correct.Visible = session.HasPermission("Attendance.Edit");
         _history.Visible = session.HasPermission("Attendance.View");
-        var filters = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = true, FlowDirection = FlowDirection.RightToLeft, AutoScroll = true };
-        var export = MakeButton("تصدير Excel"); export.Visible = session.HasPermission("Attendance.Export");
+        var export = FilterTheme.CreateSecondaryButton("تصدير Excel");
+        export.AutoSize = true;
+        export.Height = FilterTheme.ToolbarHeight;
+        export.Visible = session.HasPermission("Attendance.Export");
         export.Click += async (_, _) => await GridExcelExport.SaveAsync((IWin32Window?)FindForm() ?? this, _grid,
             _excelExportService, "تصدير حضور الأطفال", "حضور الأطفال");
-        filters.Controls.AddRange([new Label { Text = "التاريخ", AutoSize = true, Padding = new Padding(0, 8, 0, 0) }, _date,
-            new Label { Text = "الفصل", AutoSize = true, Padding = new Padding(0, 8, 0, 0) }, _classroom,
-            new Label { Text = "الحالة", AutoSize = true, Padding = new Padding(0, 8, 0, 0) }, _status, _search, _refresh, _history, _manual, _present, _absent, _checkout, _correct, _markAll]);
-        filters.Controls.Add(export);
-        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 3, ColumnCount = 1, RightToLeft = RightToLeft.Yes };
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 92)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        layout.Controls.Add(filters, 0, 0); layout.Controls.Add(_summary, 0, 1); layout.Controls.Add(_grid, 0, 2); Controls.Add(layout);
+        export.Name = "attendance.export";
+
+        var filters = new FilterCard { Name = "attendance.filters" };
+        filters.AddField("attendance.date", "التاريخ", _date);
+        filters.AddField("attendance.classroom", "الفصل", _classroom);
+        filters.AddField("attendance.status", "الحالة", _status);
+        filters.AddField("attendance.search", "بحث", _search, columnSpan: 3);
+
+        var toolbar = new ActionToolbar { Name = "attendance.actions" };
+        toolbar.Add(_refresh, _history, _manual, _present, _absent, _checkout, _correct, _markAll, export);
+
+        _grid.Dock = DockStyle.None;
+        _summary.Dock = DockStyle.None;
+        Controls.Add(_grid);
+        Controls.Add(_summary);
+        Controls.Add(toolbar);
+        Controls.Add(filters);
+        toolbar.LayoutChanged += (_, _) => LayoutContent();
+        VisibleChanged += (_, _) => { if (Visible) LayoutContent(); };
+        Resize += (_, _) => LayoutContent();
+        LayoutContent();
+
+        void LayoutContent()
+        {
+            const int margin = 14;
+            var width = Math.Max(240, ClientSize.Width - margin * 2);
+            filters.SetBounds(margin, margin, width, filters.Height);
+            filters.Arrange();
+            var toolbarTop = filters.Bottom + 10;
+            toolbar.SetBounds(margin, toolbarTop, width, toolbar.ArrangeItems(width));
+            _summary.SetBounds(margin, toolbar.Bottom + 4, width, 34);
+            _grid.SetBounds(margin, _summary.Bottom + 4, width, Math.Max(120, ClientSize.Height - _summary.Bottom - margin));
+        }
+
         _date.ValueChanged += async (_, _) => await LoadAsync(); _classroom.SelectedIndexChanged += async (_, _) => await LoadAsync();
-        _search.TextChanged += (_, _) => Render(); _status.SelectedIndexChanged += (_, _) => Render(); _refresh.Click += async (_, _) => await LoadAsync();
+        _search.Input.TextChanged += (_, _) => Render(); _status.SelectedIndexChanged += (_, _) => Render(); _refresh.Click += async (_, _) => await LoadAsync();
         _present.Click += async (_, _) => await RecordAsync(AttendanceStatus.Present);
         _absent.Click += async (_, _) => await RecordAsync(AttendanceStatus.Absent);
         _checkout.Click += async (_, _) => await CheckOutAsync(); _markAll.Click += async (_, _) => await MarkAllAsync();
@@ -211,7 +242,13 @@ internal sealed class ChildAttendancePage : UserControl
     private void UpdateActions() { var row = Selected(); _present.Enabled = _absent.Enabled = _manual.Enabled = row is { IsMarked: false }; _correct.Enabled = _correct.Visible && row is { IsMarked: true }; _checkout.Enabled = _checkout.Visible && row is { IsMarked: true, CheckIn: not null, CheckOut: null }; }
     private void ShowError(string message) { if (!IsDisposed) AppDialog.ShowInformation((IWin32Window?)FindForm() ?? this, "حضور الأطفال", message); }
     private static string Time(DateTimeOffset? time) => time?.ToLocalTime().ToString("HH:mm") ?? "—";
-    private static Button MakeButton(string text, bool primary = false) => new() { Text = text, AutoSize = true, Height = 36, BackColor = primary ? Color.FromArgb(55, 105, 39) : Color.White, ForeColor = primary ? Color.White : Color.FromArgb(35, 48, 34), UseVisualStyleBackColor = false };
+    private static Button MakeButton(string text, bool primary = false)
+    {
+        var button = BrandControls.ActionButton(text, primary, autoSize: true);
+        button.Height = FilterTheme.ToolbarHeight;
+        button.MinimumSize = new Size(0, FilterTheme.ToolbarHeight);
+        return button;
+    }
     private static DataGridView MakeGrid() => new() { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, RightToLeft = RightToLeft.Yes, BackgroundColor = Color.White, RowHeadersVisible = false, Columns = { new DataGridViewTextBoxColumn { HeaderText = "الطفل" }, new DataGridViewTextBoxColumn { HeaderText = "الفصل" }, new DataGridViewTextBoxColumn { HeaderText = "الحالة" }, new DataGridViewTextBoxColumn { HeaderText = "وقت الحضور" }, new DataGridViewTextBoxColumn { HeaderText = "وقت الانصراف" }, new DataGridViewTextBoxColumn { HeaderText = "طريقة التسجيل" }, new DataGridViewTextBoxColumn { HeaderText = "ملاحظات" } } };
 }
 
@@ -219,23 +256,24 @@ internal sealed class EmployeeAttendancePage : UserControl
 {
     private readonly IServiceScopeFactory _scopes;
     private readonly IExcelExportService _excelExportService;
-    private readonly DateTimePicker _date = new() { Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy", MaxDate = DateTime.Today, Width = 145 };
-    private readonly TextBox _search = new() { PlaceholderText = "بحث باسم الموظف أو الوظيفة", Width = 230, RightToLeft = RightToLeft.Yes };
+    private readonly DateTimePicker _date = FilterTheme.CreateDatePicker();
+    private readonly FilterSearchBox _search = new("بحث باسم الموظف أو الوظيفة");
     private readonly DataGridView _grid = new() { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, RightToLeft = RightToLeft.Yes, RowHeadersVisible = false, Columns = { new DataGridViewTextBoxColumn { HeaderText = "الموظف" }, new DataGridViewTextBoxColumn { HeaderText = "الوظيفة" }, new DataGridViewTextBoxColumn { HeaderText = "الحالة" }, new DataGridViewTextBoxColumn { HeaderText = "الحضور" }, new DataGridViewTextBoxColumn { HeaderText = "الانصراف" }, new DataGridViewTextBoxColumn { HeaderText = "طريقة التسجيل" }, new DataGridViewTextBoxColumn { HeaderText = "ملاحظات" } } };
-    private readonly Button _present = new() { Text = "حاضر الآن", AutoSize = true };
-    private readonly Button _absent = new() { Text = "غائب", AutoSize = true };
-    private readonly Button _checkout = new() { Text = "تسجيل انصراف", AutoSize = true };
-    private readonly Button _edit = new() { Text = "تصحيح السجل", AutoSize = true };
-    private readonly Button _refresh = new() { Text = "تحديث", AutoSize = true };
-    private readonly Button _export = new() { Text = "تصدير Excel", AutoSize = true };
-    private readonly Button _history = new() { Text = "سجل موظف لفترة", AutoSize = true };
+    private readonly Button _present = MakeButton("حاضر الآن");
+    private readonly Button _absent = MakeButton("غائب");
+    private readonly Button _checkout = MakeButton("تسجيل انصراف");
+    private readonly Button _edit = MakeButton("تصحيح السجل");
+    private readonly Button _refresh = MakeButton("تحديث");
+    private readonly Button _export = MakeButton("تصدير Excel");
+    private readonly Button _history = MakeButton("سجل موظف لفترة");
     private readonly Label _summary = new() { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight };
     private List<EmployeeDailyAttendanceDto> _rows = [];
     private int _version;
 
     public EmployeeAttendancePage(IServiceScopeFactory scopes, UserSession session, IExcelExportService excelExportService)
     {
-        _scopes = scopes; _excelExportService = excelExportService; Dock = DockStyle.Fill; BackColor = Color.White; Padding = new Padding(12); RightToLeft = RightToLeft.Yes;
+        _scopes = scopes; _excelExportService = excelExportService; Dock = DockStyle.Fill; BackColor = BrandPalette.AppBackground; RightToLeft = RightToLeft.Yes;
+        _date.MaxDate = DateTime.Today;
         _export.Visible = session.HasPermission("EmployeeAttendance.Export");
         _export.Click += async (_, _) => await GridExcelExport.SaveAsync((IWin32Window?)FindForm() ?? this, _grid,
             _excelExportService, "تصدير حضور الموظفين", "حضور الموظفين");
@@ -245,14 +283,40 @@ internal sealed class EmployeeAttendancePage : UserControl
             using var form = new EmployeeAttendanceHistoryForm(_scopes, _excelExportService, session.HasPermission("EmployeeAttendance.Export"));
             form.ShowDialog(FindForm());
         };
-        var bar = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = true, FlowDirection = FlowDirection.RightToLeft, AutoScroll = true };
-        bar.Controls.AddRange([new Label { Text = "التاريخ", AutoSize = true, Padding = new Padding(0, 8, 0, 0) }, _date, _search, _refresh, _history, _present, _absent, _checkout, _edit, _export]);
         _present.Visible = _absent.Visible = _checkout.Visible = session.HasPermission("EmployeeAttendance.Record");
         _edit.Visible = session.HasPermission("EmployeeAttendance.Edit");
-        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 3, ColumnCount = 1 };
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 92)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        layout.Controls.Add(bar, 0, 0); layout.Controls.Add(_summary, 0, 1); layout.Controls.Add(_grid, 0, 2); Controls.Add(layout);
-        _date.ValueChanged += async (_, _) => await LoadAsync(); _refresh.Click += async (_, _) => await LoadAsync(); _search.TextChanged += (_, _) => Render();
+
+        var filters = new FilterCard { Name = "employee-attendance.filters" };
+        filters.AddField("employee-attendance.date", "التاريخ", _date);
+        filters.AddField("employee-attendance.search", "بحث", _search, columnSpan: 3);
+
+        var toolbar = new ActionToolbar { Name = "employee-attendance.actions" };
+        toolbar.Add(_refresh, _history, _present, _absent, _checkout, _edit, _export);
+
+        _grid.Dock = DockStyle.None;
+        _summary.Dock = DockStyle.None;
+        Controls.Add(_grid);
+        Controls.Add(_summary);
+        Controls.Add(toolbar);
+        Controls.Add(filters);
+        toolbar.LayoutChanged += (_, _) => LayoutContent();
+        VisibleChanged += (_, _) => { if (Visible) LayoutContent(); };
+        Resize += (_, _) => LayoutContent();
+        LayoutContent();
+
+        void LayoutContent()
+        {
+            const int margin = 12;
+            var width = Math.Max(240, ClientSize.Width - margin * 2);
+            filters.SetBounds(margin, margin, width, filters.Height);
+            filters.Arrange();
+            var toolbarTop = filters.Bottom + 10;
+            toolbar.SetBounds(margin, toolbarTop, width, toolbar.ArrangeItems(width));
+            _summary.SetBounds(margin, toolbar.Bottom + 4, width, 30);
+            _grid.SetBounds(margin, _summary.Bottom + 4, width, Math.Max(120, ClientSize.Height - _summary.Bottom - margin));
+        }
+
+        _date.ValueChanged += async (_, _) => await LoadAsync(); _refresh.Click += async (_, _) => await LoadAsync(); _search.Input.TextChanged += (_, _) => Render();
         _grid.SelectionChanged += (_, _) => UpdateActions(); _present.Click += async (_, _) => await RecordAsync(AttendanceStatus.Present); _absent.Click += async (_, _) => await RecordAsync(AttendanceStatus.Absent);
         _checkout.Click += async (_, _) => await CheckoutAsync(); _edit.Click += async (_, _) => await OpenEditorAsync();
         _grid.CellDoubleClick += async (_, _) => { if (Current() is not null) await OpenEditorAsync(); };
@@ -323,6 +387,13 @@ internal sealed class EmployeeAttendancePage : UserControl
     private bool _sessionHasRecord => _present.Visible;
     private bool _sessionHasEdit => _edit.Visible;
     private void UpdateActions() { var row = Current(); _present.Enabled = _absent.Enabled = row is { IsMarked: false }; _edit.Enabled = _edit.Visible && row is { IsMarked: true }; _checkout.Enabled = _checkout.Visible && row is { IsMarked: true, CheckInTime: not null, CheckOutTime: null }; }
+    private static Button MakeButton(string text, bool primary = false)
+    {
+        var button = BrandControls.ActionButton(text, primary, autoSize: true);
+        button.Height = FilterTheme.ToolbarHeight;
+        button.MinimumSize = new Size(0, FilterTheme.ToolbarHeight);
+        return button;
+    }
 }
 
 

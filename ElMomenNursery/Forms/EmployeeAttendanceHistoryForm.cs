@@ -37,30 +37,33 @@ internal sealed class EmployeeAttendanceHistoryForm : Form
         BackColor = BrandPalette.AppBackground;
         Font = new Font("Segoe UI", 10F);
 
-        var dateFilters = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft, WrapContents = false, Padding = new Padding(8) };
-        dateFilters.Controls.AddRange([new Label { Text = "من تاريخ", AutoSize = true, Padding = new Padding(0, 8, 0, 0) }, _start,
-            new Label { Text = "إلى تاريخ", AutoSize = true, Padding = new Padding(0, 8, 0, 0) }, _end]);
-        var employeeFilters = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft, WrapContents = false, Padding = new Padding(8) };
-        employeeFilters.Controls.AddRange([new Label { Text = "اسم الموظف", AutoSize = true, Padding = new Padding(0, 8, 0, 0) }, _search,
-            new Label { Text = "اختر الموظف", AutoSize = true, Padding = new Padding(0, 8, 0, 0) }, _employees, _show, _export]);
+        var filters = new FilterCard { Name = "employee-attendance-history.filters", Dock = DockStyle.Top };
+        filters.AddGroup("history.period", "الفترة من / إلى", 2, _start, _end);
+        filters.AddField("history.search", "بحث باسم الموظف", _search, 2);
+        filters.AddField("history.employee", "اختر الموظف", _employees, 2);
+        filters.AddActions(_show);
+        var toolbar = new ActionToolbar { Dock = DockStyle.Top, Height = FilterTheme.ToolbarHeight };
+        toolbar.Add(_export);
         _export.Visible = canExport;
         _export.Enabled = false;
         _export.Click += async (_, _) => await GridExcelExport.SaveAsync(this, _grid, _excelExportService,
             "تصدير كشف حضور الموظف", "كشف حضور موظف");
 
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Padding = new Padding(10), RightToLeft = RightToLeft.Yes };
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, FilterTheme.ToolbarHeight + 8));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         var history = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2 };
         history.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
         history.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         history.Controls.Add(_summary, 0, 0);
         history.Controls.Add(_grid, 0, 1);
-        layout.Controls.Add(dateFilters, 0, 0);
-        layout.Controls.Add(employeeFilters, 0, 1);
+        layout.Controls.Add(filters, 0, 0);
+        layout.Controls.Add(toolbar, 0, 1);
         layout.Controls.Add(history, 0, 2);
         Controls.Add(layout);
+        layout.Resize += (_, _) => { filters.SetBounds(0, 0, layout.ClientSize.Width, filters.Height); filters.Arrange(); toolbar.SetBounds(0, filters.Bottom + 6, layout.ClientSize.Width, FilterTheme.ToolbarHeight); };
+        filters.SetBounds(0, 0, layout.ClientSize.Width, filters.Height); filters.Arrange(); toolbar.SetBounds(0, filters.Bottom + 6, layout.ClientSize.Width, FilterTheme.ToolbarHeight);
 
         _start.ValueChanged += (_, _) => ClampEndDate();
         _search.TextChanged += (_, _) => FilterEmployees();

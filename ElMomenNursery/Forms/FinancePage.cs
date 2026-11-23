@@ -14,8 +14,8 @@ public sealed class FinancePage : UserControl
     private readonly UserSession? _session;
     private readonly IExcelExportService? _excel;
 
-    private readonly DateTimePicker _fromPicker = new() { Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy", ShowCheckBox = true, Checked = true, Width = 135, Font = new Font("Segoe UI", 9.5F) };
-    private readonly DateTimePicker _toPicker = new() { Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy", ShowCheckBox = true, Checked = true, Width = 135, Font = new Font("Segoe UI", 9.5F) };
+    private readonly DateTimePicker _fromPicker = FilterTheme.CreateDatePicker(optional: true);
+    private readonly DateTimePicker _toPicker = FilterTheme.CreateDatePicker(optional: true);
 
     private readonly Button _quickToday = MainForm.CreateActionButton("اليوم");
     private readonly Button _quickThisMonth = MainForm.CreateActionButton("هذا الشهر", true);
@@ -136,12 +136,17 @@ public sealed class FinancePage : UserControl
             FlowDirection = FlowDirection.TopDown,
             WrapContents = false,
             AutoSize = true,
-            Width = 1000
+            Width = Math.Max(320, mainContainer.ClientSize.Width - mainContainer.Padding.Horizontal)
         };
 
-        headerPanel.Width = 1000;
-        filterPanel.Width = 1000;
-        kpiPanel.Width = 1000;
+        void ResizeTopSection()
+        {
+            var width = Math.Max(320, mainContainer.ClientSize.Width - mainContainer.Padding.Horizontal);
+            topFlow.Width = headerPanel.Width = filterPanel.Width = kpiPanel.Width = width;
+            if (filterPanel is FilterCard filterCard) filterCard.Arrange();
+        }
+        mainContainer.Resize += (_, _) => ResizeTopSection();
+        ResizeTopSection();
 
         topFlow.Controls.Add(headerPanel);
         topFlow.Controls.Add(filterPanel);
@@ -159,53 +164,18 @@ public sealed class FinancePage : UserControl
 
     private Control BuildFilterBar()
     {
-        var filterBox = new Panel
-        {
-            Height = 60,
-            BackColor = BrandPalette.Surface,
-            BorderStyle = BorderStyle.FixedSingle,
-            Padding = new Padding(10),
-            Margin = new Padding(0, 4, 0, 8)
-        };
-
-        var flow = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            FlowDirection = FlowDirection.RightToLeft,
-            WrapContents = false,
-            AutoScroll = true
-        };
-
-        var applyBtn = MainForm.CreateActionButton("تطبيق");
-        applyBtn.Height = 36;
-        applyBtn.Width = 85;
-
-        var refreshBtn = MainForm.CreateActionButton("تحديث");
-        refreshBtn.Height = 36;
-        refreshBtn.Width = 85;
-
-        var fromLabel = new Label { Text = "من:", AutoSize = true, TextAlign = ContentAlignment.MiddleLeft, Margin = new Padding(0, 8, 4, 0) };
-        var toLabel = new Label { Text = "إلى:", AutoSize = true, TextAlign = ContentAlignment.MiddleLeft, Margin = new Padding(12, 8, 4, 0) };
-
-        _quickToday.Height = 36;
-        _quickToday.Width = 75;
-        _quickThisMonth.Height = 36;
-        _quickThisMonth.Width = 90;
-        _quickLastMonth.Height = 36;
-        _quickLastMonth.Width = 100;
-        _quickAll.Height = 36;
-        _quickAll.Width = 70;
-
-        flow.Controls.AddRange([
-            _quickToday, _quickThisMonth, _quickLastMonth, _quickAll,
-            fromLabel, _fromPicker, toLabel, _toPicker,
-            applyBtn, refreshBtn
-        ]);
+        var filterBox = new FilterCard { Name = "finance.filters", Margin = new Padding(0, 4, 0, 8) };
+        filterBox.AddGroup("finance.period", "الفترة من / إلى", 2, _fromPicker, _toPicker);
+        filterBox.AddGroup("finance.quick-period", "فترة سريعة", 3, _quickToday, _quickThisMonth, _quickLastMonth, _quickAll);
+        var applyBtn = FilterTheme.CreatePrimaryButton("تطبيق");
+        var refreshBtn = FilterTheme.CreateSecondaryButton("تحديث");
+        filterBox.AddActions(applyBtn, refreshBtn);
 
         applyBtn.Click += async (_, _) => await LoadDataAsync();
         refreshBtn.Click += async (_, _) => await LoadDataAsync();
 
-        filterBox.Controls.Add(flow);
+        filterBox.Resize += (_, _) => filterBox.Arrange();
+        filterBox.Arrange();
         return filterBox;
     }
 

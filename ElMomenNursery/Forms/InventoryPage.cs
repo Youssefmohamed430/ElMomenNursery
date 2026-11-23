@@ -58,13 +58,24 @@ public sealed class InventoryPage : UserControl
         deleted.Visible = _session?.HasPermission("Inventory.Restore") == true; restore.Visible = false;
         export.Visible = _session?.HasPermission("Inventory.Export") == true;
         category.Width = 180; status.Width = 130; min.Width = max.Width = 100;
-        var filters = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 43, WrapContents = true, FlowDirection = FlowDirection.RightToLeft, BackColor = Color.Transparent };
-        filters.Controls.AddRange([search, category, status, min, max, apply, clear]);
-        var actions = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 48, WrapContents = true, FlowDirection = FlowDirection.RightToLeft, BackColor = Color.Transparent };
-        actions.Controls.AddRange([add, edit, toggle, delete, deleted, restore, export]);
-        count.Dock = DockStyle.Bottom; count.Height = 30;
-        grid.Dock = DockStyle.Fill;
+        var filters = new FilterCard { Name = "inventory.items.filters" };
+        filters.AddField("inventory.items.search", "اسم الصنف", search, 2);
+        filters.AddField("inventory.items.category", "الفئة", category);
+        filters.AddField("inventory.items.status", "الحالة", status);
+        filters.AddField("inventory.items.min", "أقل سعر", min);
+        filters.AddField("inventory.items.max", "أعلى سعر", max);
+        filters.AddActions(apply, clear);
+        var actions = new ActionToolbar { Name = "inventory.items.actions" };
+        actions.Add(add, edit, toggle, delete, deleted, restore, export);
+        count.Dock = DockStyle.None; count.Height = 30; grid.Dock = DockStyle.None;
         root.Controls.Add(grid); root.Controls.Add(count); root.Controls.Add(actions); root.Controls.Add(filters);
+        void LayoutItems()
+        {
+            var width = Math.Max(240, root.ClientSize.Width - root.Padding.Horizontal); filters.SetBounds(0, 0, width, filters.Height); filters.Arrange();
+            actions.SetBounds(0, filters.Bottom + 8, width, actions.ArrangeItems(width)); count.SetBounds(0, actions.Bottom, width, 28);
+            grid.SetBounds(0, count.Bottom, width, Math.Max(120, root.ClientSize.Height - count.Bottom));
+        }
+        root.Resize += (_, _) => LayoutItems(); LayoutItems();
 
         apply.Click += async (_, _) => await LoadItems(); clear.Click += async (_, _) => { search.Clear(); category.SelectedIndex = 0; status.SelectedIndex = 0; min.Clear(); max.Clear(); await LoadItems(); };
         search.KeyDown += async (_, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; await LoadItems(); } };
@@ -168,12 +179,21 @@ public sealed class InventoryPage : UserControl
         add.Visible = edit.Visible = toggle.Visible = delete.Visible = canManage; deleted.Visible = _session?.HasPermission("Inventory.Restore") == true;
         restore.Visible = false; export.Visible = _session?.HasPermission("Inventory.Export") == true;
         status.Width = 130;
-        var filters = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 43, WrapContents = true, FlowDirection = FlowDirection.RightToLeft };
-        filters.Controls.AddRange([search, status, apply, clear]);
-        var actions = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 48, WrapContents = true, FlowDirection = FlowDirection.RightToLeft };
-        actions.Controls.AddRange([add, edit, toggle, delete, deleted, restore, export]);
-        count.Dock = DockStyle.Bottom; count.Height = 30; grid.Dock = DockStyle.Fill;
+        var filters = new FilterCard { Name = "inventory.categories.filters" };
+        filters.AddField("inventory.categories.search", "اسم الفئة", search, 2);
+        filters.AddField("inventory.categories.status", "الحالة", status);
+        filters.AddActions(apply, clear);
+        var actions = new ActionToolbar { Name = "inventory.categories.actions" };
+        actions.Add(add, edit, toggle, delete, deleted, restore, export);
+        count.Dock = DockStyle.None; count.Height = 30; grid.Dock = DockStyle.None;
         root.Controls.Add(grid); root.Controls.Add(count); root.Controls.Add(actions); root.Controls.Add(filters);
+        void LayoutCategories()
+        {
+            var width = Math.Max(240, root.ClientSize.Width - root.Padding.Horizontal); filters.SetBounds(0, 0, width, filters.Height); filters.Arrange();
+            actions.SetBounds(0, filters.Bottom + 8, width, actions.ArrangeItems(width)); count.SetBounds(0, actions.Bottom, width, 28);
+            grid.SetBounds(0, count.Bottom, width, Math.Max(120, root.ClientSize.Height - count.Bottom));
+        }
+        root.Resize += (_, _) => LayoutCategories(); LayoutCategories();
         apply.Click += async (_, _) => await Load(); clear.Click += async (_, _) => { search.Clear(); status.SelectedIndex = 0; await Load(); };
         search.KeyDown += async (_, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; await Load(); } };
         add.Click += async (_, _) => { using var form = new InventoryCategoryEditorForm(_scopes); if (form.ShowDialog(this) == DialogResult.OK) await Load(); };

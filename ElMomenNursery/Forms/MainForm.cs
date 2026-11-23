@@ -469,25 +469,8 @@ public sealed class MainForm : Form
         RightToLeft = RightToLeft.Yes
     };
 
-    internal static Button CreateActionButton(string text, bool primary = false)
-    {
-        var button = new Button
-        {
-            Text = text,
-            Height = 42,
-            FlatStyle = FlatStyle.Flat,
-            BackColor = primary ? BrandPalette.PrimaryGreen : BrandPalette.Surface,
-            ForeColor = primary ? Color.White : BrandPalette.Text,
-            Font = new Font("Segoe UI", 9.5F, primary ? FontStyle.Bold : FontStyle.Regular),
-            Cursor = Cursors.Hand,
-            RightToLeft = RightToLeft.Yes,
-            UseVisualStyleBackColor = false
-        };
-        button.FlatAppearance.BorderColor = primary ? BrandPalette.PrimaryGreen : BrandPalette.Border;
-        button.FlatAppearance.BorderSize = 1;
-        button.FlatAppearance.MouseOverBackColor = primary ? BrandPalette.PrimaryGreenHover : BrandPalette.SoftGreen;
-        return button;
-    }
+    internal static Button CreateActionButton(string text, bool primary = false) =>
+        Styling.BrandControls.ActionButton(text, primary);
 
     internal static DataGridView CreateGrid(string[] columns)
     {
