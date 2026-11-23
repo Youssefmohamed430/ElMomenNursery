@@ -27,6 +27,7 @@ public sealed class SubscriptionsPage : UserControl
     private readonly Button _invoice = Button("فاتورة بيع من المخزن");
     private readonly Button _edit = Button("تعديل");
     private readonly Button _pay = Button("تسجيل دفعة");
+    private readonly Button _fine = Button("تسجيل غرامة غياب 15 يوم");
     private readonly Button _cancel = Button("إلغاء الاشتراك");
     private readonly Button _delete = Button("حذف");
     private readonly Button _receipt = Button("طباعة / إعادة طباعة إيصال");
@@ -47,7 +48,7 @@ public sealed class SubscriptionsPage : UserControl
             new DataGridViewTextBoxColumn { HeaderText = "المدفوع" }, new DataGridViewTextBoxColumn { HeaderText = "المتبقي" }, new DataGridViewTextBoxColumn { HeaderText = "الحالة" },
             new DataGridViewTextBoxColumn { HeaderText = "ملاحظات" }, new DataGridViewTextBoxColumn { HeaderText = "تاريخ الإضافة" }, new DataGridViewTextBoxColumn { Visible = false }]);
         _add.Visible = session.HasPermission("Subscriptions.Manage"); _edit.Visible = _cancel.Visible = _delete.Visible = session.HasPermission("Subscriptions.Manage");
-        _pay.Visible = session.HasPermission("Payments.Create"); _receipt.Visible = session.HasPermission("Payments.View"); _export.Visible = session.HasPermission("Subscriptions.Export");
+        _pay.Visible = session.HasPermission("Payments.Create"); _fine.Visible = session.HasPermission("Payments.Create") && session.HasPermission("Finance.ManageIncome"); _receipt.Visible = session.HasPermission("Payments.View"); _export.Visible = session.HasPermission("Subscriptions.Export");
         var apply = Button("تطبيق"); var clear = Button("مسح الفلاتر"); var refresh = Button("تحديث");
         _invoice.Visible = session.HasPermission("Payments.Create");
         var filter = new FilterCard { Name = "subscriptions.filters" };
@@ -59,7 +60,7 @@ public sealed class SubscriptionsPage : UserControl
         filter.AddField("subscriptions.balance", "الرصيد", _balance);
         filter.AddActions(apply, clear);
         var toolbar = new ActionToolbar { Name = "subscriptions.actions" };
-        toolbar.Add(refresh, _add, _invoice, _edit, _pay, _cancel, _delete, _receipt, _export);
+        toolbar.Add(refresh, _add, _invoice, _edit, _pay, _fine, _cancel, _delete, _receipt, _export);
         _grid.Dock = DockStyle.None; _summary.Dock = DockStyle.None;
         Controls.Add(_grid); Controls.Add(_summary); Controls.Add(toolbar); Controls.Add(filter);
         Resize += (_, _) => LayoutContent(); LayoutContent();
@@ -76,7 +77,7 @@ public sealed class SubscriptionsPage : UserControl
         _add.Click += async (_, _) => await EditAsync(null); _edit.Click += async (_, _) => { if (Selected() is { } row) await EditAsync(row); };
         _invoice.Click += async (_, _) => { using var form = new CashierInvoiceForm(_scopes); if (form.ShowDialog(FindForm()) == DialogResult.OK) await LoadAsync(); };
         _cancel.Click += async (_, _) => await CancelAsync(); _delete.Click += async (_, _) => await DeleteAsync();
-        _pay.Click += async (_, _) => await RecordPaymentAsync(); _receipt.Click += async (_, _) => await PrintAsync();
+        _pay.Click += async (_, _) => await RecordPaymentAsync(); _fine.Click += async (_, _) => await RecordAbsenceFineAsync(); _receipt.Click += async (_, _) => await PrintAsync();
         _export.Click += async (_, _) => await GridExcelExport.SaveAsync((IWin32Window?)FindForm() ?? this, _grid, _excel, "تصدير الاشتراكات", "الاشتراكات");
         _grid.SelectionChanged += (_, _) => UpdateActions(); _grid.KeyDown += async (_, e) => { if (e.KeyCode == Keys.F5) { e.Handled = true; await LoadAsync(); } };
         Load += async (_, _) => { await LoadPlansAsync(); await LoadClassroomsAsync(); await LoadAsync(); };
@@ -155,6 +156,25 @@ public sealed class SubscriptionsPage : UserControl
         try { await using var scope = _scopes.CreateAsyncScope(); var svc = scope.ServiceProvider.GetRequiredService<ISubscriptionService>(); var res = await svc.DeleteSubscriptionAsync(row.Id);
             if (!ResultPresenter.Present(this, "حذف الاشتراك", res)) return; await LoadAsync(); }
         catch { ShowError("تعذر حذف الاشتراك."); }
+    }
+
+    private async Task RecordAbsenceFineAsync()
+    {
+        using var form = new AbsenceFineForm(_scopes);
+        if (form.ShowDialog(FindForm()) != DialogResult.OK || form.Child is null) return;
+        try
+        {
+            await using var scope = _scopes.CreateAsyncScope();
+            var finance = scope.ServiceProvider.GetRequiredService<IFinanceService>();
+            var result = await finance.CreateManualIncomeAsync(new CreateManualIncomeDto
+            {
+                IncomeDate = DateOnly.FromDateTime(form.FineDate), Source = "غرامة غياب 15 يوم",
+                Description = $"غرامة غياب 15 يوم - الطفل: {form.Child.Name}", Amount = form.Amount,
+                Notes = form.Notes
+            });
+            if (ResultPresenter.Present(this, "تسجيل غرامة الغياب", result)) await LoadAsync();
+        }
+        catch { ShowError("تعذر تسجيل غرامة الغياب."); }
     }
 
     private async Task RecordPaymentAsync()
@@ -332,3 +352,32 @@ internal sealed class PaymentEditorForm : Form
         var cancel = new Button { Text = "إلغاء", DialogResult = DialogResult.Cancel, Width = 90 }; grid.Controls.Add(ok, 0, 4); grid.Controls.Add(cancel, 1, 4); Controls.Add(grid); AcceptButton = ok; CancelButton = cancel;
     }
 }
+
+
+internal sealed class AbsenceFineForm : Form
+{
+    private readonly IServiceScopeFactory _scopes;
+    private readonly ComboBox _child = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
+    private readonly NumericUpDown _amount = new() { Minimum = 0.01m, Maximum = 10000000m, DecimalPlaces = 2, ThousandsSeparator = true, Width = 260 };
+    private readonly DateTimePicker _date = new() { Format = DateTimePickerFormat.Short, Width = 260 };
+    private readonly TextBox _notes = new() { Width = 260 };
+    public ChildLookupDto? Child => _child.SelectedItem as ChildLookupDto;
+    public decimal Amount => _amount.Value;
+    public DateTime FineDate => _date.Value;
+    public string? Notes => string.IsNullOrWhiteSpace(_notes.Text) ? null : _notes.Text.Trim();
+
+    public AbsenceFineForm(IServiceScopeFactory scopes)
+    {
+        _scopes = scopes; Text = "تسجيل غرامة غياب 15 يوم"; Width = 480; Height = 340; StartPosition = FormStartPosition.CenterParent;
+        RightToLeft = RightToLeft.Yes; RightToLeftLayout = true; FormBorderStyle = FormBorderStyle.FixedDialog; MaximizeBox = false;
+        var fields = new (string Label, Control Control)[] { ("الطفل", _child), ("قيمة الغرامة (ج.م)", _amount), ("تاريخ الغرامة", _date), ("ملاحظات", _notes) };
+        var table = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(16), ColumnCount = 2, RowCount = fields.Length + 1 };
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 130)); table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        for (var i = 0; i < fields.Length; i++) { table.Controls.Add(new Label { Text = fields[i].Label, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight }, 0, i); table.Controls.Add(fields[i].Control, 1, i); }
+        var save = new Button { Text = "تسجيل الغرامة", Width = 130 }; var cancel = new Button { Text = "إلغاء", Width = 90, DialogResult = DialogResult.Cancel };
+        save.Click += (_, _) => { if (Child is null) { AppDialog.ShowInformation(this, Text, "اختر الطفل."); return; } DialogResult = DialogResult.OK; Close(); };
+        var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft }; actions.Controls.AddRange([save, cancel]); table.Controls.Add(actions, 0, fields.Length); table.SetColumnSpan(actions, 2); Controls.Add(table); AcceptButton = save; CancelButton = cancel;
+        Load += async (_, _) => { try { await using var scope = _scopes.CreateAsyncScope(); var result = await scope.ServiceProvider.GetRequiredService<ISubscriptionService>().GetChildLookupAsync(null); if (result.IsSuccess) foreach (var child in result.Value) _child.Items.Add(child); } catch { AppDialog.ShowInformation(this, Text, "تعذر تحميل قائمة الأطفال."); } };
+    }
+}
+

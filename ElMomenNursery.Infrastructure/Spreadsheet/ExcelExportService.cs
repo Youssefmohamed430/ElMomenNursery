@@ -1,4 +1,4 @@
-using ClosedXML.Excel;
+﻿using ClosedXML.Excel;
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Domain.Abstractions;
 
@@ -21,9 +21,14 @@ public sealed class ExcelExportService : IExcelExportService
                 var worksheet = workbook.Worksheets.Add(SanitizeWorksheetName(data.WorksheetName));
                 worksheet.RightToLeft = true;
 
+            var hasTitle = !string.IsNullOrWhiteSpace(data.Title);
+            var hasFilters = !string.IsNullOrWhiteSpace(data.FilterDescription);
+            var headerRow = 1;
+            if (hasTitle) { worksheet.Cell(1, 1).Value = data.Title; worksheet.Cell(1, 1).Style.Font.Bold = true; worksheet.Cell(1, 1).Style.Font.FontSize = 16; worksheet.Range(1, 1, 1, data.Headers.Count).Merge(); headerRow++; }
+            if (hasFilters) { worksheet.Cell(headerRow, 1).Value = $"الفلاتر المستخدمة: {data.FilterDescription}"; worksheet.Range(headerRow, 1, headerRow, data.Headers.Count).Merge(); worksheet.Cell(headerRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right; headerRow++; }
             for (var column = 0; column < data.Headers.Count; column++)
             {
-                var header = worksheet.Cell(1, column + 1);
+                var header = worksheet.Cell(headerRow, column + 1);
                 header.Value = data.Headers[column];
                 header.Style.Font.Bold = true;
                 header.Style.Fill.BackgroundColor = XLColor.FromHtml("#EAF2E4");
@@ -36,13 +41,13 @@ public sealed class ExcelExportService : IExcelExportService
                 for (var column = 0; column < data.Headers.Count; column++)
                 {
                     var value = column < data.Rows[row].Count ? data.Rows[row][column] : null;
-                    worksheet.Cell(row + 2, column + 1).Value = value ?? string.Empty;
+                    worksheet.Cell(row + headerRow + 1, column + 1).Value = value ?? string.Empty;
                 }
             }
 
-            worksheet.SheetView.FreezeRows(1);
+            worksheet.SheetView.FreezeRows(headerRow);
             if (data.Rows.Count > 0)
-                worksheet.Range(1, 1, data.Rows.Count + 1, data.Headers.Count).SetAutoFilter();
+                worksheet.Range(headerRow, 1, data.Rows.Count + headerRow, data.Headers.Count).SetAutoFilter();
             worksheet.Columns(1, data.Headers.Count).AdjustToContents(10, 50);
                 workbook.SaveAs(filePath);
             }, cancellationToken);

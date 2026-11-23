@@ -1,4 +1,4 @@
-using System.Drawing;
+﻿using System.Drawing;
 using System.Globalization;
 using ElMomenNursery.Application.DTOs;
 using ElMomenNursery.Application.IServices;
@@ -16,6 +16,8 @@ public sealed class FinancePage : UserControl
 
     private readonly DateTimePicker _fromPicker = FilterTheme.CreateDatePicker(optional: true);
     private readonly DateTimePicker _toPicker = FilterTheme.CreateDatePicker(optional: true);
+    private readonly ComboBox _typeFilter = new() { Width = 190, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly Button _exportReportBtn = MainForm.CreateActionButton("تصدير تقرير مالي", true);
 
     private readonly Button _quickToday = MainForm.CreateActionButton("اليوم");
     private readonly Button _quickThisMonth = MainForm.CreateActionButton("هذا الشهر", true);
@@ -63,6 +65,7 @@ public sealed class FinancePage : UserControl
         RightToLeft = RightToLeft.Yes;
         BackColor = BrandPalette.AppBackground;
 
+        _typeFilter.Items.AddRange(["كل الأنواع", "دفعة اشتراك", "مبيعات مخزن", "إيراد يدوي", "راتب", "مصروف خارجي"]); _typeFilter.SelectedIndex = 0;
         _incomeGrid = MainForm.CreateGrid(["التاريخ", "النوع", "المصدر / الطرف", "البيان", "المبلغ", "المرجع", "بواسطة"]);
         _expenseGrid = MainForm.CreateGrid(["التاريخ", "النوع", "الفئة", "البيان", "المبلغ", "المرجع", "بواسطة"]);
 
@@ -166,10 +169,13 @@ public sealed class FinancePage : UserControl
     {
         var filterBox = new FilterCard { Name = "finance.filters", Margin = new Padding(0, 4, 0, 8) };
         filterBox.AddGroup("finance.period", "الفترة من / إلى", 2, _fromPicker, _toPicker);
+        filterBox.AddField("finance.type", "نوع الحركة", _typeFilter);
         filterBox.AddGroup("finance.quick-period", "فترة سريعة", 3, _quickToday, _quickThisMonth, _quickLastMonth, _quickAll);
         var applyBtn = FilterTheme.CreatePrimaryButton("تطبيق");
         var refreshBtn = FilterTheme.CreateSecondaryButton("تحديث");
-        filterBox.AddActions(applyBtn, refreshBtn);
+        _exportReportBtn.Visible = _session?.HasPermission("Finance.Export") == true;
+        filterBox.AddActions(applyBtn, refreshBtn, _exportReportBtn);
+        _exportReportBtn.Click += async (_, _) => await ExportCombinedReportAsync();
 
         applyBtn.Click += async (_, _) => await LoadDataAsync();
         refreshBtn.Click += async (_, _) => await LoadDataAsync();
@@ -492,26 +498,60 @@ public sealed class FinancePage : UserControl
             var incomeRes = await incomeTask;
             var expenseRes = await expenseTask;
 
-            if (summaryRes.IsSuccess)
-                RenderSummary(summaryRes.Value);
-
+            var selectedType = _typeFilter.SelectedItem?.ToString();
+            bool Matches(FinanceTransactionDto row) => selectedType is null or "كل الأنواع" || row.TypeLabel == selectedType;
             if (incomeRes.IsSuccess)
             {
-                _incomeRows = incomeRes.Value.ToList();
+                _incomeRows = incomeRes.Value.Where(Matches).ToList();
                 RenderIncomeGrid();
             }
 
             if (expenseRes.IsSuccess)
             {
-                _expenseRows = expenseRes.Value.ToList();
+                _expenseRows = expenseRes.Value.Where(Matches).ToList();
                 RenderExpenseGrid();
             }
+            if (summaryRes.IsSuccess) RenderFilteredSummary(summaryRes.Value);
         }
         catch (Exception)
         {
             if (!IsDisposed && currentVersion == _loadVersion)
                 AppDialog.ShowInformation(this, "خطأ", "تعذر تحميل البيانات المالية.");
         }
+    }
+
+    private void RenderFilteredSummary(FinanceSummaryDto original)
+    {
+        var income = _incomeRows.Sum(x => x.Amount);
+        var expenses = _expenseRows.Sum(x => x.Amount);
+        var selected = _typeFilter.SelectedItem?.ToString() ?? "كل الأنواع";
+        _incomeKpiValue.Text = $"{income:N2} ج.م";
+        _incomeKpiSub.Text = selected == "كل الأنواع" ? $"اشتراكات: {original.TotalSubscriptionIncome:N2} | مبيعات: {original.TotalInventorySaleIncome:N2} | إيرادات أخرى: {original.TotalManualIncome:N2}" : $"النوع المحدد: {selected}";
+        _expenseKpiValue.Text = $"{expenses:N2} ج.م";
+        _expenseKpiSub.Text = selected == "كل الأنواع" ? $"رواتب: {original.TotalPayrollExpense:N2} | مصاريف خارجية: {original.TotalManualExpense:N2}" : $"النوع المحدد: {selected}";
+        var net = income - expenses; _netKpiValue.Text = $"{(net >= 0 ? "+" : "")}{net:N2} ج.م";
+        _netKpiValue.ForeColor = net >= 0 ? BrandPalette.PrimaryGreen : BrandPalette.DangerText;
+        if (_netKpiCard is not null) _netKpiCard.BackColor = net >= 0 ? BrandPalette.SoftGreen : BrandPalette.SoftRed;
+        _netKpiSub.Text = net >= 0 ? "فائض مالي (المقبوضات تفوق المصروفات)" : "عجز مالي مؤقت (المصروفات تفوق المقبوضات)";
+    }
+
+    private async Task ExportCombinedReportAsync()
+    {
+        if (_excel is null) return;
+        var all = _incomeRows.Select(x => (Row: x, Kind: "مقبوضات")).Concat(_expenseRows.Select(x => (Row: x, Kind: "مصروفات")))
+            .OrderByDescending(x => x.Row.Date).ToArray();
+        var rows = all.Select(x => (IReadOnlyList<string?>)new[] { x.Kind, x.Row.Date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture), x.Row.TypeLabel, x.Row.Category, x.Row.Description, x.Row.Amount.ToString("N2", CultureInfo.CurrentCulture), x.Row.Reference ?? "—", x.Row.RecordedBy ?? "—" }).ToList();
+        rows.Add(["ملخص", "", "إجمالي المقبوضات", "", "", _incomeRows.Sum(x => x.Amount).ToString("N2", CultureInfo.CurrentCulture), "", ""]);
+        rows.Add(["ملخص", "", "إجمالي المصروفات", "", "", _expenseRows.Sum(x => x.Amount).ToString("N2", CultureInfo.CurrentCulture), "", ""]);
+        rows.Add(["ملخص", "", "الصافي", "", "", (_incomeRows.Sum(x => x.Amount) - _expenseRows.Sum(x => x.Amount)).ToString("N2", CultureInfo.CurrentCulture), "", ""]);
+        var dateRange = $"من {(_fromPicker.Checked ? _fromPicker.Value.ToString("dd/MM/yyyy") : "البداية")} إلى {(_toPicker.Checked ? _toPicker.Value.ToString("dd/MM/yyyy") : "النهاية")}";
+        var filterText = $"الفترة: {dateRange}؛ النوع: {_typeFilter.SelectedItem ?? "كل الأنواع"}";
+        var reportTitle = $"التقرير المالي للمقبوضات والمصروفات - {filterText}";
+        using var dialog = new SaveFileDialog { Title = reportTitle, Filter = "ملف Excel (*.xlsx)|*.xlsx", DefaultExt = "xlsx", AddExtension = true, FileName = $"تقرير_مالي_{_typeFilter.SelectedItem}_{DateTime.Now:yyyyMMdd_HHmm}.xlsx", OverwritePrompt = true };
+        if (dialog.ShowDialog((IWin32Window?)FindForm() ?? this) != DialogResult.OK) return;
+        var data = new ExcelExportData("التقرير المالي", ["الحركة", "التاريخ", "النوع", "الفئة / الطرف", "البيان", "المبلغ", "المرجع", "بواسطة"], rows, reportTitle, filterText);
+        var result = await _excel.ExportAsync(data, dialog.FileName);
+        ResultPresenter.Present((IWin32Window?)FindForm() ?? this, "تصدير التقرير المالي", result);
     }
 
     private void RenderSummary(FinanceSummaryDto s)
@@ -603,3 +643,5 @@ public sealed class FinancePage : UserControl
         _deleteExpenseBtn.Enabled = canManage && row is { IsEditable: true };
     }
 }
+
+

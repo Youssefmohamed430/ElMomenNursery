@@ -1,4 +1,4 @@
-using ElMomenNursery.Application.IServices;
+﻿using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Infrastructure.Security;
 using ElMomenNursery.Controls;
 using ElMomenNursery.Styling;
@@ -53,7 +53,10 @@ internal sealed class UserManagementForm : UserControl
             var result = await WithServiceAsync(service => service.GetAccountsAsync());
             if (result.IsFailure) { _status.Text = result.Error.Description; return; }
             foreach (var user in result.Value)
-                _grid.Rows.Add(user.Username, user.FullName, string.Join("، ", user.Roles), user.IsActive ? "نشط" : "موقوف", user.Id, user.IsActive);
+            {
+                var index = _grid.Rows.Add(user.Username, user.FullName, string.Join("، ", user.Roles.Select(RoleNameArabic)), user.IsActive ? "نشط" : "موقوف", user.Id, user.IsActive);
+                _grid.Rows[index].Tag = user.Roles.ToArray();
+            }
             _status.Text = $"عدد الحسابات: {_grid.Rows.Count}";
         }
         catch (UnauthorizedAccessException exception) { _log.Warning(exception, "Access denied while loading user accounts"); _status.Text = "ليست لديك صلاحية عرض الحسابات."; }
@@ -70,12 +73,12 @@ internal sealed class UserManagementForm : UserControl
                 FormBorderStyle = FormBorderStyle.FixedDialog, MinimizeBox = false, MaximizeBox = false, RightToLeft = RightToLeft.Yes, RightToLeftLayout = true };
             var name = Input("الاسم الكامل", 25); var username = Input("اسم المستخدم", 75); var password = Input("كلمة المرور (12 حرفًا على الأقل)", 125);
             password.UseSystemPasswordChar = true;
-            var role = new ComboBox { Left = 150, Top = 175, Width = 230, DropDownStyle = ComboBoxStyle.DropDownList, DataSource = roles.Value.ToList(), DisplayMember = "Name" };
+            var role = new ComboBox { Left = 150, Top = 175, Width = 230, DropDownStyle = ComboBoxStyle.DropDownList, DataSource = roles.Value.Select(x => new RoleOption(x)).ToList() };
             var button = Button("إنشاء الحساب"); button.Left = 150; button.Top = 235; button.Click += (_, _) => dialog.DialogResult = DialogResult.OK;
             dialog.Controls.AddRange([LabelAt("الاسم الكامل", 3), name, LabelAt("اسم المستخدم", 53), username,
                 LabelAt("كلمة المرور", 103), password, LabelAt("الدور", 153), role, button]);
-            if (dialog.ShowDialog(FindForm()) != DialogResult.OK || role.SelectedItem is not RoleSummary selected) return;
-            var result = await WithServiceAsync(service => service.CreateAccountAsync(username.Text, name.Text, password.Text, selected.Id));
+            if (dialog.ShowDialog(FindForm()) != DialogResult.OK || role.SelectedItem is not RoleOption selected) return;
+            var result = await WithServiceAsync(service => service.CreateAccountAsync(username.Text, name.Text, password.Text, selected.Role.Id));
             if (result.IsFailure) _log.Warning("Account creation was rejected; errorCode={ErrorCode}", result.Error.Code);
             if (result.IsFailure) AppDialog.ShowInformation(this, "إنشاء حساب", result.Error.Description);
             _status.Text = result.Message ?? (result.IsSuccess ? "تم إنشاء الحساب." : "تعذر إنشاء الحساب.");
@@ -132,22 +135,22 @@ internal sealed class UserManagementForm : UserControl
             if (roles.IsFailure) { _status.Text = roles.Error.Description; return; }
             using var dialog = new Form { Text = "صلاحيات الأدوار", Size = new Size(460, 560), StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog, RightToLeft = RightToLeft.Yes, RightToLeftLayout = true };
-            var select = new ComboBox { Left = 25, Top = 20, Width = 390, DropDownStyle = ComboBoxStyle.DropDownList, DataSource = roles.Value.ToList(), DisplayMember = "Name" };
-            var permissions = AuthSeed.PermissionCodes.Select(code => new CheckBox { Text = code, AutoSize = true, Tag = code }).ToList();
+            var select = new ComboBox { Left = 25, Top = 20, Width = 390, DropDownStyle = ComboBoxStyle.DropDownList, DataSource = roles.Value.Select(x => new RoleOption(x)).ToList() };
+            var permissions = AuthSeed.PermissionCodes.Select(code => new CheckBox { Text = PermissionNameArabic(code), AutoSize = true, Tag = code, RightToLeft = RightToLeft.Yes }).ToList();
             var list = new FlowLayoutPanel { Left = 25, Top = 62, Width = 390, Height = 390, AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             list.Controls.AddRange(permissions.ToArray());
             select.SelectedIndexChanged += (_, _) =>
             {
-                var current = select.SelectedItem as RoleSummary;
+                var current = (select.SelectedItem as RoleOption)?.Role;
                 foreach (var item in permissions) item.Checked = current?.PermissionCodes.Contains((string)item.Tag!) == true;
             };
-            if (select.SelectedItem is RoleSummary initial)
-                foreach (var item in permissions) item.Checked = initial.PermissionCodes.Contains((string)item.Tag!);
+            if (select.SelectedItem is RoleOption initial)
+                foreach (var item in permissions) item.Checked = initial.Role.PermissionCodes.Contains((string)item.Tag!);
             var save = Button("حفظ الصلاحيات"); save.Left = 25; save.Top = 465; save.Click += (_, _) => dialog.DialogResult = DialogResult.OK;
             dialog.Controls.AddRange([select, list, save]);
-            if (dialog.ShowDialog(FindForm()) != DialogResult.OK || select.SelectedItem is not RoleSummary chosen) return;
-            var result = await WithServiceAsync(service => service.SetRolePermissionsAsync(chosen.Id, permissions.Where(x => x.Checked).Select(x => (string)x.Tag!).ToArray()));
-            if (result.IsFailure) _log.Warning("Role permission update was rejected; roleId={RoleId}; errorCode={ErrorCode}", chosen.Id, result.Error.Code);
+            if (dialog.ShowDialog(FindForm()) != DialogResult.OK || select.SelectedItem is not RoleOption chosen) return;
+            var result = await WithServiceAsync(service => service.SetRolePermissionsAsync(chosen.Role.Id, permissions.Where(x => x.Checked).Select(x => (string)x.Tag!).ToArray()));
+            if (result.IsFailure) _log.Warning("Role permission update was rejected; roleId={RoleId}; errorCode={ErrorCode}", chosen.Role.Id, result.Error.Code);
             if (result.IsFailure) AppDialog.ShowInformation(this, "صلاحيات الأدوار", result.Error.Description);
             _status.Text = result.Message ?? "تم تحديث صلاحيات الدور.";
         }
@@ -161,17 +164,17 @@ internal sealed class UserManagementForm : UserControl
         try
         {
             var row = _grid.SelectedRows[0]; var userId = (Guid)row.Cells[4].Value!;
-            var existingNames = row.Cells[2].Value?.ToString()?.Split('،', StringSplitOptions.TrimEntries) ?? [];
+            var existingNames = row.Tag as string[] ?? [];
             var roles = await WithServiceAsync(service => service.GetRolesAsync());
             if (roles.IsFailure) { _status.Text = roles.Error.Description; return; }
             using var dialog = new Form { Text = "تعيين أدوار للحساب", Size = new Size(390, 430), StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog, RightToLeft = RightToLeft.Yes, RightToLeftLayout = true };
-            var list = new CheckedListBox { Left = 25, Top = 20, Width = 320, Height = 300, CheckOnClick = true };
-            foreach (var role in roles.Value) { var i = list.Items.Add(role); if (existingNames.Contains(role.Name)) list.SetItemChecked(i, true); }
+            var list = new CheckedListBox { Left = 25, Top = 20, Width = 320, Height = 300, CheckOnClick = true, RightToLeft = RightToLeft.Yes };
+            foreach (var role in roles.Value) { var i = list.Items.Add(new RoleOption(role)); if (existingNames.Contains(role.Name, StringComparer.Ordinal)) list.SetItemChecked(i, true); }
             var save = Button("حفظ الأدوار"); save.Left = 25; save.Top = 335; save.Click += (_, _) => dialog.DialogResult = DialogResult.OK;
             dialog.Controls.AddRange([list, save]);
             if (dialog.ShowDialog(FindForm()) != DialogResult.OK) return;
-            var selected = list.CheckedItems.Cast<RoleSummary>().Select(x => x.Id).ToArray();
+            var selected = list.CheckedItems.Cast<RoleOption>().Select(x => x.Role.Id).ToArray();
             var result = await WithServiceAsync(service => service.SetUserRolesAsync(userId, selected));
             if (result.IsFailure) _log.Warning("User role update was rejected; userId={UserId}; errorCode={ErrorCode}", userId, result.Error.Code);
             if (result.IsFailure) AppDialog.ShowInformation(this, "تعيين الأدوار", result.Error.Description);
@@ -180,6 +183,43 @@ internal sealed class UserManagementForm : UserControl
         }
         catch (UnauthorizedAccessException exception) { _log.Warning(exception, "Access denied while assigning account roles"); _status.Text = "ليست لديك صلاحية تعيين الأدوار."; }
         catch (Exception exception) { _log.Error(exception, "Failed to assign account roles"); _status.Text = "تعذر تحديث أدوار الحساب."; }
+    }
+
+
+    private sealed record RoleOption(RoleSummary Role)
+    {
+        public override string ToString() => RoleNameArabic(Role.Name);
+    }
+
+    private static string RoleNameArabic(string name) => name switch
+    {
+        "Admin" => "مدير النظام",
+        "Manager" => "مدير الحضانة",
+        "Teacher" => "معلم / معلمة",
+        "Accountant" => "محاسب",
+        "Receptionist" => "موظف استقبال",
+        _ => name
+    };
+
+    private static string PermissionNameArabic(string code)
+    {
+        var parts = code.Split('.', 2);
+        if (parts.Length != 2) return code;
+        var module = parts[0] switch
+        {
+            "Students" => "الأطفال", "Classes" => "الفصول", "Attendance" => "حضور الأطفال",
+            "EmployeeAttendance" => "حضور الموظفين", "Employees" => "الموظفين", "Payments" => "المدفوعات",
+            "Expenses" => "المصروفات", "Inventory" => "المخزن", "Subscriptions" => "الاشتراكات",
+            "Users" => "المستخدمين", "Roles" => "الأدوار", "Permissions" => "الصلاحيات",
+            "Settings" => "الإعدادات", "Finance" => "الماليات", "Payroll" => "الرواتب", _ => parts[0]
+        };
+        var action = parts[1] switch
+        {
+            "View" => "عرض", "Create" => "إضافة", "Edit" => "تعديل", "Delete" => "حذف",
+            "Manage" => "إدارة", "Record" => "تسجيل", "Export" => "تصدير Excel", "Restore" => "استعادة",
+            "ManageIncome" => "إدارة المقبوضات", "ManageExpenses" => "إدارة مصروفات", _ => parts[1]
+        };
+        return $"{action} {module}";
     }
 
     private static Button Button(string text) => new() { Text = text, Width = 140, Height = 40, Margin = new Padding(5), FlatStyle = FlatStyle.Flat,

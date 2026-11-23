@@ -1,4 +1,4 @@
-using ElMomenNursery.Application.DTOs;
+﻿using ElMomenNursery.Application.DTOs;
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Domain.Abstractions;
 using ElMomenNursery.Controls;
@@ -39,7 +39,7 @@ internal sealed class PayrollPage : UserControl
         AddField(editor, "مصاريف التأمين", _insurance); AddField(editor, "تاريخ الصرف", _paymentDate); AddField(editor, "ملاحظات", _notes);
         _savePayroll.Click += async (_, _) => await SaveAndCalculateAsync();
         var calculate = Button("حساب المحدد"); calculate.Click += async (_, _) => await WithSelectedAsync((service, id) => service.CalculateFinalSalary(id), "تم حساب الراتب.");
-        var pay = Button("صرف الراتب"); pay.Click += async (_, _) => await WithSelectedAsync((service, id) => service.MarkRecordAsPaid(id), "تم صرف الراتب وتسجيل المصروف.");
+        var pay = Button("صرف الراتب"); pay.Click += async (_, _) => await PaySelectedAsync();
         var edit = Button("تعديل المحدد"); edit.Click += (_, _) => BeginEdit();
         var cancelEdit = Button("إلغاء التعديل"); cancelEdit.Click += (_, _) => EndEdit();
         var refresh = Button("تحديث"); refresh.Click += async (_, _) => await LoadAsync();
@@ -142,6 +142,21 @@ internal sealed class PayrollPage : UserControl
         var result = await action(scope.ServiceProvider.GetRequiredService<IPayRollRecordService>(), payrollId);
         if (result.IsFailure) { AppDialog.ShowInformation(this, "الرواتب", result.Error.Description); return; }
         await LoadAsync(); AppDialog.ShowInformation(this, "الرواتب", success);
+    }
+
+    private async Task PaySelectedAsync()
+    {
+        if (_grid.SelectedRows.Count == 0 || _grid.SelectedRows[0].Tag is not Guid id)
+        { AppDialog.ShowInformation(this, "الرواتب", "اختر سجل راتب."); return; }
+        var record = _records.FirstOrDefault(x => x.Id == id);
+        if (record is null) return;
+        if (!record.IsCalculated)
+        { AppDialog.ShowInformation(this, "الرواتب", "احسب الراتب أولًا قبل الصرف."); return; }
+        var warning = record.AdvanceDeduction > 0
+            ? $"تنبيه: على الموظف سلفة متبقية، وسيُخصم منها {record.AdvanceDeduction:N2} جنيه.\nصافي المبلغ الذي سيُصرف: {record.AmountPaid:N2} جنيه.\nهل تريد تسجيل الصرف؟"
+            : $"صافي المبلغ الذي سيُصرف: {record.AmountPaid:N2} جنيه. هل تريد تسجيل الصرف؟";
+        if (!AppDialog.Confirm(this, "تأكيد صرف الراتب", warning)) return;
+        await WithSelectedAsync((service, payrollId) => service.MarkRecordAsPaid(payrollId), "تم صرف الراتب وتسجيل المصروف.");
     }
 
     private void SetEmployeeForSelected()

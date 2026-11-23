@@ -1,4 +1,4 @@
-using ElMomenNursery.Application.IServices;
+﻿using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Controls;
 using System.Globalization;
 
@@ -9,6 +9,8 @@ internal static class GridExcelExport
     public static async Task SaveAsync(IWin32Window owner, DataGridView grid, IExcelExportService exporter,
         string title, string worksheetName)
     {
+        var filterDescription = GetFilterDescription(grid);
+        var reportTitle = $"{title} - {filterDescription}";
         var visibleColumns = grid.Columns.Cast<DataGridViewColumn>()
             .Where(column => column.Visible)
             .OrderBy(column => column.DisplayIndex)
@@ -30,11 +32,11 @@ internal static class GridExcelExport
 
         using var dialog = new SaveFileDialog
         {
-            Title = title,
+            Title = reportTitle,
             Filter = "ملف Excel (*.xlsx)|*.xlsx",
             DefaultExt = "xlsx",
             AddExtension = true,
-            FileName = $"{worksheetName}_{DateTime.Now.ToString("yyyyMMdd_HHmm", CultureInfo.InvariantCulture)}.xlsx",
+            FileName = $"{SafeFilePart(reportTitle)}_{DateTime.Now.ToString("yyyyMMdd_HHmm", CultureInfo.InvariantCulture)}.xlsx",
             OverwritePrompt = true
         };
         if (dialog.ShowDialog(owner) != DialogResult.OK) return;
@@ -42,7 +44,7 @@ internal static class GridExcelExport
         try
         {
             var data = new ExcelExportData(worksheetName,
-                visibleColumns.Select(column => column.HeaderText).ToArray(), rows);
+                visibleColumns.Select(column => column.HeaderText).ToArray(), rows, reportTitle, filterDescription);
             var result = await exporter.ExportAsync(data, dialog.FileName);
             ResultPresenter.Present(owner, title, result);
         }
@@ -53,4 +55,63 @@ internal static class GridExcelExport
                 MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
         }
     }
+    private static string GetFilterDescription(DataGridView grid)
+    {
+        FilterCard? card = null;
+        for (Control? current = grid.Parent; current is not null && card is null; current = current.Parent)
+            card = FindFilterCard(current);
+        if (card is null) return "كل البيانات";
+
+        var values = new List<string>();
+        foreach (var field in card.Fields)
+        {
+            var value = DescribeControl(field.Input);
+            if (value is not null) values.Add($"{field.Label.Text}: {value}");
+        }
+        foreach (var group in card.Controls.OfType<FilterGroup>())
+        {
+            var groupValues = group.Controls.Cast<Control>().Where(control => control is not Label)
+                .Select(DescribeControl).Where(value => value is not null).ToArray();
+            if (groupValues.Length > 0) values.Add($"{group.Label.Text}: {string.Join(" إلى ", groupValues)}");
+        }
+        return values.Count == 0 ? "كل البيانات" : string.Join("؛ ", values);
+    }
+
+    private static FilterCard? FindFilterCard(Control root)
+    {
+        if (root is FilterCard filter) return filter;
+        foreach (Control child in root.Controls)
+            if (FindFilterCard(child) is { } found) return found;
+        return null;
+    }
+
+    private static string? DescribeControl(Control control)
+    {
+        if (control is FilterSearchBox search) return DescribeText(search.Text);
+        if (control is ComboBox combo)
+        {
+            var value = combo.SelectedItem?.ToString();
+            if (string.IsNullOrWhiteSpace(value) || value == "الكل" || value.StartsWith("كل ", StringComparison.Ordinal)) return null;
+            return value;
+        }
+        if (control is DateTimePicker date)
+        {
+            if (date.ShowCheckBox && !date.Checked) return null;
+            return date.Value.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+        }
+        if (control is TextBox text) return DescribeText(text.Text);
+        if (control is NumericUpDown number) return number.Value == 0 ? null : number.Value.ToString(CultureInfo.CurrentCulture);
+        if (control is CheckBox check) return check.Checked ? "نعم" : null;
+        return null;
+    }
+
+    private static string? DescribeText(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string SafeFilePart(string value)
+    {
+        foreach (var invalid in Path.GetInvalidFileNameChars()) value = value.Replace(invalid, ' ');
+        value = string.Join("_", value.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+        return value.Length > 100 ? value[..100] : value;
+    }
+
 }
