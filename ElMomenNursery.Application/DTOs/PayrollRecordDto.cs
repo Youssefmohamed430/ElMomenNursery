@@ -1,5 +1,7 @@
 namespace ElMomenNursery.Application.DTOs;
 
+public sealed record PayrollBatchResultDto(int CreatedCount, int SkippedCount);
+
 public class PayrollRecordDto
 {
     public Guid Id { get; init; }

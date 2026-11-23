@@ -68,6 +68,37 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
         return Result.Success(ToDto(record, ""));
     }
 
+    public async Task<Result<PayrollBatchResultDto>> CreatePayrollRecordsForAllEmployeesAsync(DateOnly startDate, DateOnly endDate, CancellationToken cancellationToken = default)
+    {
+        if (!permissions.HasPermission("Payroll.Manage")) return PayrollRecordErrors.PermissionDenied;
+        if (startDate == default || endDate < startDate) return PayrollRecordErrors.InvalidData;
+        try
+        {
+            var employees = await unitOfWork.Repository<Employee>().ListAsync(cancellationToken: cancellationToken);
+            var records = await unitOfWork.Repository<PayrollRecord>().ListAsync(
+                x => x.PeriodStart <= endDate && x.PeriodEnd >= startDate, cancellationToken: cancellationToken);
+            var existingEmployeeIds = records.Select(x => x.EmployeeId).ToHashSet();
+            var eligible = employees.Where(x => !existingEmployeeIds.Contains(x.Id)).ToArray();
+            await unitOfWork.BeginTransactionAsync(cancellationToken);
+            foreach (var employee in eligible)
+            {
+                await unitOfWork.Repository<PayrollRecord>().AddAsync(new PayrollRecord
+                {
+                    EmployeeId = employee.Id, Employee = employee, PeriodStart = startDate, PeriodEnd = endDate,
+                    AgreedSalary = employee.Salary
+                }, cancellationToken);
+            }
+            await unitOfWork.CommitTransactionAsync(cancellationToken);
+            return Result.Success(new PayrollBatchResultDto(eligible.Length, employees.Count - eligible.Length));
+        }
+        catch (Exception ex)
+        {
+            await unitOfWork.RollbackTransactionAsync(CancellationToken.None);
+            logger.LogError(ex, "Bulk payroll record creation failed; startDate={StartDate}; endDate={EndDate}", startDate, endDate);
+            return PayrollRecordErrors.PersistenceFailure;
+        }
+    }
+
     public async Task<Result<PayrollRecordDto>> UpdatePayRollRecordAsync(Guid id, UpdatePayrollRecordDto dto)
     {
         if (!permissions.HasPermission("Payroll.Manage")) return PayrollRecordErrors.PermissionDenied;

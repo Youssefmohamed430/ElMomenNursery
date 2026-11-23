@@ -13,6 +13,8 @@ internal sealed class PayrollPage : UserControl
     private readonly DateTimePicker _from = new() { Format = DateTimePickerFormat.Short };
     private readonly DateTimePicker _to = new() { Format = DateTimePickerFormat.Short };
     private readonly DateTimePicker _paymentDate = new() { Format = DateTimePickerFormat.Short };
+    private readonly DateTimePicker _filterFrom = new() { Format = DateTimePickerFormat.Short, ShowCheckBox = true };
+    private readonly DateTimePicker _filterTo = new() { Format = DateTimePickerFormat.Short, ShowCheckBox = true };
     private readonly NumericUpDown _salary = MoneyInput();
     private readonly NumericUpDown _insurance = MoneyInput();
     private readonly NumericUpDown _additions = MoneyInput();
@@ -29,12 +31,15 @@ internal sealed class PayrollPage : UserControl
         var today = DateTime.Today;
         _from.Value = new DateTime(today.Year, today.Month, 1);
         _to.Value = new DateTime(today.Year, today.Month, DateTime.DaysInMonth(today.Year, today.Month));
+        _filterFrom.Value = _from.Value; _filterTo.Value = _to.Value;
+        _filterFrom.Checked = _filterTo.Checked = true;
         Dock = DockStyle.Fill; RightToLeft = RightToLeft.Yes; BackColor = Color.WhiteSmoke; Padding = new Padding(20);
         var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, RightToLeft = RightToLeft.Yes };
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         var title = new Label { Text = "إدارة الرواتب", AutoSize = true, Font = new Font("Segoe UI", 18, FontStyle.Bold), Margin = new Padding(4, 4, 4, 14) };
         var editor = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, WrapContents = true, RightToLeft = RightToLeft.Yes, Padding = new Padding(0, 0, 0, 12) };
         AddField(editor, "الموظف", _employee); AddField(editor, "بداية الفترة", _from); AddField(editor, "نهاية الفترة", _to);
+        AddField(editor, "عرض من تاريخ", _filterFrom); AddField(editor, "إلى تاريخ", _filterTo);
         AddField(editor, "الراتب الشهري", _salary); AddField(editor, "إضافات", _additions); AddField(editor, "خصومات أخرى", _deductions);
         AddField(editor, "مصاريف التأمين", _insurance); AddField(editor, "تاريخ الصرف", _paymentDate); AddField(editor, "ملاحظات", _notes);
         _savePayroll.Click += async (_, _) => await SaveAndCalculateAsync();
@@ -44,7 +49,12 @@ internal sealed class PayrollPage : UserControl
         var cancelEdit = Button("إلغاء التعديل"); cancelEdit.Click += (_, _) => EndEdit();
         var refresh = Button("تحديث"); refresh.Click += async (_, _) => await LoadAsync();
         var advances = Button("سلف الموظفين"); advances.Click += async (_, _) => { using var dialog = new EmployeeAdvancesForm(_scopes); dialog.ShowDialog(this); await LoadAsync(); };
-        editor.Controls.AddRange([_savePayroll, edit, cancelEdit, calculate, pay, advances, refresh]);
+        var generate = Button("إنشاء سجلات لكل الموظفين"); generate.Click += async (_, _) => await GenerateForAllEmployeesAsync();
+        var clearDateFilter = Button("إلغاء فلتر التاريخ"); clearDateFilter.Click += async (_, _) => { _filterFrom.Checked = _filterTo.Checked = false; await LoadAsync(); };
+        _filterFrom.ValueChanged += async (_, _) => { if (_filterFrom.Checked) await LoadAsync(); };
+        _filterTo.ValueChanged += async (_, _) => { if (_filterTo.Checked) await LoadAsync(); };
+        _filterFrom.MouseUp += async (_, _) => await LoadAsync(); _filterTo.MouseUp += async (_, _) => await LoadAsync();
+        editor.Controls.AddRange([_savePayroll, generate, clearDateFilter, edit, cancelEdit, calculate, pay, advances, refresh]);
         _grid.Columns.Add("Employee", "الموظف"); _grid.Columns.Add("Period", "الفترة"); _grid.Columns.Add("Salary", "الراتب الشهري");
         _grid.Columns.Add("Daily", "أجر اليوم"); _grid.Columns.Add("Absences", "أيام الغياب"); _grid.Columns.Add("Insurance", "التأمين");
         _grid.Columns.Add("Advance", "خصم السلف"); _grid.Columns.Add("Net", "صافي الراتب"); _grid.Columns.Add("Paid", "الحالة");
@@ -70,12 +80,26 @@ internal sealed class PayrollPage : UserControl
         var service = scope.ServiceProvider.GetRequiredService<IPayRollRecordService>();
         var result = await service.GetAllPayrollRecordsAsync();
         if (result.IsFailure) { AppDialog.ShowInformation(this, "الرواتب", result.Error.Description); return; }
-        _records = result.Value; _grid.Rows.Clear();
+        _records = result.Value.Where(record =>
+            (!_filterFrom.Checked || record.PeriodEnd >= DateOnly.FromDateTime(_filterFrom.Value)) &&
+            (!_filterTo.Checked || record.PeriodStart <= DateOnly.FromDateTime(_filterTo.Value))).ToArray(); _grid.Rows.Clear();
         foreach (var record in _records)
         {
             var index = _grid.Rows.Add(record.EmployeeName, $"{record.PeriodStart:dd/MM/yyyy} - {record.PeriodEnd:dd/MM/yyyy}", record.AgreedSalary.ToString("N2"), record.DailySalary.ToString("N2"), record.AbsenceDays, record.Insurancefunds.ToString("N2"), record.AdvanceDeduction.ToString("N2"), record.AmountPaid.ToString("N2"), record.IsPaid ? "تم الصرف" : record.IsCalculated ? "جاهز للصرف" : "غير محسوب");
             _grid.Rows[index].Tag = record.Id;
         }
+    }
+
+    private async Task GenerateForAllEmployeesAsync()
+    {
+        if (_from.Value.Date > _to.Value.Date) { AppDialog.ShowInformation(this, "الرواتب", "بداية الفترة يجب أن تسبق نهايتها."); return; }
+        var start = DateOnly.FromDateTime(_from.Value); var end = DateOnly.FromDateTime(_to.Value);
+        if (!AppDialog.Confirm(this, "إنشاء سجلات الرواتب", $"سيتم إنشاء سجل راتب لكل موظف ليس لديه سجل متداخل للفترة {start:dd/MM/yyyy} إلى {end:dd/MM/yyyy}. هل تريد المتابعة؟")) return;
+        await using var scope = _scopes.CreateAsyncScope();
+        var result = await scope.ServiceProvider.GetRequiredService<IPayRollRecordService>().CreatePayrollRecordsForAllEmployeesAsync(start, end);
+        if (result.IsFailure) { AppDialog.ShowInformation(this, "الرواتب", result.Error.Description); return; }
+        await LoadAsync();
+        AppDialog.ShowInformation(this, "الرواتب", $"تم إنشاء {result.Value.CreatedCount} سجل، وتخطي {result.Value.SkippedCount} موظف لوجود سجل متداخل للفترة.");
     }
 
     private void BeginEdit()

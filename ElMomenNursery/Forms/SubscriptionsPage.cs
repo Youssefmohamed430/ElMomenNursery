@@ -41,8 +41,11 @@ public sealed class SubscriptionsPage : UserControl
         _status.Items.AddRange(["الكل", "مستحق", "مدفوع جزئيًا", "مدفوع", "ملغي", "معفى"]); _status.SelectedIndex = 0;
         _plan.Items.Add(new PlanChoice(null, "كل الخطط")); _plan.SelectedIndex = 0;
         _classroom.Items.Add(new ClassroomFilterOptionDto(Guid.Empty, "كل الفصول")); _classroom.SelectedIndex = 0;
-        _from.Checked = false;
-        _to.Checked = false;
+        var currentMonth = DateTime.Today;
+        _from.Value = new DateTime(currentMonth.Year, currentMonth.Month, 1);
+        _to.Value = new DateTime(currentMonth.Year, currentMonth.Month, DateTime.DaysInMonth(currentMonth.Year, currentMonth.Month));
+        _from.Checked = true;
+        _to.Checked = true;
         _grid.Columns.AddRange([new DataGridViewTextBoxColumn { HeaderText = "الطفل" }, new DataGridViewTextBoxColumn { HeaderText = "الخطة" },
             new DataGridViewTextBoxColumn { HeaderText = "من" }, new DataGridViewTextBoxColumn { HeaderText = "إلى" }, new DataGridViewTextBoxColumn { HeaderText = "المستحق" },
             new DataGridViewTextBoxColumn { HeaderText = "المدفوع" }, new DataGridViewTextBoxColumn { HeaderText = "المتبقي" }, new DataGridViewTextBoxColumn { HeaderText = "الحالة" },
