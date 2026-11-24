@@ -1,0 +1,30 @@
+2026-11-24 11:47:03.365 +02:00 [INF]  Application starting { AppVersion: "1.0.0.0" }
+2026-11-24 11:47:03.608 +02:00 [INF]  Resolved nursery data directory; dataDirectory=C:\Users\Gaber\AppData\Local\AlMoumenNursery; databasePath=E:\Projects\Elmomen Desktop App\ElMomenNursery\dev-data\nursery-mockup.db; databaseExists=true { AppVersion: "1.0.0.0" }
+2026-11-24 11:47:05.247 +02:00 [INF]  Database startup check; databasePath=E:\Projects\Elmomen Desktop App\ElMomenNursery\dev-data\nursery-mockup.db; pendingMigrations=[] { AppVersion: "1.0.0.0" }
+2026-11-24 11:47:05.355 +02:00 [INF]  Database migration completed; durationMs=105 { AppVersion: "1.0.0.0" }
+2026-11-24 11:47:05.777 +02:00 [INF]  Authentication seed completed; durationMs=421 { AppVersion: "1.0.0.0" }
+2026-11-24 11:47:20.342 +02:00 [INF]  User logged in; UserId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-24 11:47:20.425 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرئيسية; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-24 11:47:39.383 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الموظفون; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-24 11:47:46.669 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الماليات; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-24 11:47:48.440 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=المخزن; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-24 11:47:53.138 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الأطفال; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-24 11:47:58.682 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الحضور; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-24 11:48:02.274 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الفصول; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-24 11:48:07.617 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=إدارة المستخدمين; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-24 11:50:15.768 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الأطفال; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-24 11:51:23.159 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرواتب; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-24 11:51:23.777 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الموظفون; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-24 11:52:32.102 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الاشتراكات والمدفوعات; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-24 11:53:21.043 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الماليات; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-24 11:53:34.544 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=المخزن; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-24 11:53:46.432 +02:00 [INF]  User logged out; UserId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-24 11:53:47.954 +02:00 [INF]  Application stopped normally { AppVersion: "1.0.0.0" }
+2026-11-24 12:07:14.304 +02:00 [INF]  Application starting { AppVersion: "1.0.0.0" }
+2026-11-24 12:07:14.374 +02:00 [INF]  Resolved nursery data directory; dataDirectory=C:\Users\Gaber\AppData\Local\AlMoumenNursery; databasePath=E:\Projects\Elmomen Desktop App\ElMomenNursery\dev-data\nursery-mockup.db; databaseExists=true { AppVersion: "1.0.0.0" }
+2026-11-24 12:07:15.398 +02:00 [INF]  Database startup check; databasePath=E:\Projects\Elmomen Desktop App\ElMomenNursery\dev-data\nursery-mockup.db; pendingMigrations=[] { AppVersion: "1.0.0.0" }
+2026-11-24 12:07:15.531 +02:00 [INF]  Database migration completed; durationMs=129 { AppVersion: "1.0.0.0" }
+2026-11-24 12:07:15.883 +02:00 [INF]  Authentication seed completed; durationMs=350 { AppVersion: "1.0.0.0" }
+2026-11-24 12:07:29.543 +02:00 [INF]  User logged in; UserId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-24 12:07:29.608 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرئيسية; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-24 12:07:32.749 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الاشتراكات والمدفوعات; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }

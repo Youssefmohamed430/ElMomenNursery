@@ -104,11 +104,17 @@ public sealed class SubscriptionService : ISubscriptionService
     public async Task<Result<SubscriptionDto>> CreateSubscriptionAsync(CreateSubscriptionDto dto, CancellationToken ct = default)
     {
         if (!Allowed("Subscriptions.Manage")) return SubscriptionErrors.PermissionDenied;
+
         if (dto.InitialPayment is not null && !Allowed("Payments.Create")) return SubscriptionErrors.PermissionDenied;
+
         if (dto.PeriodStart == default || dto.PeriodEnd < dto.PeriodStart) return SubscriptionErrors.InvalidPeriod;
+
         var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(x => x.Id == dto.ChildId, asNoTracking: false, cancellationToken: ct);
+
         if (child is null) return SubscriptionErrors.ChildNotFound;
+
         if (dto.PeriodStart < child.EnrollmentDate) return SubscriptionErrors.PeriodBeforeEnrollment;
+
         SubscriptionPlan? plan = null;
         if (dto.SubscriptionPlanId is Guid planId)
         {
@@ -117,14 +123,19 @@ public sealed class SubscriptionService : ISubscriptionService
         }
         var amount = dto.AmountDue ?? plan?.DefaultFee ?? 0m;
         if (amount < 0) return SubscriptionErrors.InvalidAmount;
+
         if (dto.InitialPayment is not null && (dto.InitialPayment.Amount <= 0 || dto.InitialPayment.Amount > amount))
             return dto.InitialPayment.Amount <= 0 ? SubscriptionErrors.InvalidAmount : SubscriptionErrors.OverpaymentNotAllowed;
+
         var overlap = await unitOfWork.Repository<Subscription>().AnyAsync(x => x.ChildId == child.Id && x.Status != SubscriptionStatus.Cancelled
             && x.PeriodStart <= dto.PeriodEnd && x.PeriodEnd >= dto.PeriodStart, ct);
+
         if (overlap && !dto.ConfirmOverlappingPeriod) return SubscriptionErrors.OverlappingPeriod;
         var initialPaid = dto.InitialPayment?.Amount ?? 0;
+
         var sub = new Subscription { ChildId = child.Id, Child = child, SubscriptionPlanId = plan?.Id, SubscriptionPlan = plan,
             PeriodStart = dto.PeriodStart, PeriodEnd = dto.PeriodEnd, AmountDue = amount, Notes = Clean(dto.Notes), Status = ComputeStatus(amount, initialPaid) };
+
         var before = "—";
         Payment? initialPayment = null;
         await unitOfWork.BeginTransactionAsync(ct);
@@ -149,6 +160,7 @@ public sealed class SubscriptionService : ISubscriptionService
             logger.LogError(ex, "Subscription creation failed; subscriptionId={SubscriptionId}; childId={ChildId}", sub.Id, child.Id);
             return PersistenceErrorMapper.FromException(ex);
         }
+
         sub.Child = child; sub.SubscriptionPlan = plan;
         var createdDto = ToDto(sub, dto.InitialPayment?.Amount ?? 0);
         if (initialPayment is not null) createdDto.InitialPaymentReceipt = await WithNurserySettings(ToReceipt(initialPayment, sub, 0, initialPayment.Amount), ct);
@@ -206,11 +218,21 @@ public sealed class SubscriptionService : ISubscriptionService
     public async Task<Result<PaymentReceiptDto>> RecordPaymentAsync(Guid subscriptionId, RecordPaymentDto dto, CancellationToken ct = default)
     {
         if (!Allowed("Payments.Create")) return SubscriptionErrors.PermissionDenied;
+
         if (dto.Amount <= 0) return SubscriptionErrors.InvalidAmount;
-        var item = await GetTrackedSubscription(subscriptionId, true, ct); if (item is null) return SubscriptionErrors.NotFound;
+
+        var item = await GetTrackedSubscription(subscriptionId, true, ct);
+
+        if (item is null) return SubscriptionErrors.NotFound;
+
         if (item.Status is SubscriptionStatus.Cancelled or SubscriptionStatus.Waived) return SubscriptionErrors.PaymentNotAllowedForStatus;
-        var beforePaid = await PaidAsync(subscriptionId, ct); if (dto.Amount > item.AmountDue - beforePaid) return SubscriptionErrors.OverpaymentNotAllowed;
+
+        var beforePaid = await PaidAsync(subscriptionId, ct);
+
+        if (dto.Amount > item.AmountDue - beforePaid) return SubscriptionErrors.OverpaymentNotAllowed;
+
         var before = SubscriptionValues(item, beforePaid);
+
         await unitOfWork.BeginTransactionAsync(ct);
         try
         {
