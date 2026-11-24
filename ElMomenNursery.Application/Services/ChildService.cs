@@ -26,6 +26,8 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger, 
             var details = string.Join("\n", validationResults.Select(x => x.ErrorMessage).Where(x => !string.IsNullOrWhiteSpace(x)));
             return new Error(ChildErrors.InvalidData.Code, string.IsNullOrWhiteSpace(details) ? ChildErrors.InvalidData.Description : details);
         }
+        if (childDto.DateOfBirth > DateOnly.FromDateTime(DateTime.Today) || childDto.DateOfBirth > childDto.EnrollmentDate)
+            return ChildErrors.InvalidData;
         try
         {
             var child = childDto.Adapt<Child>();
@@ -47,6 +49,8 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger, 
     {
         if (!permissions.HasAnyPermission("Students.Edit", "Students.Create")) return ChildErrors.PermissionDenied;
         if (childDto is null) return ChildErrors.InvalidData;
+        if (childDto.DateOfBirth > DateOnly.FromDateTime(DateTime.Today) || childDto.DateOfBirth > childDto.EnrollmentDate)
+            return ChildErrors.InvalidData;
         try
         {
             var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(c => c.Id == childId, asNoTracking: false);

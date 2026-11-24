@@ -20,7 +20,10 @@ public sealed class EmployeeService(IUnitOfWork unitOfWork, ILogger<EmployeeServ
         if (employee.Salary < 0) return EmployeeErrors.InvalidSalary;
 
         employee.NationalIdNumber = employee.NationalIdNumber.Trim();
-        if (await unitOfWork.Repository<Employee>().AnyAsync(e => e.NationalIdNumber == employee.NationalIdNumber))
+        // The database's unique index spans soft-deleted rows too, so include them
+        // in the friendly duplicate check instead of letting SQLite reject the save.
+        if (await unitOfWork.Repository<Employee>().Query().IgnoreQueryFilters()
+                .AnyAsync(e => e.NationalIdNumber == employee.NationalIdNumber))
             return EmployeeErrors.DuplicateNationalId;
 
         var entity = employee.Adapt<Employee>();
@@ -126,7 +129,7 @@ public sealed class EmployeeService(IUnitOfWork unitOfWork, ILogger<EmployeeServ
         if (new[] { employee.FullName, employee.NationalIdNumber, employee.Address, employee.Phone, employee.JobDesignation }
             .Any(value => value is not null && string.IsNullOrWhiteSpace(value))) return EmployeeErrors.InvalidData;
         if (employee.Salary < 0) return EmployeeErrors.InvalidSalary;
-        if (employee.NationalIdNumber is not null && await unitOfWork.Repository<Employee>().AnyAsync(e =>
+        if (employee.NationalIdNumber is not null && await unitOfWork.Repository<Employee>().Query().IgnoreQueryFilters().AnyAsync(e =>
                 e.Id != id && e.NationalIdNumber == employee.NationalIdNumber.Trim())) return EmployeeErrors.DuplicateNationalId;
 
         if (employee.NationalIdNumber is not null) employee.NationalIdNumber = employee.NationalIdNumber.Trim();

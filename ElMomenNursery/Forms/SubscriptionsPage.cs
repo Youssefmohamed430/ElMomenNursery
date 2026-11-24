@@ -25,6 +25,7 @@ public sealed class SubscriptionsPage : UserControl
     private readonly Label _summary = new() { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight };
     private readonly Button _add = Button("إضافة اشتراك");
     private readonly Button _invoice = Button("فاتورة بيع من المخزن");
+    private readonly Button _invoiceHistory = Button("سجل الفواتير");
     private readonly Button _edit = Button("تعديل");
     private readonly Button _pay = Button("تسجيل دفعة");
     private readonly Button _fine = Button("تسجيل غرامة غياب 15 يوم");
@@ -54,6 +55,7 @@ public sealed class SubscriptionsPage : UserControl
         _pay.Visible = session.HasPermission("Payments.Create"); _fine.Visible = session.HasPermission("Payments.Create") && session.HasPermission("Finance.ManageIncome"); _receipt.Visible = session.HasPermission("Payments.View"); _export.Visible = session.HasPermission("Subscriptions.Export");
         var apply = Button("تطبيق"); var clear = Button("مسح الفلاتر"); var refresh = Button("تحديث");
         _invoice.Visible = session.HasPermission("Payments.Create");
+        _invoiceHistory.Visible = session.HasPermission("Payments.View");
         var filter = new FilterCard { Name = "subscriptions.filters" };
         filter.AddField("subscriptions.search", "اسم الطفل", _search, 2);
         filter.AddField("subscriptions.status", "حالة الاشتراك", _status);
@@ -63,7 +65,7 @@ public sealed class SubscriptionsPage : UserControl
         filter.AddField("subscriptions.balance", "الرصيد", _balance);
         filter.AddActions(apply, clear);
         var toolbar = new ActionToolbar { Name = "subscriptions.actions" };
-        toolbar.Add(refresh, _add, _invoice, _edit, _pay, _fine, _cancel, _delete, _receipt, _export);
+        toolbar.Add(refresh, _add, _invoice, _invoiceHistory, _edit, _pay, _fine, _cancel, _delete, _receipt, _export);
         _grid.Dock = DockStyle.None; _summary.Dock = DockStyle.None;
         Controls.Add(_grid); Controls.Add(_summary); Controls.Add(toolbar); Controls.Add(filter);
         Resize += (_, _) => LayoutContent(); LayoutContent();
@@ -79,6 +81,7 @@ public sealed class SubscriptionsPage : UserControl
         clear.Click += async (_, _) => { _search.Clear(); _status.SelectedIndex = 0; _plan.SelectedIndex = 0; _classroom.SelectedIndex = 0; _from.Checked = _to.Checked = false; _balance.Checked = false; await LoadAsync(); };
         _add.Click += async (_, _) => await EditAsync(null); _edit.Click += async (_, _) => { if (Selected() is { } row) await EditAsync(row); };
         _invoice.Click += async (_, _) => { using var form = new CashierInvoiceForm(_scopes); if (form.ShowDialog(FindForm()) == DialogResult.OK) await LoadAsync(); };
+        _invoiceHistory.Click += (_, _) => { using var form = new InvoiceHistoryForm(_scopes); form.ShowDialog(FindForm()); };
         _cancel.Click += async (_, _) => await CancelAsync(); _delete.Click += async (_, _) => await DeleteAsync();
         _pay.Click += async (_, _) => await RecordPaymentAsync(); _fine.Click += async (_, _) => await RecordAbsenceFineAsync(); _receipt.Click += async (_, _) => await PrintAsync();
         _export.Click += async (_, _) => await GridExcelExport.SaveAsync((IWin32Window?)FindForm() ?? this, _grid, _excel, "تصدير الاشتراكات", "الاشتراكات");
@@ -351,7 +354,7 @@ internal sealed class PaymentEditorForm : Form
         var labels = new[] { "المبلغ", "طريقة الدفع", "المرجع", "ملاحظات" }; var fields = new Control[] { _amount, _method, _reference, _notes };
         var grid = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(16), ColumnCount = 2, RowCount = 5 }; grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 100)); grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         for (var i = 0; i < fields.Length; i++) { grid.Controls.Add(new Label { Text = labels[i], Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight }, 0, i); grid.Controls.Add(fields[i], 1, i); }
-        var ok = new Button { Text = "حفظ", Width = 90 }; ok.Click += (_, _) => { if (_amount.Value > max) { AppDialog.ShowInformation(this, Text, "المبلغ أكبر من المتبقي."); return; } Values = new RecordPaymentDto(_amount.Value, _method.SelectedIndex switch { 0 => PaymentMethod.Cash, 1 => PaymentMethod.BankTransfer, _ => PaymentMethod.Other }, _reference.Text, _notes.Text); DialogResult = DialogResult.OK; Close(); };
+        var ok = new Button { Text = "حفظ", Width = 90 }; ok.Click += (_, _) => { if (_amount.Value <= 0) { AppDialog.ShowInformation(this, Text, "يجب أن يكون مبلغ الدفعة أكبر من صفر."); _amount.Focus(); return; } if (_amount.Value > max) { AppDialog.ShowInformation(this, Text, "المبلغ أكبر من المتبقي."); _amount.Focus(); return; } Values = new RecordPaymentDto(_amount.Value, _method.SelectedIndex switch { 0 => PaymentMethod.Cash, 1 => PaymentMethod.BankTransfer, _ => PaymentMethod.Other }, _reference.Text, _notes.Text); DialogResult = DialogResult.OK; Close(); };
         var cancel = new Button { Text = "إلغاء", DialogResult = DialogResult.Cancel, Width = 90 }; grid.Controls.Add(ok, 0, 4); grid.Controls.Add(cancel, 1, 4); Controls.Add(grid); AcceptButton = ok; CancelButton = cancel;
     }
 }

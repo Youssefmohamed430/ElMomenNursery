@@ -11,6 +11,16 @@ namespace ElMomenNursery.Application.Services;
 
 public sealed class InvoiceService(IUnitOfWork uow, ILogger<InvoiceService> logger, IPermissionService permissions, ISessionManager sessions) : IInvoiceService
 {
+    public async Task<Result<IReadOnlyList<InvoiceListItemDto>>> GetInvoicesAsync(CancellationToken ct = default)
+    {
+        if (!permissions.HasPermission("Payments.View")) return CommonErrors.PermissionDenied;
+        var rows = await uow.Repository<Invoice>().Query().Include(x => x.Child).Include(x => x.Lines)
+            .OrderByDescending(x => x.InvoiceDate).ThenByDescending(x => x.CreatedAt).ToListAsync(ct);
+        return Result.Success<IReadOnlyList<InvoiceListItemDto>>(rows.Select(x => new InvoiceListItemDto(
+            x.Id, x.InvoiceNumber, x.InvoiceDate, x.CustomerName ?? x.Child?.FullName ?? "عميل نقدي", x.TotalAmount,
+            x.Status, x.PaymentMethod, x.PaymentReference,
+            x.Lines.Select(line => new InvoiceReceiptLineDto(line.ItemNameSnapshot, line.UnitPriceSnapshot, line.Quantity, line.LineTotal)).ToArray())).ToArray());
+    }
     private bool Allowed(string permission) => PermissionGuard.Check(permissions, permission) is null;
 
     public async Task<Result<IReadOnlyList<InventoryItemDto>>> GetAvailableItemsAsync(CancellationToken ct = default)

@@ -134,7 +134,13 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
                 x => x.EmployeeId == record.EmployeeId && x.AdvanceDate <= record.PeriodEnd && x.RemainingAmount > 0,
                 asNoTracking: false);
             advances = advances.OrderBy(x => x.AdvanceDate).ThenBy(x => x.CreatedAt).ToList();
-            if (advances.Sum(x => x.RemainingAmount) < record.AdvanceDeduction)
+            var repaymentRepository = unitOfWork.Repository<EmployeeAdvanceRepayment>();
+            var existingRepayments = await repaymentRepository.ListAsync(x => x.PayrollRecordId == record.Id,
+                cancellationToken: CancellationToken.None);
+            var alreadyRepaid = existingRepayments.Sum(x => x.Amount);
+            var advancesAlreadyLinked = existingRepayments.Select(x => x.EmployeeAdvanceId).ToHashSet();
+            var amountToAllocate = Math.Max(0, record.AdvanceDeduction - alreadyRepaid);
+            if (advances.Sum(x => x.RemainingAmount) < amountToAllocate)
             {
                 await unitOfWork.RollbackTransactionAsync();
                 return PayrollRecordErrors.AdvanceBalanceChanged;
@@ -151,11 +157,12 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
                 await unitOfWork.RollbackTransactionAsync();
                 return expenseResult.Error;
             }
-            var amountToAllocate = record.AdvanceDeduction;
             foreach (var advance in advances)
             {
+                if (advancesAlreadyLinked.Contains(advance.Id)) continue;
                 if (amountToAllocate <= 0) break;
                 var repayment = Math.Min(advance.RemainingAmount, amountToAllocate);
+                if (repayment <= 0) continue;
                 advance.RemainingAmount -= repayment;
                 amountToAllocate -= repayment;
                 await unitOfWork.Repository<EmployeeAdvanceRepayment>().AddAsync(new EmployeeAdvanceRepayment

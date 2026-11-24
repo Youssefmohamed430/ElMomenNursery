@@ -146,8 +146,11 @@ public sealed class LocalAccountManagementService(NurseryDbContext db, ISessionM
         }
         db.UserRoles.RemoveRange(user.UserRoles);
         user.RoleId = roles[0].Id; user.Role = roles[0];
+        // Keep the already tracked Role instances out of the join entity graph.
+        // Mapping UserRoleMapping here creates new Role objects with the same keys,
+        // which makes EF Core reject the save as a duplicate tracked entity.
         foreach (var role in roles)
-            db.UserRoles.Add(new UserRoleMapping(user, role).Adapt<UserRole>(AccountMappingConfig.Config));
+            db.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = role.Id });
         user.UpdatedAt = DateTimeOffset.UtcNow;
         db.AuthenticationAuditLogs.Add(MapAudit(actor?.UserId, actor?.Username ?? string.Empty, "UserRolesChanged", true,
             $"actorId={actor?.UserId}; targetUserId={userId}; roleCount={roles.Count}"));

@@ -35,10 +35,14 @@ internal sealed class EmployeesPage : UserControl
         var addButton = CreateActionButton("إضافة موظف", primary: true);
         var editButton = CreateActionButton("تعديل البيانات");
         var deleteButton = CreateActionButton("حذف موظف");
+        var deletedButton = CreateActionButton("عرض المحذوفين");
+        var restoreButton = CreateActionButton("استعادة موظف");
         var exportButton = CreateActionButton("تصدير Excel");
         exportButton.Visible = _session.HasPermission("Employees.Export");
         var canManage = _session.HasPermission("Employees.Manage");
         addButton.Visible = editButton.Visible = deleteButton.Visible = canManage;
+        deletedButton.Visible = _session.HasPermission("Employees.Restore");
+        restoreButton.Visible = false;
         var resultCount = new Label
         {
             AutoSize = false,
@@ -57,6 +61,7 @@ internal sealed class EmployeesPage : UserControl
 
         List<EmployeeDto> employees = [];
         var employeeLoadInProgress = false;
+        var showingDeleted = false;
         search.TextChanged += (_, _) => RenderEmployees();
         addButton.Click += (_, _) => RunSafeEvent(async () =>
         {
@@ -87,6 +92,22 @@ internal sealed class EmployeesPage : UserControl
         }, "Open employee editor");
         exportButton.Click += async (_, _) => await GridExcelExport.SaveAsync(this, grid, _excelExportService,
             "تصدير قائمة الموظفين", "الموظفون");
+        deletedButton.Click += (_, _) => RunSafeEvent(async () =>
+        {
+            showingDeleted = !showingDeleted;
+            deletedButton.Text = showingDeleted ? "عرض الموظفين" : "عرض المحذوفين";
+            restoreButton.Visible = showingDeleted && _session.HasPermission("Employees.Restore");
+            addButton.Visible = editButton.Visible = deleteButton.Visible = !showingDeleted && canManage;
+            filters.Enabled = !showingDeleted;
+            await LoadEmployeesAsync();
+        }, "Toggle deleted employees");
+        restoreButton.Click += (_, _) => RunSafeEvent(async () =>
+        {
+            if (!TryGetSelectedEmployeeId(out var id)) return;
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var result = await scope.ServiceProvider.GetRequiredService<IEmployeeService>().RestoreEmployee(id);
+            if (ResultPresenter.Present(this, "استعادة الموظف", result)) await LoadEmployeesAsync();
+        }, "Restore employee");
         deleteButton.Click += (_, _) => RunSafeEvent(async () =>
         {
             if (!TryGetSelectedEmployeeId(out var id)) return;
@@ -122,7 +143,7 @@ internal sealed class EmployeesPage : UserControl
         }, "Delete employee");
 
         var toolbar = new ActionToolbar { Name = "employees.actions" };
-        toolbar.Add(addButton, editButton, deleteButton, exportButton);
+        toolbar.Add(addButton, editButton, deleteButton, deletedButton, restoreButton, exportButton);
         page.Controls.AddRange([filters, toolbar, resultCount, grid]);
         page.Resize += (_, _) => LayoutEmployeesPage();
         LayoutEmployeesPage();
@@ -141,7 +162,12 @@ internal sealed class EmployeesPage : UserControl
             {
                 Result<IReadOnlyList<EmployeeDto>> loadedResult;
                 await using (var scope = _scopeFactory.CreateAsyncScope())
-                    loadedResult = await scope.ServiceProvider.GetRequiredService<IEmployeeService>().GetEmployees();
+                {
+                    var service = scope.ServiceProvider.GetRequiredService<IEmployeeService>();
+                    loadedResult = showingDeleted
+                        ? await service.GetDeletedEmployees()
+                        : await service.GetEmployees();
+                }
                 if (page.IsDisposed || grid.IsDisposed || resultCount.IsDisposed)
                 {
                     _log.Debug("Employee load cancelled: page disposed");
@@ -171,7 +197,7 @@ internal sealed class EmployeesPage : UserControl
 
         void RenderEmployees()
         {
-            var query = search.Text.Trim();
+            var query = showingDeleted ? string.Empty : search.Text.Trim();
             var visibleEmployees = string.IsNullOrEmpty(query)
                 ? employees
                 : employees.Where(employee =>

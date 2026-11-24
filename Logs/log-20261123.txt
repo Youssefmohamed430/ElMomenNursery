@@ -281,3 +281,436 @@
 2026-11-23 08:54:36.583 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الاشتراكات والمدفوعات; userId="e2d963af-f0b7-472c-83e5-c1a35e922603" { AppVersion: "1.0.0.0" }
 2026-11-23 08:54:43.559 +02:00 [INF]  User logged out; UserId="e2d963af-f0b7-472c-83e5-c1a35e922603" { AppVersion: "1.0.0.0" }
 2026-11-23 08:54:44.708 +02:00 [INF]  Application stopped normally { AppVersion: "1.0.0.0" }
+2026-11-23 18:12:56.055 +02:00 [INF]  Application starting { AppVersion: "1.0.0.0" }
+2026-11-23 18:12:56.247 +02:00 [INF]  Resolved nursery data directory; dataDirectory=C:\Users\Gaber\AppData\Local\AlMoumenNursery; databasePath=E:\Projects\Elmomen Desktop App\ElMomenNursery\dev-data\nursery-mockup.db; databaseExists=true { AppVersion: "1.0.0.0" }
+2026-11-23 18:12:57.663 +02:00 [INF]  Database startup check; databasePath=E:\Projects\Elmomen Desktop App\ElMomenNursery\dev-data\nursery-mockup.db; pendingMigrations=[] { AppVersion: "1.0.0.0" }
+2026-11-23 18:12:57.746 +02:00 [INF]  Database migration completed; durationMs=81 { AppVersion: "1.0.0.0" }
+2026-11-23 18:12:58.140 +02:00 [INF]  Authentication seed completed; durationMs=393 { AppVersion: "1.0.0.0" }
+2026-11-23 18:13:22.354 +02:00 [INF]  User logged in; UserId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:13:22.511 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرئيسية; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:13:25.606 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=إدارة المستخدمين; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:13:52.535 +02:00 [WRN] ElMomenNursery.Forms.UserManagementForm Account creation was rejected; errorCode=Accounts.WeakPassword { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+2026-11-23 18:14:37.685 +02:00 [INF] ElMomenNursery.Infrastructure.Security.LocalAccountManagementService Account created; actorId="92c91409-7f19-446b-b726-4a9780b2f1ea"; targetUserId="9958297a-5414-4d33-b582-7a5d4ec89427" { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+2026-11-23 18:15:17.853 +02:00 [INF] ElMomenNursery.Infrastructure.Security.LocalAccountManagementService Account created; actorId="92c91409-7f19-446b-b726-4a9780b2f1ea"; targetUserId="c97eb652-6afd-44ce-9009-9b552843971e" { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+2026-11-23 18:15:43.795 +02:00 [INF] ElMomenNursery.Infrastructure.Security.LocalAccountManagementService Account active state changed; actorId="92c91409-7f19-446b-b726-4a9780b2f1ea"; targetUserId="c97eb652-6afd-44ce-9009-9b552843971e"; isActive=false { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+2026-11-23 18:16:12.647 +02:00 [WRN] ElMomenNursery.Forms.UserManagementForm Account creation was rejected; errorCode=Accounts.WeakPassword { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+2026-11-23 18:16:30.294 +02:00 [INF]  User logged out; UserId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:16:45.435 +02:00 [WRN] ElMomenNursery.Infrastructure.Security.LocalAuthService Login rejected for inactive account; userId="c97eb652-6afd-44ce-9009-9b552843971e" { AppVersion: "1.0.0.0" }
+2026-11-23 18:16:45.441 +02:00 [WRN] ElMomenNursery.Forms.LoginForm Authentication operation was rejected; setupMode=false; errorCode=Common.InvalidCredentials { AppVersion: "1.0.0.0" }
+2026-11-23 18:16:52.096 +02:00 [WRN] ElMomenNursery.Infrastructure.Security.LocalAuthService Login rejected for inactive account; userId="c97eb652-6afd-44ce-9009-9b552843971e" { AppVersion: "1.0.0.0" }
+2026-11-23 18:16:52.100 +02:00 [WRN] ElMomenNursery.Forms.LoginForm Authentication operation was rejected; setupMode=false; errorCode=Common.InvalidCredentials { AppVersion: "1.0.0.0" }
+2026-11-23 18:17:02.188 +02:00 [WRN] ElMomenNursery.Infrastructure.Security.LocalAuthService Login rejected for inactive account; userId="c97eb652-6afd-44ce-9009-9b552843971e" { AppVersion: "1.0.0.0" }
+2026-11-23 18:17:02.233 +02:00 [WRN] ElMomenNursery.Forms.LoginForm Authentication operation was rejected; setupMode=false; errorCode=Common.InvalidCredentials { AppVersion: "1.0.0.0" }
+2026-11-23 18:17:20.098 +02:00 [INF]  User logged in; UserId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:17:20.133 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرئيسية; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:17:32.492 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الأطفال; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:17:37.714 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الموظفون; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:17:39.505 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=إدارة المستخدمين; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:17:45.896 +02:00 [INF]  User logged out; UserId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:18:03.446 +02:00 [INF]  User logged in; UserId="9958297a-5414-4d33-b582-7a5d4ec89427" { AppVersion: "1.0.0.0" }
+2026-11-23 18:18:03.488 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرئيسية; userId="9958297a-5414-4d33-b582-7a5d4ec89427" { AppVersion: "1.0.0.0" }
+2026-11-23 18:18:09.727 +02:00 [INF]  User logged out; UserId="9958297a-5414-4d33-b582-7a5d4ec89427" { AppVersion: "1.0.0.0" }
+2026-11-23 18:18:18.724 +02:00 [INF]  User logged in; UserId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:18:18.761 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرئيسية; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:18:36.303 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=إدارة المستخدمين; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:18:50.057 +02:00 [INF] ElMomenNursery.Infrastructure.Security.LocalAccountManagementService Password reset by administrator; actorId="92c91409-7f19-446b-b726-4a9780b2f1ea"; targetUserId="9958297a-5414-4d33-b582-7a5d4ec89427" { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+2026-11-23 18:18:52.495 +02:00 [INF]  User logged out; UserId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:19:01.544 +02:00 [INF]  User logged in; UserId="9958297a-5414-4d33-b582-7a5d4ec89427" { AppVersion: "1.0.0.0" }
+2026-11-23 18:19:01.584 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرئيسية; userId="9958297a-5414-4d33-b582-7a5d4ec89427" { AppVersion: "1.0.0.0" }
+2026-11-23 18:19:08.430 +02:00 [INF]  User logged out; UserId="9958297a-5414-4d33-b582-7a5d4ec89427" { AppVersion: "1.0.0.0" }
+2026-11-23 18:19:14.775 +02:00 [INF]  User logged in; UserId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:19:14.809 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرئيسية; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:19:27.167 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=إدارة المستخدمين; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:19:35.817 +02:00 [ERR] ElMomenNursery.Forms.UserManagementForm Failed to assign account roles { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+System.InvalidOperationException: The instance of entity type 'Role' cannot be tracked because another instance with the same key value for {'Id'} is already being tracked. When attaching existing entities, ensure that only one entity instance with a given key value is attached. Consider using 'DbContextOptionsBuilder.EnableSensitiveDataLogging' to see the conflicting key values.
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.IdentityMap`1.ThrowIdentityConflict(InternalEntityEntry entry)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.IdentityMap`1.Add(TKey key, InternalEntityEntry entry, Boolean updateDuplicate)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.IdentityMap`1.Add(TKey key, InternalEntityEntry entry)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.IdentityMap`1.Add(InternalEntityEntry entry)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.StartTracking(InternalEntityEntry entry)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.InternalEntityEntry.SetEntityState(EntityState oldState, EntityState newState, Boolean acceptChanges, Boolean modifyProperties)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.InternalEntityEntry.SetEntityState(EntityState entityState, Boolean acceptChanges, Boolean modifyProperties, Nullable`1 forceStateWhenUnknownKey, Nullable`1 fallbackState)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.EntityGraphAttacher.PaintAction(EntityEntryGraphNode`1 node)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.EntityEntryGraphIterator.TraverseGraph[TState](EntityEntryGraphNode`1 node, Func`2 handleNode)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.EntityEntryGraphIterator.TraverseGraph[TState](EntityEntryGraphNode`1 node, Func`2 handleNode)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.EntityGraphAttacher.AttachGraph(InternalEntityEntry rootEntry, EntityState targetState, EntityState storeGeneratedWithKeySetTargetState, Boolean forceStateWhenUnknownKey)
+   at Microsoft.EntityFrameworkCore.Internal.InternalDbSet`1.SetEntityState(InternalEntityEntry entry, EntityState entityState)
+   at Microsoft.EntityFrameworkCore.Internal.InternalDbSet`1.Add(TEntity entity)
+   at ElMomenNursery.Infrastructure.Security.LocalAccountManagementService.SetUserRolesAsync(Guid userId, IReadOnlyCollection`1 roleIds, CancellationToken cancellationToken) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Infrastructure\Security\LocalAccountManagementService.cs:line 150
+   at ElMomenNursery.Forms.UserManagementForm.WithServiceAsync[T](Func`2 operation) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery\Forms\UserManagementForm.cs:line 245
+   at ElMomenNursery.Forms.UserManagementForm.WithServiceAsync[T](Func`2 operation) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery\Forms\UserManagementForm.cs:line 245
+   at ElMomenNursery.Forms.UserManagementForm.AssignRolesAsync() in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery\Forms\UserManagementForm.cs:line 178
+2026-11-23 18:19:36.957 +02:00 [INF]  User logged out; UserId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:19:50.229 +02:00 [INF]  User logged in; UserId="9958297a-5414-4d33-b582-7a5d4ec89427" { AppVersion: "1.0.0.0" }
+2026-11-23 18:19:50.280 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرئيسية; userId="9958297a-5414-4d33-b582-7a5d4ec89427" { AppVersion: "1.0.0.0" }
+2026-11-23 18:19:57.723 +02:00 [INF]  User logged out; UserId="9958297a-5414-4d33-b582-7a5d4ec89427" { AppVersion: "1.0.0.0" }
+2026-11-23 18:20:08.020 +02:00 [INF]  User logged in; UserId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:20:08.057 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرئيسية; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:20:09.609 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=إدارة المستخدمين; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:20:41.296 +02:00 [ERR] ElMomenNursery.Forms.UserManagementForm Failed to assign account roles { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+System.InvalidOperationException: The instance of entity type 'Role' cannot be tracked because another instance with the same key value for {'Id'} is already being tracked. When attaching existing entities, ensure that only one entity instance with a given key value is attached. Consider using 'DbContextOptionsBuilder.EnableSensitiveDataLogging' to see the conflicting key values.
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.IdentityMap`1.ThrowIdentityConflict(InternalEntityEntry entry)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.IdentityMap`1.Add(TKey key, InternalEntityEntry entry, Boolean updateDuplicate)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.IdentityMap`1.Add(TKey key, InternalEntityEntry entry)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.IdentityMap`1.Add(InternalEntityEntry entry)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.StartTracking(InternalEntityEntry entry)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.InternalEntityEntry.SetEntityState(EntityState oldState, EntityState newState, Boolean acceptChanges, Boolean modifyProperties)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.InternalEntityEntry.SetEntityState(EntityState entityState, Boolean acceptChanges, Boolean modifyProperties, Nullable`1 forceStateWhenUnknownKey, Nullable`1 fallbackState)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.EntityGraphAttacher.PaintAction(EntityEntryGraphNode`1 node)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.EntityEntryGraphIterator.TraverseGraph[TState](EntityEntryGraphNode`1 node, Func`2 handleNode)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.EntityEntryGraphIterator.TraverseGraph[TState](EntityEntryGraphNode`1 node, Func`2 handleNode)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.EntityGraphAttacher.AttachGraph(InternalEntityEntry rootEntry, EntityState targetState, EntityState storeGeneratedWithKeySetTargetState, Boolean forceStateWhenUnknownKey)
+   at Microsoft.EntityFrameworkCore.Internal.InternalDbSet`1.SetEntityState(InternalEntityEntry entry, EntityState entityState)
+   at Microsoft.EntityFrameworkCore.Internal.InternalDbSet`1.Add(TEntity entity)
+   at ElMomenNursery.Infrastructure.Security.LocalAccountManagementService.SetUserRolesAsync(Guid userId, IReadOnlyCollection`1 roleIds, CancellationToken cancellationToken) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Infrastructure\Security\LocalAccountManagementService.cs:line 150
+   at ElMomenNursery.Forms.UserManagementForm.WithServiceAsync[T](Func`2 operation) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery\Forms\UserManagementForm.cs:line 245
+   at ElMomenNursery.Forms.UserManagementForm.WithServiceAsync[T](Func`2 operation) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery\Forms\UserManagementForm.cs:line 245
+   at ElMomenNursery.Forms.UserManagementForm.AssignRolesAsync() in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery\Forms\UserManagementForm.cs:line 178
+2026-11-23 18:22:35.124 +02:00 [INF] ElMomenNursery.Infrastructure.Security.LocalAccountManagementService Role permissions changed; actorId="92c91409-7f19-446b-b726-4a9780b2f1ea"; roleId="2d1ac5b1-4af0-4a15-9932-8d4c940ddd6a"; permissionCount=32 { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+2026-11-23 18:23:03.497 +02:00 [INF]  User logged out; UserId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:23:15.645 +02:00 [INF]  User logged in; UserId="e2d963af-f0b7-472c-83e5-c1a35e922603" { AppVersion: "1.0.0.0" }
+2026-11-23 18:23:15.679 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرئيسية; userId="e2d963af-f0b7-472c-83e5-c1a35e922603" { AppVersion: "1.0.0.0" }
+2026-11-23 18:23:18.688 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الأطفال; userId="e2d963af-f0b7-472c-83e5-c1a35e922603" { AppVersion: "1.0.0.0" }
+2026-11-23 18:23:23.335 +02:00 [INF]  User logged out; UserId="e2d963af-f0b7-472c-83e5-c1a35e922603" { AppVersion: "1.0.0.0" }
+2026-11-23 18:23:29.259 +02:00 [INF]  User logged in; UserId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:23:29.294 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرئيسية; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:23:31.886 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=إدارة المستخدمين; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:23:39.202 +02:00 [INF] ElMomenNursery.Infrastructure.Security.LocalAccountManagementService Role permissions changed; actorId="92c91409-7f19-446b-b726-4a9780b2f1ea"; roleId="2d1ac5b1-4af0-4a15-9932-8d4c940ddd6a"; permissionCount=33 { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+2026-11-23 18:23:42.413 +02:00 [INF]  User logged out; UserId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:23:48.270 +02:00 [INF]  User logged in; UserId="e2d963af-f0b7-472c-83e5-c1a35e922603" { AppVersion: "1.0.0.0" }
+2026-11-23 18:23:48.303 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرئيسية; userId="e2d963af-f0b7-472c-83e5-c1a35e922603" { AppVersion: "1.0.0.0" }
+2026-11-23 18:23:49.935 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الأطفال; userId="e2d963af-f0b7-472c-83e5-c1a35e922603" { AppVersion: "1.0.0.0" }
+2026-11-23 18:23:55.205 +02:00 [INF]  User logged out; UserId="e2d963af-f0b7-472c-83e5-c1a35e922603" { AppVersion: "1.0.0.0" }
+2026-11-23 18:24:04.348 +02:00 [INF]  User logged in; UserId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:24:04.381 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرئيسية; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:24:15.375 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=إدارة المستخدمين; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:24:25.200 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الماليات; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:24:26.711 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرئيسية; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:25:41.039 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الأطفال; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:30:14.496 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الفصول; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:30:21.727 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرئيسية; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:30:23.178 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الأطفال; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:34:37.100 +02:00 [INF] ElMomenNursery.Application.Services.ChildService Created child record; childId="2a0b166a-e8c1-4465-94fc-1bdaa36f59c5" { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+2026-11-23 18:35:14.198 +02:00 [INF] ElMomenNursery.Application.Services.ChildService Updated child record; childId="2a0b166a-e8c1-4465-94fc-1bdaa36f59c5" { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+2026-11-23 18:36:05.821 +02:00 [INF] ElMomenNursery.Application.Services.ChildService Updated child record; childId="2a0b166a-e8c1-4465-94fc-1bdaa36f59c5" { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+2026-11-23 18:38:28.799 +02:00 [INF] ElMomenNursery.Application.Services.ChildService Created child record; childId="c5ac6832-493e-4a82-979c-88ecbdbf53d0" { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+2026-11-23 18:41:10.890 +02:00 [INF] ElMomenNursery.Application.Services.ChildService Deleted child record; childId="ac5e2f55-ffb0-4683-a947-5c3cdc210cad" { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+2026-11-23 18:42:45.013 +02:00 [INF]  User logged out; UserId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 18:42:46.456 +02:00 [INF]  Application stopped normally { AppVersion: "1.0.0.0" }
+2026-11-23 20:32:28.506 +02:00 [INF]  Application starting { AppVersion: "1.0.0.0" }
+2026-11-23 20:32:28.715 +02:00 [INF]  Resolved nursery data directory; dataDirectory=C:\Users\Gaber\AppData\Local\AlMoumenNursery; databasePath=E:\Projects\Elmomen Desktop App\ElMomenNursery\dev-data\nursery-mockup.db; databaseExists=true { AppVersion: "1.0.0.0" }
+2026-11-23 20:32:30.265 +02:00 [INF]  Database startup check; databasePath=E:\Projects\Elmomen Desktop App\ElMomenNursery\dev-data\nursery-mockup.db; pendingMigrations=[] { AppVersion: "1.0.0.0" }
+2026-11-23 20:32:30.356 +02:00 [INF]  Database migration completed; durationMs=88 { AppVersion: "1.0.0.0" }
+2026-11-23 20:32:30.643 +02:00 [INF]  Authentication seed completed; durationMs=287 { AppVersion: "1.0.0.0" }
+2026-11-23 20:32:45.891 +02:00 [INF]  User logged in; UserId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 20:32:45.983 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرئيسية; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 20:32:47.790 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الموظفون; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 20:35:33.020 +02:00 [INF] ElMomenNursery.Application.Services.EmployeeService Created employee record; employeeId="02e6a48b-decf-4ef9-a7c0-00e7db910f2a" { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+2026-11-23 20:35:52.960 +02:00 [INF] ElMomenNursery.Application.Services.EmployeeService Updated employee record; employeeId="02e6a48b-decf-4ef9-a7c0-00e7db910f2a" { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+2026-11-23 20:36:24.909 +02:00 [INF] ElMomenNursery.Application.Services.EmployeeService Deleted employee record; employeeId="02e6a48b-decf-4ef9-a7c0-00e7db910f2a" { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+2026-11-23 20:36:30.156 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرواتب; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 20:36:38.030 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الموظفون; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 20:37:29.227 +02:00 [WRN] ElMomenNursery.Forms.EmployeeEditorForm Employee salary input rejected; errorCode=InvalidNumericInput { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+2026-11-23 20:37:43.131 +02:00 [INF] ElMomenNursery.Application.Services.EmployeeService Deleted employee record; employeeId="e4f01691-dfec-4ce7-86ac-9ba908c2e4e2" { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+2026-11-23 20:37:53.082 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرئيسية; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 20:37:57.499 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الأطفال; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 20:38:00.330 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرواتب; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 20:38:15.137 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الحضور; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 20:51:17.578 +02:00 [INF] ElMomenNursery.Application.Services.EmployeeAttendanceService Recorded manual employee attendance; attendanceId="be700300-b54e-43c5-bfeb-79b1ba49b3c1"; employeeId="67bd0ca6-537a-490f-bea2-201afc16fc2f" { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+2026-11-23 20:51:20.611 +02:00 [INF] ElMomenNursery.Application.Services.EmployeeAttendanceService Recorded manual employee attendance; attendanceId="6c10dd9c-c550-4a47-828a-061a4cca404d"; employeeId="a7fa67c9-526b-4eb5-bb6f-879dee3389de" { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+2026-11-23 20:53:10.022 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرئيسية; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 20:53:11.415 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الأطفال; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 20:53:12.706 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الموظفون; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 20:53:13.858 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرواتب; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 20:53:15.457 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الفصول; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 20:53:16.615 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرواتب; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 20:54:23.291 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الاشتراكات والمدفوعات; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 20:59:29.077 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الأطفال; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 20:59:40.907 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الاشتراكات والمدفوعات; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 21:02:23.956 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الماليات; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 21:02:40.663 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الاشتراكات والمدفوعات; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 21:09:14.254 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الماليات; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 21:09:51.650 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الموظفون; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 21:09:53.646 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الحضور; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 21:09:54.984 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الاشتراكات والمدفوعات; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 21:13:18.730 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=المخزن; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 21:13:24.424 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الاشتراكات والمدفوعات; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 21:13:56.223 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=المخزن; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 21:14:19.044 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الاشتراكات والمدفوعات; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 21:14:24.682 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=المخزن; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 21:18:04.733 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الاشتراكات والمدفوعات; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 21:18:15.722 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الماليات; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 21:18:56.205 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الاشتراكات والمدفوعات; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 21:36:28.272 +02:00 [INF]  Application starting { AppVersion: "1.0.0.0" }
+2026-11-23 21:36:28.622 +02:00 [INF]  Resolved nursery data directory; dataDirectory=C:\Users\Gaber\AppData\Local\AlMoumenNursery; databasePath=E:\Projects\Elmomen Desktop App\ElMomenNursery\dev-data\nursery-mockup.db; databaseExists=true { AppVersion: "1.0.0.0" }
+2026-11-23 21:36:30.681 +02:00 [INF]  Database startup check; databasePath=E:\Projects\Elmomen Desktop App\ElMomenNursery\dev-data\nursery-mockup.db; pendingMigrations=[] { AppVersion: "1.0.0.0" }
+2026-11-23 21:36:30.779 +02:00 [INF]  Database migration completed; durationMs=96 { AppVersion: "1.0.0.0" }
+2026-11-23 21:36:31.210 +02:00 [INF]  Authentication seed completed; durationMs=429 { AppVersion: "1.0.0.0" }
+2026-11-23 21:37:01.357 +02:00 [INF]  User logged in; UserId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 21:37:01.418 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرئيسية; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 21:37:21.979 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرواتب; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 21:37:40.198 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الماليات; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 21:44:37.335 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرواتب; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 21:45:37.359 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الموظفون; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 21:45:38.302 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرواتب; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 21:51:26.726 +02:00 [ERR] Microsoft.EntityFrameworkCore.Database.Command Failed executing DbCommand (8ms) [Parameters=[@p0='?' (Size = 36), @p1='?' (DbType = Decimal), @p2='?' (Size = 36), @p3='?' (Size = 36), @p4='?' (Size = 10)], CommandType='"Text"', CommandTimeout='30']
+INSERT INTO "EmployeeAdvanceRepayments" ("Id", "Amount", "EmployeeAdvanceId", "PayrollRecordId", "RepaymentDate")
+VALUES (@p0, @p1, @p2, @p3, @p4); { EventId: { Id: 20102, Name: "Microsoft.EntityFrameworkCore.Database.Command.CommandError" }, UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+2026-11-23 21:51:26.755 +02:00 [ERR] Microsoft.EntityFrameworkCore.Update An exception occurred in the database while saving changes for context type 'ElMomenNursery.Infrastructure.Persistence.NurseryDbContext'.
+Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: 'UNIQUE constraint failed: EmployeeAdvanceRepayments.EmployeeAdvanceId, EmployeeAdvanceRepayments.PayrollRecordId'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken) { EventId: { Id: 10000, Name: "Microsoft.EntityFrameworkCore.Update.SaveChangesFailed" }, UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: 'UNIQUE constraint failed: EmployeeAdvanceRepayments.EmployeeAdvanceId, EmployeeAdvanceRepayments.PayrollRecordId'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+2026-11-23 21:51:26.793 +02:00 [ERR] ElMomenNursery.Infrastructure.Persistence.EfUnitOfWork Failed to commit database transaction; rolling back { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: 'UNIQUE constraint failed: EmployeeAdvanceRepayments.EmployeeAdvanceId, EmployeeAdvanceRepayments.PayrollRecordId'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at ElMomenNursery.Infrastructure.Persistence.EfUnitOfWork.CommitTransactionAsync(CancellationToken cancellationToken) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Infrastructure\Persistence\EfUnitOfWork.cs:line 107
+2026-11-23 21:51:26.900 +02:00 [ERR] ElMomenNursery.Application.Services.PayRollRecordService Payroll payment posting failed; id="49c0fc22-ad63-4360-83d7-ea5e09544273" { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: 'UNIQUE constraint failed: EmployeeAdvanceRepayments.EmployeeAdvanceId, EmployeeAdvanceRepayments.PayrollRecordId'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at ElMomenNursery.Infrastructure.Persistence.EfUnitOfWork.CommitTransactionAsync(CancellationToken cancellationToken) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Infrastructure\Persistence\EfUnitOfWork.cs:line 107
+   at ElMomenNursery.Infrastructure.Persistence.EfUnitOfWork.CommitTransactionAsync(CancellationToken cancellationToken) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Infrastructure\Persistence\EfUnitOfWork.cs:line 115
+   at ElMomenNursery.Infrastructure.Persistence.EfUnitOfWork.CommitTransactionAsync(CancellationToken cancellationToken) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Infrastructure\Persistence\EfUnitOfWork.cs:line 121
+   at ElMomenNursery.Application.Services.PayRollRecordService.MarkRecordAsPaid(Guid id) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Application\Services\PayRollRecordService.cs:line 169
+2026-11-23 21:52:24.486 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=المخزن; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 21:52:26.117 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرواتب; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 21:54:56.103 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الحضور; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 21:54:57.068 +02:00 [INF] ElMomenNursery.Forms.MainForm Section opened; section=الرواتب; userId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 21:56:30.272 +02:00 [ERR] Microsoft.EntityFrameworkCore.Database.Command Failed executing DbCommand (2ms) [Parameters=[@p0='?' (Size = 36), @p1='?' (Size = 16), @p2='?' (Size = 11), @p3='?' (DbType = Int64), @p4='?' (DbType = Int64), @p5='?', @p6='?' (Size = 12), @p7='?' (DbType = Int32), @p8='?' (DbType = Boolean), @p9='?' (Size = 10), @p10='?' (DbType = Boolean), @p11='?' (Size = 5), @p12='?' (Size = 7), @p13='?' (Size = 13), @p14='?' (Size = 11), @p15='?' (Size = 5), @p16='?' (DbType = Decimal), @p17='?' (DbType = Int64)], CommandType='"Text"', CommandTimeout='30']
+INSERT INTO "Employees" ("Id", "Address", "AlternatePhone", "CreatedAt", "DeletedAt", "DeletedByUserId", "FullName", "GraduationYear", "HasExperience", "HireDate", "IsDeleted", "JobDesignation", "MaritalStatus", "NationalIdNumber", "Phone", "Qualification", "Salary", "UpdatedAt")
+VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14, @p15, @p16, @p17); { EventId: { Id: 20102, Name: "Microsoft.EntityFrameworkCore.Database.Command.CommandError" }, UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+2026-11-23 21:56:30.274 +02:00 [ERR] Microsoft.EntityFrameworkCore.Update An exception occurred in the database while saving changes for context type 'ElMomenNursery.Infrastructure.Persistence.NurseryDbContext'.
+Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: 'UNIQUE constraint failed: Employees.NationalIdNumber'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken) { EventId: { Id: 10000, Name: "Microsoft.EntityFrameworkCore.Update.SaveChangesFailed" }, UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: 'UNIQUE constraint failed: Employees.NationalIdNumber'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+2026-11-23 21:56:30.294 +02:00 [ERR] ElMomenNursery.Infrastructure.Persistence.EfUnitOfWork Failed to commit database transaction; rolling back { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: 'UNIQUE constraint failed: Employees.NationalIdNumber'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at ElMomenNursery.Infrastructure.Persistence.EfUnitOfWork.CommitTransactionAsync(CancellationToken cancellationToken) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Infrastructure\Persistence\EfUnitOfWork.cs:line 107
+2026-11-23 21:56:30.333 +02:00 [ERR] ElMomenNursery.Application.Services.PayRollRecordService Bulk payroll record creation failed; startDate="2027-01-01"; endDate="2027-02-01" { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: 'UNIQUE constraint failed: Employees.NationalIdNumber'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at ElMomenNursery.Infrastructure.Persistence.EfUnitOfWork.CommitTransactionAsync(CancellationToken cancellationToken) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Infrastructure\Persistence\EfUnitOfWork.cs:line 107
+   at ElMomenNursery.Infrastructure.Persistence.EfUnitOfWork.CommitTransactionAsync(CancellationToken cancellationToken) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Infrastructure\Persistence\EfUnitOfWork.cs:line 115
+   at ElMomenNursery.Infrastructure.Persistence.EfUnitOfWork.CommitTransactionAsync(CancellationToken cancellationToken) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Infrastructure\Persistence\EfUnitOfWork.cs:line 121
+   at ElMomenNursery.Application.Services.PayRollRecordService.CreatePayrollRecordsForAllEmployeesAsync(DateOnly startDate, DateOnly endDate, CancellationToken cancellationToken) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Application\Services\PayRollRecordService.cs:line 91
+2026-11-23 21:56:49.398 +02:00 [ERR] Microsoft.EntityFrameworkCore.Database.Command Failed executing DbCommand (1ms) [Parameters=[@p0='?' (Size = 36), @p1='?' (Size = 16), @p2='?' (Size = 11), @p3='?' (DbType = Int64), @p4='?' (DbType = Int64), @p5='?', @p6='?' (Size = 12), @p7='?' (DbType = Int32), @p8='?' (DbType = Boolean), @p9='?' (Size = 10), @p10='?' (DbType = Boolean), @p11='?' (Size = 5), @p12='?' (Size = 7), @p13='?' (Size = 13), @p14='?' (Size = 11), @p15='?' (Size = 5), @p16='?' (DbType = Decimal), @p17='?' (DbType = Int64)], CommandType='"Text"', CommandTimeout='30']
+INSERT INTO "Employees" ("Id", "Address", "AlternatePhone", "CreatedAt", "DeletedAt", "DeletedByUserId", "FullName", "GraduationYear", "HasExperience", "HireDate", "IsDeleted", "JobDesignation", "MaritalStatus", "NationalIdNumber", "Phone", "Qualification", "Salary", "UpdatedAt")
+VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14, @p15, @p16, @p17); { EventId: { Id: 20102, Name: "Microsoft.EntityFrameworkCore.Database.Command.CommandError" }, UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+2026-11-23 21:56:49.400 +02:00 [ERR] Microsoft.EntityFrameworkCore.Update An exception occurred in the database while saving changes for context type 'ElMomenNursery.Infrastructure.Persistence.NurseryDbContext'.
+Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: 'UNIQUE constraint failed: Employees.NationalIdNumber'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken) { EventId: { Id: 10000, Name: "Microsoft.EntityFrameworkCore.Update.SaveChangesFailed" }, UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: 'UNIQUE constraint failed: Employees.NationalIdNumber'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+2026-11-23 21:56:49.415 +02:00 [ERR] ElMomenNursery.Infrastructure.Persistence.EfUnitOfWork Failed to commit database transaction; rolling back { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: 'UNIQUE constraint failed: Employees.NationalIdNumber'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at ElMomenNursery.Infrastructure.Persistence.EfUnitOfWork.CommitTransactionAsync(CancellationToken cancellationToken) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Infrastructure\Persistence\EfUnitOfWork.cs:line 107
+2026-11-23 21:56:49.460 +02:00 [ERR] ElMomenNursery.Application.Services.PayRollRecordService Bulk payroll record creation failed; startDate="2027-01-01"; endDate="2027-02-01" { UserId: 92c91409-7f19-446b-b726-4a9780b2f1ea, AppVersion: "1.0.0.0" }
+Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: 'UNIQUE constraint failed: Employees.NationalIdNumber'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalDatabase.SaveChangesAsync(IList`1 entries, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at ElMomenNursery.Infrastructure.Persistence.EfUnitOfWork.CommitTransactionAsync(CancellationToken cancellationToken) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Infrastructure\Persistence\EfUnitOfWork.cs:line 107
+   at ElMomenNursery.Infrastructure.Persistence.EfUnitOfWork.CommitTransactionAsync(CancellationToken cancellationToken) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Infrastructure\Persistence\EfUnitOfWork.cs:line 115
+   at ElMomenNursery.Infrastructure.Persistence.EfUnitOfWork.CommitTransactionAsync(CancellationToken cancellationToken) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Infrastructure\Persistence\EfUnitOfWork.cs:line 121
+   at ElMomenNursery.Application.Services.PayRollRecordService.CreatePayrollRecordsForAllEmployeesAsync(DateOnly startDate, DateOnly endDate, CancellationToken cancellationToken) in E:\Projects\Elmomen Desktop App\ElMomenNursery\ElMomenNursery.Application\Services\PayRollRecordService.cs:line 91
+2026-11-23 21:57:12.767 +02:00 [INF]  User logged out; UserId="92c91409-7f19-446b-b726-4a9780b2f1ea" { AppVersion: "1.0.0.0" }
+2026-11-23 21:57:14.083 +02:00 [INF]  Application stopped normally { AppVersion: "1.0.0.0" }

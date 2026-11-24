@@ -172,7 +172,7 @@ public sealed class FinanceService(
                     Category = cust,
                     Description = $"فاتورة بيع #{inv.InvoiceNumber}",
                     Amount = inv.TotalAmount,
-                    Reference = inv.InvoiceNumber,
+                    Reference = string.IsNullOrWhiteSpace(inv.PaymentReference) ? inv.InvoiceNumber : $"{inv.InvoiceNumber} / {inv.PaymentReference}",
                     RecordedBy = inv.CreatedByUser?.FullName ?? "—",
                     CreatedAt = inv.CreatedAt,
                     IsEditable = false

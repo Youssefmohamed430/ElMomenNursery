@@ -33,7 +33,7 @@ public static class AuthSeed
         var mappings = new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
             ["Admin"] = PermissionCodes,
-            ["Manager"] = ["Students.View", "Students.Create", "Students.Edit", "Classes.View", "Classes.Manage", "Attendance.View", "Attendance.Record", "Attendance.Edit", "Employees.View", "Employees.Manage", "Payments.View", "Payments.Create", "Expenses.View", "Inventory.View", "Inventory.Manage", "Subscriptions.View", "Subscriptions.Manage", "Finance.View", "Finance.ManageExpenses", "Finance.ManageIncome", "Finance.Export", "Payroll.Manage"],
+            ["Manager"] = ["Students.View", "Students.Create", "Students.Edit", "Classes.View", "Classes.Manage", "Attendance.View", "Attendance.Record", "Attendance.Edit", "Employees.View", "Employees.Manage", "Employees.Restore", "Payments.View", "Payments.Create", "Expenses.View", "Inventory.View", "Inventory.Manage", "Subscriptions.View", "Subscriptions.Manage", "Finance.View", "Finance.ManageExpenses", "Finance.ManageIncome", "Finance.Export", "Payroll.Manage"],
             ["Teacher"] = ["Students.View", "Classes.View", "Attendance.View", "Attendance.Record"],
             ["Accountant"] = ["Payments.View", "Payments.Create", "Payments.Edit", "Expenses.View", "Expenses.Manage", "Subscriptions.View", "Finance.View", "Finance.ManageExpenses", "Finance.ManageIncome", "Finance.Export", "Payroll.Manage"],
             ["Receptionist"] = ["Students.View", "Students.Create", "Classes.View", "Subscriptions.View"]
@@ -50,6 +50,16 @@ public static class AuthSeed
             }
             db.AppSettings.Add(new AppSetting { Key = "Authentication.RolePermissionsSeeded.V1", Value = "true",
                 Description = "Initial role permission mapping seed completed." });
+            await db.SaveChangesAsync(ct);
+        }
+
+        // Manager accounts need access to the existing employee restore workflow
+        // on databases that already completed the original role-permission seed.
+        var managerId = await db.Roles.Where(x => x.Name == "Manager").Select(x => x.Id).SingleAsync(ct);
+        var restorePermissionId = await db.Permissions.Where(x => x.Code == "Employees.Restore").Select(x => x.Id).SingleAsync(ct);
+        if (!await db.RolePermissions.AnyAsync(x => x.RoleId == managerId && x.PermissionId == restorePermissionId, ct))
+        {
+            db.RolePermissions.Add(new RolePermission { RoleId = managerId, PermissionId = restorePermissionId });
             await db.SaveChangesAsync(ct);
         }
 
