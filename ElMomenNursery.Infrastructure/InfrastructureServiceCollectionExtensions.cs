@@ -69,7 +69,6 @@ public static class InfrastructureServiceCollectionExtensions
                 connectionString,
                 sqlite => sqlite.MigrationsAssembly(typeof(NurseryDbContext).Assembly.FullName))
             .ConfigureWarnings(warnings => warnings
-                .Ignore(CoreEventId.PossibleIncorrectRequiredNavigationWithQueryFilterInteractionWarning)
                 .Ignore(RelationalEventId.PendingModelChangesWarning)));
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.Configure<AuthSecurityOptions>(options =>

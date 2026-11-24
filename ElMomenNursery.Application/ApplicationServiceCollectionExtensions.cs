@@ -9,6 +9,7 @@ public static class ApplicationServiceCollectionExtensions
     public static IServiceCollection AddNurseryApplication(this IServiceCollection services)
     {
         services.AddScoped<IChildService, ChildService>();
+        services.AddScoped<IClassroomService, ClassroomService>();
         services.AddScoped<IEmployeeService, EmployeeService>();
         services.AddScoped<IEmployeeAttendanceService, EmployeeAttendanceService>();
         services.AddScoped<IChildAttendanceService, ChildAttendanceService>();

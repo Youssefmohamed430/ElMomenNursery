@@ -1,11 +1,3 @@
-using ElMomenNursery.Application.Abstractions.Persistence;
-using ElMomenNursery.Application.DTOs;
-using ElMomenNursery.Application.IServices;
-using ElMomenNursery.Application.Mappings;
-using ElMomenNursery.Domain.Abstractions;
-using ElMomenNursery.Domain.Entities;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
 namespace ElMomenNursery.Application.Services;
 
@@ -18,6 +10,10 @@ public sealed class EmployeeService(IUnitOfWork unitOfWork, ILogger<EmployeeServ
         if (employee is null || HasMissingRequiredField(employee.FullName, employee.NationalIdNumber, employee.Address, employee.Phone, employee.JobDesignation))
             return EmployeeErrors.InvalidData;
         if (employee.Salary < 0) return EmployeeErrors.InvalidSalary;
+        if (!ValidNationalId(employee.NationalIdNumber)) return EmployeeErrors.InvalidNationalId;
+        if (!PhoneNumberValidator.IsValidEgyptianMobile(employee.Phone)
+            || !string.IsNullOrWhiteSpace(employee.AlternatePhone) && !PhoneNumberValidator.IsValidEgyptianMobile(employee.AlternatePhone)) return EmployeeErrors.InvalidPhone;
+        if (employee.GraduationYear is int graduationYear && (graduationYear < 1900 || graduationYear > DateTime.Today.Year)) return EmployeeErrors.InvalidGraduationYear;
 
         employee.NationalIdNumber = employee.NationalIdNumber.Trim();
         // The database's unique index spans soft-deleted rows too, so include them
@@ -129,6 +125,10 @@ public sealed class EmployeeService(IUnitOfWork unitOfWork, ILogger<EmployeeServ
         if (new[] { employee.FullName, employee.NationalIdNumber, employee.Address, employee.Phone, employee.JobDesignation }
             .Any(value => value is not null && string.IsNullOrWhiteSpace(value))) return EmployeeErrors.InvalidData;
         if (employee.Salary < 0) return EmployeeErrors.InvalidSalary;
+        if (employee.NationalIdNumber is not null && !ValidNationalId(employee.NationalIdNumber)) return EmployeeErrors.InvalidNationalId;
+        if (employee.Phone is not null && !PhoneNumberValidator.IsValidEgyptianMobile(employee.Phone)) return EmployeeErrors.InvalidPhone;
+        if (!string.IsNullOrWhiteSpace(employee.AlternatePhone) && !PhoneNumberValidator.IsValidEgyptianMobile(employee.AlternatePhone)) return EmployeeErrors.InvalidPhone;
+        if (employee.GraduationYear is int graduationYear && (graduationYear < 1900 || graduationYear > DateTime.Today.Year)) return EmployeeErrors.InvalidGraduationYear;
         if (employee.NationalIdNumber is not null && await unitOfWork.Repository<Employee>().Query().IgnoreQueryFilters().AnyAsync(e =>
                 e.Id != id && e.NationalIdNumber == employee.NationalIdNumber.Trim())) return EmployeeErrors.DuplicateNationalId;
 
@@ -153,4 +153,5 @@ public sealed class EmployeeService(IUnitOfWork unitOfWork, ILogger<EmployeeServ
     }
 
     private static bool HasMissingRequiredField(params string?[] fields) => fields.Any(string.IsNullOrWhiteSpace);
+    private static bool ValidNationalId(string value) => value.Length == 14 && value.All(char.IsDigit);
 }

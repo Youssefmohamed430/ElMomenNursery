@@ -1,13 +1,3 @@
-using ElMomenNursery.Application.Abstractions.Persistence;
-using ElMomenNursery.Application.DTOs;
-using ElMomenNursery.Application.Common;
-using ElMomenNursery.Application.IServices;
-using ElMomenNursery.Domain.Abstractions;
-using ElMomenNursery.Domain.Entities;
-using ElMomenNursery.Domain.Enums;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-
 namespace ElMomenNursery.Application.Services;
 
 public sealed class SubscriptionService : ISubscriptionService
@@ -181,7 +171,6 @@ public sealed class SubscriptionService : ISubscriptionService
         item.SubscriptionPlanId = dto.SubscriptionPlanId; item.SubscriptionPlan = updatedPlan; item.PeriodStart = dto.PeriodStart; item.PeriodEnd = dto.PeriodEnd;
         item.AmountDue = dto.AmountDue; item.Notes = Clean(dto.Notes);
         if (item.Status is not (SubscriptionStatus.Cancelled or SubscriptionStatus.Waived)) item.Status = ComputeStatus(dto.AmountDue, paid);
-        unitOfWork.Repository<Subscription>().Update(item);
         await Audit("Subscription.Updated", id, before, SubscriptionValues(item, paid), dto.Reason, ct);
         var saveError = await SaveChangesErrorAsync(ct);
         if (saveError is not null) return saveError;
@@ -195,7 +184,7 @@ public sealed class SubscriptionService : ISubscriptionService
         var item = await GetTrackedSubscription(id, true, ct); if (item is null) return SubscriptionErrors.NotFound;
         if (item.Status == SubscriptionStatus.Cancelled) return SubscriptionErrors.AlreadyCancelled;
         var paid = await PaidAsync(id, ct); var before = SubscriptionValues(item, paid);
-        item.Status = SubscriptionStatus.Cancelled; unitOfWork.Repository<Subscription>().Update(item);
+        item.Status = SubscriptionStatus.Cancelled;
         await Audit("Subscription.Cancelled", id, before, SubscriptionValues(item, paid), reason, ct);
         var saveError = await SaveChangesErrorAsync(ct);
         if (saveError is not null) return saveError;

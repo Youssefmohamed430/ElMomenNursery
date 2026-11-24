@@ -1,15 +1,6 @@
 using ElMomenNursery.Application.Abstractions.Persistence;
+using ElMomenNursery.Application.Common;
 using ElMomenNursery.Application.DTOs;
-using ElMomenNursery.Application.IServices;
-using ElMomenNursery.Application.Mappings;
-using ElMomenNursery.Domain.Abstractions;
-using ElMomenNursery.Domain.Entities;
-using ElMomenNursery.Domain.Enums;
-using System.Linq.Expressions;
-using System.ComponentModel.DataAnnotations;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-
 namespace ElMomenNursery.Application.Services;
 
 public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger, IPermissionService permissions) : IChildService
@@ -19,6 +10,7 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger, 
         var permissionError = PermissionGuard.Check(permissions, "Students.Create", ChildErrors.PermissionDenied);
         if (permissionError is not null) return permissionError;
         if (childDto is null) return ChildErrors.InvalidData;
+        if (!ValidChildFields(childDto)) return ChildErrors.InvalidData;
         var validationResults = new List<ValidationResult>();
         if (!Validator.TryValidateObject(childDto, new ValidationContext(childDto), validationResults, validateAllProperties: true))
         {
@@ -47,8 +39,10 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger, 
     }
     public async Task<Result<ChildDto>> UpdateChildAsync(Guid childId, UpdateChildDTO childDto)
     {
-        if (!permissions.HasAnyPermission("Students.Edit", "Students.Create")) return ChildErrors.PermissionDenied;
+        var permissionError = PermissionGuard.Check(permissions, "Students.Edit", ChildErrors.PermissionDenied);
+        if (permissionError is not null) return permissionError;
         if (childDto is null) return ChildErrors.InvalidData;
+        if (!ValidChildFields(childDto)) return ChildErrors.InvalidData;
         if (childDto.DateOfBirth > DateOnly.FromDateTime(DateTime.Today) || childDto.DateOfBirth > childDto.EnrollmentDate)
             return ChildErrors.InvalidData;
         try
@@ -139,10 +133,8 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger, 
             }
 
         Expression<Func<Child, bool>> predicate = child => true;
-        var searchText = filter.SearchText?.Trim();
+        var searchText = ArabicNameNormalizer.Normalize(filter.SearchText);
         var today = DateOnly.FromDateTime(DateTime.Today);
-        if (!string.IsNullOrEmpty(searchText))
-            predicate = And(predicate, child => child.FullName.Contains(searchText));
         if (filter.Gender.HasValue)
             predicate = And(predicate, child => child.Gender == filter.Gender.Value);
         if (filter.Shift.HasValue)
@@ -179,6 +171,8 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger, 
         var children = await unitOfWork.Repository<Child>().ListAsync(
             predicate,
             cancellationToken: cancellationToken);
+        if (searchText.Length > 0)
+            children = children.Where(child => ArabicNameNormalizer.Normalize(child.FullName).Contains(searchText, StringComparison.Ordinal)).ToList();
         logger.LogDebug("Loaded children; resultCount={ResultCount}", children.Count);
         return Result.Success<IReadOnlyList<ChildDto>>(children.Adapt<List<ChildDto>>());
     }
@@ -294,6 +288,22 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger, 
         var children = await unitOfWork.Repository<Child>().ListAsync(c => c.EnrollmentDate >= startDate && c.EnrollmentDate <= endDate);
         return Result.Success<IReadOnlyList<ChildDto>>(children.Adapt<List<ChildDto>>());
     }
+
+    private static bool ValidChildFields(CreateChildDTO x) =>
+        !string.IsNullOrWhiteSpace(x.FullName) && !string.IsNullOrWhiteSpace(x.Address)
+        && !string.IsNullOrWhiteSpace(x.FatherName) && !string.IsNullOrWhiteSpace(x.MotherName)
+        && PhoneNumberValidator.IsValidEgyptianMobile(x.FatherPhone)
+        && PhoneNumberValidator.IsValidEgyptianMobile(x.MotherPhone)
+        && (string.IsNullOrWhiteSpace(x.FatherWhatsApp) || PhoneNumberValidator.IsValidEgyptianMobile(x.FatherWhatsApp))
+        && (string.IsNullOrWhiteSpace(x.MotherWhatsApp) || PhoneNumberValidator.IsValidEgyptianMobile(x.MotherWhatsApp));
+
+    private static bool ValidChildFields(UpdateChildDTO x) =>
+        !string.IsNullOrWhiteSpace(x.FullName) && !string.IsNullOrWhiteSpace(x.Address)
+        && !string.IsNullOrWhiteSpace(x.FatherName) && !string.IsNullOrWhiteSpace(x.MotherName)
+        && PhoneNumberValidator.IsValidEgyptianMobile(x.FatherPhone)
+        && PhoneNumberValidator.IsValidEgyptianMobile(x.MotherPhone)
+        && (string.IsNullOrWhiteSpace(x.FatherWhatsApp) || PhoneNumberValidator.IsValidEgyptianMobile(x.FatherWhatsApp))
+        && (string.IsNullOrWhiteSpace(x.MotherWhatsApp) || PhoneNumberValidator.IsValidEgyptianMobile(x.MotherWhatsApp));
 
     private static int CountActiveFilters(ChildFilter? filter)
     {

@@ -1,12 +1,3 @@
-using ElMomenNursery.Application.Abstractions.Persistence;
-using ElMomenNursery.Application.Common;
-using ElMomenNursery.Application.DTOs;
-using ElMomenNursery.Application.IServices;
-using ElMomenNursery.Domain.Abstractions;
-using ElMomenNursery.Domain.Entities;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-
 namespace ElMomenNursery.Application.Services;
 
 public sealed class InventoryCategoryService(IUnitOfWork unitOfWork, ILogger<InventoryCategoryService> logger, IPermissionService permissions, ISessionManager sessions) : IInventoryCategoryService

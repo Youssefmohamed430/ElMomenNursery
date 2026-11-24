@@ -32,7 +32,7 @@
 
 - Keep development-only fixtures under the ignored `dev-data/` directory at the solution root.
 - Use synthetic records only. Never put real nursery records, credentials, exports, backups, or local database files in source control.
-- The eventual application database must live in a protected Windows application-data location outside the installation folder. The exact per-user vs machine-wide location is TBD pending the nursery's Windows sign-in model.
+- The application database defaults to `%LOCALAPPDATA%\AlMoumenNursery\nursery.db`, outside the installation folder. Machine-specific development overrides belong in the ignored `ElMomenNursery/appsettings.Development.json` file.
 
 ## Change workflow
 
@@ -63,3 +63,7 @@ The desktop composition root configures Serilog and exposes it through `Microsof
 ## Application results and errors
 
 Use `ElMomenNursery.Domain.Abstractions.Result` / `Result<TValue>` for expected business outcomes from Application use cases. Return typed `Error` values with stable codes and Arabic descriptions; group feature errors in a feature-specific static class. Exceptions remain for infrastructure failures and programming errors, and should be logged at the application boundary. Read `Result<TValue>.Value` only after checking `IsSuccess`.
+
+## Nursery business settings
+
+Business defaults are stored in `AppSettings` and can be changed there without editing code: payroll paid days per month defaults to 22; the subscription alert defaults to 3 days after its start; the absence fine alert defaults to 15 absence days; and the default absence fine is EGP 50. Treat these as nursery policy values and update them through an authorized settings workflow when one is available.

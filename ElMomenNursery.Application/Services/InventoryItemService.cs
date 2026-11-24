@@ -1,12 +1,3 @@
-using ElMomenNursery.Application.Abstractions.Persistence;
-using ElMomenNursery.Application.Common;
-using ElMomenNursery.Application.DTOs;
-using ElMomenNursery.Application.IServices;
-using ElMomenNursery.Domain.Abstractions;
-using ElMomenNursery.Domain.Entities;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-
 namespace ElMomenNursery.Application.Services;
 
 public sealed class InventoryItemService(IUnitOfWork unitOfWork, ILogger<InventoryItemService> logger, IPermissionService permissions, ISessionManager sessions) : IInventoryItemService
@@ -55,14 +46,27 @@ public sealed class InventoryItemService(IUnitOfWork unitOfWork, ILogger<Invento
         {
             var item = await unitOfWork.Repository<InventoryItem>().Query(asNoTracking: false).Include(x => x.Category).SingleOrDefaultAsync(x => x.Id == itemId, cancellationToken);
             if (item is null) return InventoryErrors.ItemNotFound;
+            if (dto.ExpectedQuantity is int expected && item.Quantity != expected) return InventoryErrors.QuantityChanged;
+            if (dto.Quantity != item.Quantity && string.IsNullOrWhiteSpace(dto.QuantityAdjustmentReason)) return InventoryErrors.QuantityAdjustmentReasonRequired;
             var category = await unitOfWork.Repository<InventoryCategory>().FirstOrDefaultAsync(x => x.Id == dto.CategoryId, asNoTracking: false, cancellationToken: cancellationToken);
             if (category is null) return InventoryErrors.CategoryNotFound;
             if (dto.CategoryId != item.CategoryId && !category.IsActive) return InventoryErrors.CategoryInactive;
             if (await HasDuplicate(dto.Name.Trim(), category.Id, item.Id, cancellationToken)) return InventoryErrors.DuplicateItemName;
-            var before = Values(item); item.Name = dto.Name.Trim(); item.CategoryId = category.Id; item.Category = category; item.UnitPrice = dto.UnitPrice; item.Quantity = dto.Quantity; item.IsActive = dto.IsActive;
+            var before = Values(item);
+            var quantityDelta = dto.Quantity - item.Quantity;
+            item.Name = dto.Name.Trim(); item.CategoryId = category.Id; item.Category = category; item.UnitPrice = dto.UnitPrice; item.Quantity = dto.Quantity; item.IsActive = dto.IsActive;
+            if (quantityDelta != 0)
+                await unitOfWork.Repository<StockMovement>().AddAsync(new StockMovement
+                {
+                    InventoryItemId = item.Id, InventoryItem = item, Quantity = quantityDelta,
+                    MovementType = ElMomenNursery.Domain.Enums.StockMovementType.Adjustment,
+                    OccurredAt = DateTimeOffset.UtcNow, RecordedByUserId = sessions.CurrentUser?.UserId,
+                    Notes = dto.QuantityAdjustmentReason!.Trim()
+                }, cancellationToken);
             await Audit("InventoryItem.Updated", item.Id, before, Values(item), cancellationToken); await unitOfWork.SaveChangesAsync(cancellationToken);
             return Result.Success(ToDto(item), InventoryErrors.ItemUpdated.Description);
         }
+        catch (DbUpdateConcurrencyException ex) { logger.LogWarning(ex, "Inventory item quantity changed concurrently; itemId={ItemId}", itemId); return InventoryErrors.QuantityChanged; }
         catch (DbUpdateException ex) { logger.LogWarning(ex, "Inventory item update failed; itemId={ItemId}; errorCode={ErrorCode}", itemId, PersistenceErrorMapper.FromException(ex).Code); return PersistenceErrorMapper.FromException(ex); }
     }
 

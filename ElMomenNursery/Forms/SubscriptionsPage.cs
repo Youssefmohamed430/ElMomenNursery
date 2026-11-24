@@ -172,12 +172,7 @@ public sealed class SubscriptionsPage : UserControl
         {
             await using var scope = _scopes.CreateAsyncScope();
             var finance = scope.ServiceProvider.GetRequiredService<IFinanceService>();
-            var result = await finance.CreateManualIncomeAsync(new CreateManualIncomeDto
-            {
-                IncomeDate = DateOnly.FromDateTime(form.FineDate), Source = "غرامة غياب 15 يوم",
-                Description = $"غرامة غياب 15 يوم - الطفل: {form.Child.Name}", Amount = form.Amount,
-                Notes = form.Notes
-            });
+            var result = await finance.CreateAbsenceFineAsync(form.Child.Id, DateOnly.FromDateTime(form.FineDate), form.Notes);
             if (ResultPresenter.Present(this, "تسجيل غرامة الغياب", result)) await LoadAsync();
         }
         catch { ShowError("تعذر تسجيل غرامة الغياب."); }
@@ -255,6 +250,7 @@ internal sealed class SubscriptionEditorForm : Form
     private readonly DateTimePicker _end = new() { Format = DateTimePickerFormat.Short, Width = 300 };
     private readonly NumericUpDown _due = new() { Maximum = 10000000, DecimalPlaces = 2, ThousandsSeparator = true, Width = 300 };
     private readonly NumericUpDown _initial = new() { Maximum = 10000000, DecimalPlaces = 2, ThousandsSeparator = true, Width = 300 };
+    private readonly Button _saveButton = new() { Text = "حفظ", DialogResult = DialogResult.None, Width = 110 };
     private readonly ComboBox _method = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 300 };
     private readonly TextBox _reference = new() { Width = 300 }; private readonly TextBox _notes = new() { Width = 300 };
     private CancellationTokenSource? _childSearchCancellation;
@@ -271,7 +267,7 @@ internal sealed class SubscriptionEditorForm : Form
         fields.Add(("ملاحظات", _notes));
         var panel = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(16), ColumnCount = 2, RowCount = fields.Count + 1, AutoScroll = true }; panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110)); panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         for (var i = 0; i < fields.Count; i++) { panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 48)); panel.Controls.Add(new Label { Text = fields[i].Item1, TextAlign = ContentAlignment.MiddleRight, Dock = DockStyle.Fill }, 0, i); fields[i].Item2.Anchor = AnchorStyles.Left | AnchorStyles.Right; panel.Controls.Add(fields[i].Item2, 1, i); }
-        var save = new Button { Text = "حفظ", DialogResult = DialogResult.None, Width = 110 }; var cancel = new Button { Text = "إلغاء", DialogResult = DialogResult.Cancel, Width = 110 }; var actions = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Fill }; actions.Controls.AddRange([save, cancel]); panel.Controls.Add(actions, 0, fields.Count); panel.SetColumnSpan(actions, 2); Controls.Add(panel); AcceptButton = save; CancelButton = cancel;
+        var save = _saveButton; var cancel = new Button { Text = "إلغاء", DialogResult = DialogResult.Cancel, Width = 110 }; var actions = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Fill }; actions.Controls.AddRange([save, cancel]); panel.Controls.Add(actions, 0, fields.Count); panel.SetColumnSpan(actions, 2); Controls.Add(panel); AcceptButton = save; CancelButton = cancel;
         _plan.SelectedIndexChanged += (_, _) => { if (_plan.SelectedItem is SubscriptionPlanOptionDto p && _item is null) _due.Value = Math.Min(_due.Maximum, p.DefaultFee); };
         save.Click += async (_, _) => await SaveAsync(); Load += async (_, _) => await LoadOptionsAsync();
     }
@@ -314,9 +310,11 @@ internal sealed class SubscriptionEditorForm : Form
     }
     private async Task SaveAsync()
     {
+        if (!_saveButton.Enabled) return;
         if (_child.SelectedItem is not ChildLookupDto child) { ShowError("اختر الطفل من القائمة."); return; }
         if (_end.Value.Date < _start.Value.Date) { ShowError("تاريخ نهاية الاشتراك يجب أن يكون بعد بدايته."); return; }
         if (_item is null && _initial.Value > _due.Value) { ShowError("المدفوع الآن أكبر من المستحق."); return; }
+        _saveButton.Enabled = false;
         try { await using var scope = _scopes.CreateAsyncScope(); var svc = scope.ServiceProvider.GetRequiredService<ISubscriptionService>();
             if (_item is null)
             {
@@ -335,6 +333,7 @@ internal sealed class SubscriptionEditorForm : Form
             var updated = await svc.UpdateSubscriptionAsync(_item.Id, new UpdateSubscriptionDto { SubscriptionPlanId = (_plan.SelectedItem as SubscriptionPlanOptionDto)?.Id, PeriodStart = DateOnly.FromDateTime(_start.Value), PeriodEnd = DateOnly.FromDateTime(_end.Value), AmountDue = _due.Value, Notes = _notes.Text, Reason = reason });
             if (!ResultPresenter.Present(this, "الاشتراكات والمدفوعات", updated)) return; DialogResult = DialogResult.OK; Close();
         } catch { ShowError("تعذر حفظ الاشتراك."); }
+        finally { if (!IsDisposed) _saveButton.Enabled = true; }
     }
     private PaymentMethod MethodValue() => _method.SelectedIndex switch { 0 => PaymentMethod.Cash, 1 => PaymentMethod.BankTransfer, _ => PaymentMethod.Other };
     private string? PromptReason() { using var prompt = new Form { Text = "سبب التعديل", Width = 380, Height = 145, StartPosition = FormStartPosition.CenterParent, RightToLeft = RightToLeft.Yes }; var box = new TextBox { Left = 15, Top = 15, Width = 330 }; var ok = new Button { Text = "موافق", DialogResult = DialogResult.OK, Left = 255, Top = 55 }; prompt.Controls.AddRange([box, ok]); prompt.AcceptButton = ok; return prompt.ShowDialog(this) == DialogResult.OK ? box.Text : null; }
@@ -364,19 +363,17 @@ internal sealed class AbsenceFineForm : Form
 {
     private readonly IServiceScopeFactory _scopes;
     private readonly ComboBox _child = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
-    private readonly NumericUpDown _amount = new() { Minimum = 0.01m, Maximum = 10000000m, DecimalPlaces = 2, ThousandsSeparator = true, Width = 260 };
     private readonly DateTimePicker _date = new() { Format = DateTimePickerFormat.Short, Width = 260 };
     private readonly TextBox _notes = new() { Width = 260 };
     public ChildLookupDto? Child => _child.SelectedItem as ChildLookupDto;
-    public decimal Amount => _amount.Value;
     public DateTime FineDate => _date.Value;
     public string? Notes => string.IsNullOrWhiteSpace(_notes.Text) ? null : _notes.Text.Trim();
 
     public AbsenceFineForm(IServiceScopeFactory scopes)
     {
-        _scopes = scopes; Text = "تسجيل غرامة غياب 15 يوم"; Width = 480; Height = 340; StartPosition = FormStartPosition.CenterParent;
+        _scopes = scopes; Text = "تسجيل غرامة غياب"; Width = 480; Height = 340; StartPosition = FormStartPosition.CenterParent;
         RightToLeft = RightToLeft.Yes; RightToLeftLayout = true; FormBorderStyle = FormBorderStyle.FixedDialog; MaximizeBox = false;
-        var fields = new (string Label, Control Control)[] { ("الطفل", _child), ("قيمة الغرامة (ج.م)", _amount), ("تاريخ الغرامة", _date), ("ملاحظات", _notes) };
+        var fields = new (string Label, Control Control)[] { ("الطفل", _child), ("تاريخ الغرامة", _date), ("ملاحظات", _notes) };
         var table = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(16), ColumnCount = 2, RowCount = fields.Length + 1 };
         table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 130)); table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         for (var i = 0; i < fields.Length; i++) { table.Controls.Add(new Label { Text = fields[i].Label, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight }, 0, i); table.Controls.Add(fields[i].Control, 1, i); }

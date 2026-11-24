@@ -1,6 +1,3 @@
-using ElMomenNursery.Application.IServices;
-using ElMomenNursery.Domain.Abstractions;
-
 namespace ElMomenNursery.Application.Services;
 
 public static class PermissionGuard

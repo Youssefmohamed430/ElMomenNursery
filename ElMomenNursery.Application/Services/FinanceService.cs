@@ -1,12 +1,3 @@
-using ElMomenNursery.Application.Abstractions.Persistence;
-using ElMomenNursery.Application.DTOs;
-using ElMomenNursery.Application.IServices;
-using ElMomenNursery.Domain.Abstractions;
-using ElMomenNursery.Domain.Entities;
-using ElMomenNursery.Domain.Enums;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-
 namespace ElMomenNursery.Application.Services;
 
 public sealed class FinanceService(
@@ -23,7 +14,7 @@ public sealed class FinanceService(
         try
         {
             // 1. Subscription Payments
-            var paymentsQuery = unitOfWork.Repository<Payment>().Query()
+            var paymentsQuery = unitOfWork.Repository<Payment>().Query().IgnoreQueryFilters()
                 .Where(x => x.Status == PaymentStatus.Posted);
 
             if (filter.From is DateOnly fromDate)
@@ -37,10 +28,10 @@ public sealed class FinanceService(
                 paymentsQuery = paymentsQuery.Where(x => x.PaidAt <= toOffset);
             }
 
-            var subIncome = await paymentsQuery.SumAsync(x => (decimal?)x.Amount, cancellationToken) ?? 0m;
+            var subIncome = (await paymentsQuery.Select(x => x.Amount).ToListAsync(cancellationToken)).Sum();
 
             // 2. Inventory Sales (Posted Invoices)
-            var invoicesQuery = unitOfWork.Repository<Invoice>().Query()
+            var invoicesQuery = unitOfWork.Repository<Invoice>().Query().IgnoreQueryFilters()
                 .Where(x => x.Status == InvoiceStatus.Posted);
 
             if (filter.From is DateOnly invFrom)
@@ -48,7 +39,7 @@ public sealed class FinanceService(
             if (filter.To is DateOnly invTo)
                 invoicesQuery = invoicesQuery.Where(x => x.InvoiceDate <= invTo);
 
-            var invIncome = await invoicesQuery.SumAsync(x => (decimal?)x.TotalAmount, cancellationToken) ?? 0m;
+            var invIncome = (await invoicesQuery.Select(x => x.TotalAmount).ToListAsync(cancellationToken)).Sum();
 
             // 3. Manual Incomes
             var manualIncomeQuery = unitOfWork.Repository<ManualIncome>().Query();
@@ -58,7 +49,7 @@ public sealed class FinanceService(
             if (filter.To is DateOnly manTo)
                 manualIncomeQuery = manualIncomeQuery.Where(x => x.IncomeDate <= manTo);
 
-            var manIncome = await manualIncomeQuery.SumAsync(x => (decimal?)x.Amount, cancellationToken) ?? 0m;
+            var manIncome = (await manualIncomeQuery.Select(x => x.Amount).ToListAsync(cancellationToken)).Sum();
 
             // 4. Payroll Records (Paid)
             var payrollQuery = unitOfWork.Repository<PayrollRecord>().Query()
@@ -69,7 +60,7 @@ public sealed class FinanceService(
             if (filter.To is DateOnly payTo)
                 payrollQuery = payrollQuery.Where(x => (x.PaymentDate ?? x.PeriodStart) <= payTo);
 
-            var payrollExpense = await payrollQuery.SumAsync(x => (decimal?)x.AmountPaid, cancellationToken) ?? 0m;
+            var payrollExpense = (await payrollQuery.Select(x => x.AmountPaid).ToListAsync(cancellationToken)).Sum();
 
             // 5. Manual Expenses (Non-voided)
             var expenseQuery = unitOfWork.Repository<Expense>().Query()
@@ -80,7 +71,7 @@ public sealed class FinanceService(
             if (filter.To is DateOnly expTo)
                 expenseQuery = expenseQuery.Where(x => x.ExpenseDate <= expTo);
 
-            var manualExpense = await expenseQuery.SumAsync(x => (decimal?)x.Amount, cancellationToken) ?? 0m;
+            var manualExpense = (await expenseQuery.Select(x => x.Amount).ToListAsync(cancellationToken)).Sum();
 
             var summary = new FinanceSummaryDto
             {
@@ -96,7 +87,7 @@ public sealed class FinanceService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error calculating finance summary.");
-            return Result.Failure<FinanceSummaryDto>(CommonErrors.InvalidRequest);
+            return Result.Failure<FinanceSummaryDto>(PersistenceErrorMapper.FromException(ex));
         }
     }
 
@@ -110,7 +101,7 @@ public sealed class FinanceService(
             var list = new List<FinanceTransactionDto>();
 
             // 1. Subscription Payments
-            var paymentsQuery = unitOfWork.Repository<Payment>().Query()
+            var paymentsQuery = unitOfWork.Repository<Payment>().Query().IgnoreQueryFilters()
                 .Include(x => x.Child)
                 .Include(x => x.Subscription).ThenInclude(s => s!.SubscriptionPlan)
                 .Include(x => x.ReceivedByUser)
@@ -149,7 +140,7 @@ public sealed class FinanceService(
             }
 
             // 2. Inventory Sales
-            var invoicesQuery = unitOfWork.Repository<Invoice>().Query()
+            var invoicesQuery = unitOfWork.Repository<Invoice>().Query().IgnoreQueryFilters()
                 .Include(x => x.Child)
                 .Include(x => x.CreatedByUser)
                 .Where(x => x.Status == InvoiceStatus.Posted);
@@ -218,7 +209,7 @@ public sealed class FinanceService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error fetching income transactions.");
-            return Result.Failure<IReadOnlyList<FinanceTransactionDto>>(CommonErrors.InvalidRequest);
+            return Result.Failure<IReadOnlyList<FinanceTransactionDto>>(PersistenceErrorMapper.FromException(ex));
         }
     }
 
@@ -232,7 +223,8 @@ public sealed class FinanceService(
             var list = new List<FinanceTransactionDto>();
 
             // 1. Paid Payroll
-            var payrollQuery = unitOfWork.Repository<PayrollRecord>().Query()
+            var payrollQuery = unitOfWork.Repository<PayrollRecord>().Query().IgnoreQueryFilters()
+                .Where(x => !x.IsDeleted)
                 .Include(x => x.Employee)
                 .Where(x => x.IsPaid);
 
@@ -300,7 +292,7 @@ public sealed class FinanceService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error fetching expense transactions.");
-            return Result.Failure<IReadOnlyList<FinanceTransactionDto>>(CommonErrors.InvalidRequest);
+            return Result.Failure<IReadOnlyList<FinanceTransactionDto>>(PersistenceErrorMapper.FromException(ex));
         }
     }
 
@@ -360,7 +352,7 @@ public sealed class FinanceService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error creating expense.");
-            return Result.Failure<FinanceTransactionDto>(CommonErrors.InvalidRequest);
+            return Result.Failure<FinanceTransactionDto>(PersistenceErrorMapper.FromException(ex));
         }
     }
 
@@ -424,7 +416,7 @@ public sealed class FinanceService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error updating expense {Id}", id);
-            return Result.Failure<FinanceTransactionDto>(CommonErrors.InvalidRequest);
+            return Result.Failure<FinanceTransactionDto>(PersistenceErrorMapper.FromException(ex));
         }
     }
 
@@ -459,7 +451,7 @@ public sealed class FinanceService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error voiding expense {Id}", id);
-            return Result.Failure(CommonErrors.InvalidRequest);
+            return Result.Failure(PersistenceErrorMapper.FromException(ex));
         }
     }
 
@@ -519,7 +511,60 @@ public sealed class FinanceService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error creating manual income.");
-            return Result.Failure<FinanceTransactionDto>(CommonErrors.InvalidRequest);
+            return Result.Failure<FinanceTransactionDto>(PersistenceErrorMapper.FromException(ex));
+        }
+    }
+
+    public async Task<Result<FinanceTransactionDto>> CreateAbsenceFineAsync(Guid childId, DateOnly fineDate, string? notes = null, CancellationToken cancellationToken = default)
+    {
+        if (!Allowed("Finance.ManageIncome")) return CommonErrors.PermissionDenied;
+        if (childId == Guid.Empty || fineDate == default) return CommonErrors.InvalidRequest;
+        try
+        {
+            var subscription = await unitOfWork.Repository<Subscription>().FirstOrDefaultAsync(
+                x => x.ChildId == childId && x.PeriodStart <= fineDate && x.PeriodEnd >= fineDate,
+                cancellationToken: cancellationToken);
+            if (subscription is null) return FinanceErrors.AbsenceFineSubscriptionNotFound;
+            var idempotencyKey = $"absence-fine:{childId:D}:{subscription.Id:D}";
+            var existing = await unitOfWork.Repository<ManualIncome>().Query().IgnoreQueryFilters()
+                .AnyAsync(x => x.IdempotencyKey == idempotencyKey, cancellationToken);
+            if (existing) return FinanceErrors.AbsenceFineAlreadyExists;
+            var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(x => x.Id == childId, cancellationToken: cancellationToken);
+            if (child is null) return FinanceErrors.AbsenceFineSubscriptionNotFound;
+            var amount = await GetIntegerSettingAsync("Attendance.AbsenceFineAmount", 50, cancellationToken);
+            var income = new ManualIncome
+            {
+                IncomeDate = fineDate, Source = "غرامة غياب", Amount = amount,
+                Description = $"غرامة غياب - الطفل: {child.FullName}", Notes = Clean(notes),
+                IdempotencyKey = idempotencyKey, RecordedByUserId = sessions.CurrentUser?.UserId,
+                CreatedAt = DateTimeOffset.UtcNow
+            };
+            await unitOfWork.Repository<ManualIncome>().AddAsync(income, cancellationToken);
+            await unitOfWork.Repository<AuditLog>().AddAsync(new AuditLog
+            {
+                Action = "CreateAbsenceFine", EntityType = nameof(ManualIncome), EntityId = income.Id.ToString("D"),
+                UserAccountId = sessions.CurrentUser?.UserId,
+                ChangeSummary = $"childId={childId:D};subscriptionId={subscription.Id:D};amount={amount}"
+            }, cancellationToken);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            logger.LogInformation("Absence fine recorded; incomeId={IncomeId}; childId={ChildId}; subscriptionId={SubscriptionId}; amount={Amount}", income.Id, childId, subscription.Id, amount);
+            return Result.Success(new FinanceTransactionDto
+            {
+                Id = income.Id, Date = income.IncomeDate, Type = FinanceTransactionType.ManualIncome,
+                TypeLabel = "إيراد يدوي", Category = income.Source, Description = income.Description,
+                Amount = income.Amount, RecordedBy = sessions.CurrentUser?.FullName ?? "—", CreatedAt = income.CreatedAt,
+                IsEditable = false
+            }, "تم تسجيل غرامة الغياب.");
+        }
+        catch (DbUpdateException ex) when (PersistenceErrorMapper.FromException(ex) == PersistenceErrors.Unique)
+        {
+            logger.LogWarning("Duplicate absence fine rejected by unique idempotency key; childId={ChildId}", childId);
+            return FinanceErrors.AbsenceFineAlreadyExists;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Absence fine recording failed; childId={ChildId}", childId);
+            return PersistenceErrorMapper.FromException(ex);
         }
     }
 
@@ -582,7 +627,7 @@ public sealed class FinanceService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error updating manual income {Id}", id);
-            return Result.Failure<FinanceTransactionDto>(CommonErrors.InvalidRequest);
+            return Result.Failure<FinanceTransactionDto>(PersistenceErrorMapper.FromException(ex));
         }
     }
 
@@ -617,10 +662,18 @@ public sealed class FinanceService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error deleting manual income {Id}", id);
-            return Result.Failure(CommonErrors.InvalidRequest);
+            return Result.Failure(PersistenceErrorMapper.FromException(ex));
         }
     }
 
     private bool Allowed(string code) => permissions.HasPermission(code);
     private static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
+    private async Task<int> GetIntegerSettingAsync(string key, int defaultValue, CancellationToken cancellationToken)
+    {
+        var setting = await unitOfWork.Repository<AppSetting>().FirstOrDefaultAsync(x => x.Key == key,
+            cancellationToken: cancellationToken);
+        return setting is not null && int.TryParse(setting.Value, System.Globalization.NumberStyles.Integer,
+            System.Globalization.CultureInfo.InvariantCulture, out var value) && value > 0 ? value : defaultValue;
+    }
 }

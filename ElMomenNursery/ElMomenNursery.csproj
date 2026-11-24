@@ -13,6 +13,7 @@
   <ItemGroup>
     <None Update="Resources\Branding\AlMoumenNurseryLogo.jpeg" CopyToOutputDirectory="PreserveNewest" />
     <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="appsettings.Development.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

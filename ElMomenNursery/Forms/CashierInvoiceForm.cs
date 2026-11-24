@@ -5,6 +5,7 @@ using ElMomenNursery.Domain.Enums;
 using ElMomenNursery.Controls;
 using ElMomenNursery.Styling;
 using Microsoft.Extensions.DependencyInjection;
+using Serilog;
 
 namespace ElMomenNursery.Forms;
 
@@ -35,6 +36,7 @@ internal sealed class CashierInvoiceForm : Form
     };
     private readonly Label _total = new() { AutoSize = true, Font = new Font("Segoe UI", 14, FontStyle.Bold), ForeColor = BrandPalette.PrimaryGreen, Text = "الإجمالي: 0.00 ج.م" };
     private readonly List<CartLine> _cart = [];
+    private readonly Button _saveButton = Button("إصدار الفاتورة", primary: true);
     private List<InventoryItemDto> _catalog = [];
 
     public CashierInvoiceForm(IServiceScopeFactory scopes)
@@ -70,7 +72,7 @@ internal sealed class CashierInvoiceForm : Form
         cartTools.Controls.Add(_total, 0, 0);
         cartTools.Controls.Add(remove, 1, 0);
 
-        var save = Button("إصدار الفاتورة", primary: true);
+        var save = _saveButton;
         var cancel = Button("إلغاء");
         cancel.DialogResult = DialogResult.Cancel;
         var footer = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, Padding = new Padding(0, 5, 0, 0) };
@@ -259,11 +261,13 @@ internal sealed class CashierInvoiceForm : Form
 
     private async Task SaveAsync()
     {
+        if (!_saveButton.Enabled) return;
         if (_cart.Count == 0)
         {
             AppDialog.ShowInformation(this, Text, "أضف صنفًا واحدًا على الأقل إلى الفاتورة.");
             return;
         }
+        _saveButton.Enabled = false;
         try
         {
             await using var scope = _scopes.CreateAsyncScope();
@@ -273,13 +277,27 @@ internal sealed class CashierInvoiceForm : Form
                 _reference.Text, null);
             var result = await scope.ServiceProvider.GetRequiredService<IInvoiceService>().CreateInvoiceAsync(dto);
             if (!ResultPresenter.Present(this, Text, result)) return;
-            var pdf = await scope.ServiceProvider.GetRequiredService<IInvoicePdfService>().CreateInvoiceFileAsync(result.Value);
-            if (ResultPresenter.Present(this, "الفاتورة", pdf))
-                Process.Start(new ProcessStartInfo(pdf.Value) { UseShellExecute = true });
+            try
+            {
+                var pdf = await scope.ServiceProvider.GetRequiredService<IInvoicePdfService>().CreateInvoiceFileAsync(result.Value);
+                if (pdf.IsSuccess)
+                    Process.Start(new ProcessStartInfo(pdf.Value) { UseShellExecute = true });
+                else
+                {
+                    Log.ForContext<CashierInvoiceForm>().Warning("Invoice saved but PDF generation failed; invoiceId={InvoiceId}", result.Value.Id);
+                    AppDialog.ShowInformation(this, "الفاتورة", "تم حفظ الفاتورة، لكن تعذر إنشاء ملف PDF.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.ForContext<CashierInvoiceForm>().Error(ex, "Invoice PDF creation or opening failed");
+                AppDialog.ShowInformation(this, "الفاتورة", "تم حفظ الفاتورة، لكن تعذر إنشاء ملف PDF أو فتحه.");
+            }
             DialogResult = DialogResult.OK;
             Close();
         }
-        catch { AppDialog.ShowInformation(this, Text, "تعذر إصدار الفاتورة. تحقق من الكميات وحاول مرة أخرى."); }
+        catch (Exception ex) { Log.ForContext<CashierInvoiceForm>().Error(ex, "Invoice save failed"); AppDialog.ShowInformation(this, Text, "تعذر إصدار الفاتورة. تحقق من الكميات وحاول مرة أخرى."); }
+        finally { if (!IsDisposed) _saveButton.Enabled = true; }
     }
 
     private static Button Button(string text, bool primary = false) => new()

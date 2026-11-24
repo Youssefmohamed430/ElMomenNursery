@@ -486,17 +486,17 @@ public sealed class FinancePage : UserControl
             await using var scope = _scopes.CreateAsyncScope();
             var service = scope.ServiceProvider.GetRequiredService<IFinanceService>();
 
-            var summaryTask = service.GetSummaryAsync(filter);
-            var incomeTask = service.GetIncomeTransactionsAsync(filter);
-            var expenseTask = service.GetExpenseTransactionsAsync(filter);
-
-            await Task.WhenAll(summaryTask, incomeTask, expenseTask);
+            var summaryRes = await service.GetSummaryAsync(filter);
+            var incomeRes = await service.GetIncomeTransactionsAsync(filter);
+            var expenseRes = await service.GetExpenseTransactionsAsync(filter);
 
             if (IsDisposed || currentVersion != _loadVersion) return;
 
-            var summaryRes = await summaryTask;
-            var incomeRes = await incomeTask;
-            var expenseRes = await expenseTask;
+            if (summaryRes.IsFailure || incomeRes.IsFailure || expenseRes.IsFailure)
+            {
+                AppDialog.ShowInformation(this, "خطأ", "تعذر تحميل البيانات المالية.");
+                return;
+            }
 
             var selectedType = _typeFilter.SelectedItem?.ToString();
             bool Matches(FinanceTransactionDto row) => selectedType is null or "كل الأنواع" || row.TypeLabel == selectedType;

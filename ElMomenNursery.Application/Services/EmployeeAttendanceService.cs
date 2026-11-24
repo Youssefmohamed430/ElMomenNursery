@@ -1,12 +1,3 @@
-using ElMomenNursery.Application.Abstractions.Persistence;
-using ElMomenNursery.Application.DTOs;
-using ElMomenNursery.Application.IServices;
-using ElMomenNursery.Domain.Entities;
-using ElMomenNursery.Domain.Abstractions;
-using ElMomenNursery.Domain.Enums;
-using Microsoft.Extensions.Logging;
-using Microsoft.EntityFrameworkCore;
-
 namespace ElMomenNursery.Application.Services;
 
 public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<EmployeeAttendanceService> logger, IPermissionService permissions, ISessionManager sessions) : IEmployeeAttendanceService
@@ -88,6 +79,8 @@ public sealed class EmployeeAttendanceService(IUnitOfWork unitOfWork, ILogger<Em
             asNoTracking: false,
             cancellationToken: cancellationToken);
         if (employee is null)
+            return AttendanceErrors.PersonNotFound;
+        if (employee.HireDate > dto.AttendanceDate)
             return AttendanceErrors.PersonNotFound;
 
         var alreadyMarked = await unitOfWork.Repository<EmployeeAttendance>().AnyAsync(

@@ -154,7 +154,7 @@ internal sealed class ChildrenPage : UserControl
         addButton.Click += (_, _) => RunSafeEvent(async () =>
         {
             if (isCustomizing) return;
-            using var editor = new ChildEditorForm(_scopeFactory);
+            using var editor = new ChildEditorForm(_scopeFactory, canManageClasses: _session.HasPermission("Classes.Manage"));
             if (editor.ShowDialog(this) == DialogResult.OK)
                 await LoadChildrenAsync();
         }, "Open child creation form");
@@ -181,7 +181,7 @@ internal sealed class ChildrenPage : UserControl
                     _log.Debug("Child editor opening cancelled: page disposed");
                     return;
                 }
-                using var editor = new ChildEditorForm(_scopeFactory, child);
+                using var editor = new ChildEditorForm(_scopeFactory, child, _session.HasPermission("Classes.Manage"));
                 if (editor.ShowDialog(this) == DialogResult.OK)
                     await LoadChildrenAsync();
             }

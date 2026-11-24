@@ -25,26 +25,26 @@ public class CreateChildDTO
     [Range(typeof(DateOnly), "2000-01-01", "2100-12-31", ErrorMessage = "يجب أن يكون تاريخ الميلاد بين 01/01/2000 و31/12/2100.")]
     public DateOnly DateOfBirth { get; set; }
 
-    [Required(ErrorMessage = "Gender is required.")]
+    [Required(ErrorMessage = "نوع الطفل مطلوب.")]
     public ChildGender Gender { get; set; }
     public Shift Shift { get; set; }
 
-    [Required(ErrorMessage = "FatherName is required.")]
+    [Required(ErrorMessage = "اسم الأب مطلوب.")]
     public required string FatherName { get; set; }
 
     public string? FatherOccupation { get; set; }
 
-    [Required(ErrorMessage = "FatherPhone is required.")]
+    [Required(ErrorMessage = "رقم هاتف الأب مطلوب.")]
     public required string FatherPhone { get; set; }
 
     public string? FatherWhatsApp { get; set; }
 
-    [Required(ErrorMessage = "MotherName is required.")]
+    [Required(ErrorMessage = "اسم الأم مطلوب.")]
     public required string MotherName { get; set; }
 
     public string? MotherOccupation { get; set; }
 
-    [Required(ErrorMessage = "MotherPhone is required.")]   
+    [Required(ErrorMessage = "رقم هاتف الأم مطلوب.")]
     public required string MotherPhone { get; set; }
 
     public string? MotherWhatsApp { get; set; }

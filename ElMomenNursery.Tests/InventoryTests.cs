@@ -2,6 +2,7 @@ using ElMomenNursery.Application.DTOs;
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Application.Services;
 using ElMomenNursery.Domain.Entities;
+using ElMomenNursery.Domain.Abstractions;
 using ElMomenNursery.Infrastructure.Persistence;
 using ElMomenNursery.Infrastructure.Security;
 using Microsoft.Data.Sqlite;
@@ -42,7 +43,13 @@ public sealed class InventoryTests
         Assert.Equal("Inventory.InvalidQuantity", invalidQuantity.Error.Code);
         var duplicate = await service.CreateItemAsync(new CreateItemDto { Name = "العاب", CategoryId = category.Id, UnitPrice = 12m, Quantity = 4, IsActive = true });
         Assert.Equal("Inventory.DuplicateItemName", duplicate.Error.Code);
-        var updated = await service.UpdateItemAsync(item.Value.Id, new UpdateItemDto { Name = "لعبة", CategoryId = category.Id, UnitPrice = 12.5m, Quantity = 7, IsActive = true });
+        var stale = await service.UpdateItemAsync(item.Value.Id, new UpdateItemDto
+        {
+            Name = "لعبة", CategoryId = category.Id, UnitPrice = 12.5m, Quantity = 7,
+            ExpectedQuantity = 3, QuantityAdjustmentReason = "تصحيح الجرد", IsActive = true
+        });
+        Assert.Equal(InventoryErrors.QuantityChanged, stale.Error);
+        var updated = await service.UpdateItemAsync(item.Value.Id, new UpdateItemDto { Name = "لعبة", CategoryId = category.Id, UnitPrice = 12.5m, Quantity = 7, ExpectedQuantity = 4, QuantityAdjustmentReason = "تصحيح الجرد", IsActive = true });
         Assert.True(updated.IsSuccess);
         Assert.Equal(7, updated.Value.Quantity);
         var audit = await db.AuditLogs.SingleAsync(x => x.Action == "InventoryItem.Updated");
@@ -50,6 +57,10 @@ public sealed class InventoryTests
         Assert.Contains("12.50", audit.ChangeSummary);
         Assert.Contains("4 قطعة", audit.ChangeSummary);
         Assert.Contains("7 قطعة", audit.ChangeSummary);
+        var movement = await db.StockMovements.SingleAsync(x => x.InventoryItemId == item.Value.Id);
+        Assert.Equal(3, movement.Quantity);
+        Assert.Equal(ElMomenNursery.Domain.Enums.StockMovementType.Adjustment, movement.MovementType);
+        Assert.Equal("تصحيح الجرد", movement.Notes);
     }
 
     [Fact]
@@ -61,6 +72,28 @@ public sealed class InventoryTests
         var category = new InventoryCategoryService(uow, NullLogger<InventoryCategoryService>.Instance, denied, new TestSessionManager(null));
         Assert.Equal("Inventory.PermissionDenied", (await item.GetItemsAsync(new InventoryItemFilter())).Error.Code);
         Assert.Equal("Inventory.PermissionDenied", (await category.CreateCategoryAsync(new CreateCategoryDto { Name = "فئة", IsActive = true })).Error.Code);
+    }
+
+    [Fact]
+    public async Task Invoice_checks_combined_quantity_for_duplicate_item_lines()
+    {
+        await using var db = await CreateDb();
+        var category = new InventoryCategory { Name = "لوازم", IsActive = true };
+        var item = new InventoryItem { Name = "دفتر", Category = category, CategoryId = category.Id, UnitPrice = 10m, Quantity = 4, IsActive = true };
+        db.AddRange(category, item); await db.SaveChangesAsync();
+        var service = new InvoiceService(new TestUnitOfWork(db), NullLogger<InvoiceService>.Instance,
+            new TestPermissionService(), new TestSessionManager(null));
+        var request = new CreateInvoiceDto("عميل", null,
+        [
+            new CreateInvoiceLineDto(item.Id, "دفتر", 10m, 3),
+            new CreateInvoiceLineDto(item.Id, "دفتر", 10m, 2)
+        ], ElMomenNursery.Domain.Enums.PaymentMethod.Cash, null, null);
+
+        var result = await service.CreateInvoiceAsync(request);
+
+        Assert.Equal("Invoices.InsufficientStock", result.Error.Code);
+        Assert.Equal(4, (await db.InventoryItems.SingleAsync()).Quantity);
+        Assert.Empty(await db.Invoices.ToListAsync());
     }
 
     private static async Task<NurseryDbContext> CreateDb()

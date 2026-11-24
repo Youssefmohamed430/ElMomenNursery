@@ -6,6 +6,9 @@ public static class EmployeeErrors
     public static readonly Error NotFound = new("Employees.NotFound", "لم يتم العثور على سجل الموظف.");
     public static readonly Error InvalidData = new("Employees.InvalidData", "بيانات الموظف غير مكتملة أو غير صحيحة.");
     public static readonly Error InvalidSalary = new("Employees.InvalidSalary", "الراتب يجب أن يكون صفرًا أو أكثر.");
+    public static readonly Error InvalidNationalId = new("Employees.InvalidNationalId", "يجب أن يتكون الرقم القومي من 14 رقمًا.");
+    public static readonly Error InvalidPhone = new("Employees.InvalidPhone", "أدخل رقم هاتف محمول مصريًا صحيحًا.");
+    public static readonly Error InvalidGraduationYear = new("Employees.InvalidGraduationYear", "أدخل سنة تخرج بين 1900 والسنة الحالية.");
     public static readonly Error DuplicateNationalId = new("Employees.DuplicateNationalId", "الرقم القومي مسجل لموظف آخر.");
     public static readonly Error PersistenceFailure = new("Employees.PersistenceFailure", "تعذر حفظ بيانات الموظف. أعد المحاولة.");
     public static readonly Error Created = new("Employees.Created", "تم حفظ بيانات الموظف.");

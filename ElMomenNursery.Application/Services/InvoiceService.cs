@@ -1,12 +1,3 @@
-using ElMomenNursery.Application.Abstractions.Persistence;
-using ElMomenNursery.Application.DTOs;
-using ElMomenNursery.Application.IServices;
-using ElMomenNursery.Domain.Abstractions;
-using ElMomenNursery.Domain.Entities;
-using ElMomenNursery.Domain.Enums;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-
 namespace ElMomenNursery.Application.Services;
 
 public sealed class InvoiceService(IUnitOfWork uow, ILogger<InvoiceService> logger, IPermissionService permissions, ISessionManager sessions) : IInvoiceService
@@ -34,7 +25,7 @@ public sealed class InvoiceService(IUnitOfWork uow, ILogger<InvoiceService> logg
 
     public async Task<Result<InvoiceReceiptDto>> CreateInvoiceAsync(CreateInvoiceDto dto, CancellationToken ct = default)
     {
-        if (!Allowed("Payments.Create")) return InventoryErrors.PermissionDenied;
+        if (!Allowed("Payments.Create")) return CommonErrors.PermissionDenied;
         if (string.IsNullOrWhiteSpace(dto.CustomerName))
             return new Error("Invoices.CustomerRequired", "اسم العميل مطلوب لإصدار الفاتورة.");
         if (dto.Lines.Count == 0 || dto.Lines.Any(x => string.IsNullOrWhiteSpace(x.Description) || x.UnitPrice < 0 || x.Quantity <= 0 || decimal.Round(x.UnitPrice, 2) != x.UnitPrice))
@@ -42,12 +33,14 @@ public sealed class InvoiceService(IUnitOfWork uow, ILogger<InvoiceService> logg
         var child = dto.ChildId is Guid childId ? await uow.Repository<Child>().FirstOrDefaultAsync(x => x.Id == childId, asNoTracking:false, cancellationToken:ct) : null;
         if (dto.ChildId is not null && child is null) return new Error("Invoices.ChildNotFound", "لم يتم العثور على الطفل المحدد.");
         var inventoryIds = dto.Lines.Where(x => x.InventoryItemId.HasValue).Select(x => x.InventoryItemId!.Value).Distinct().ToArray();
-        var items = await uow.Repository<InventoryItem>().Query(asNoTracking:false).Where(x => inventoryIds.Contains(x.Id) && x.IsActive).ToDictionaryAsync(x => x.Id, ct);
+        var items = await uow.Repository<InventoryItem>().Query(asNoTracking:false).Include(x => x.Category)
+            .Where(x => inventoryIds.Contains(x.Id) && x.IsActive && x.Category.IsActive).ToDictionaryAsync(x => x.Id, ct);
         if (items.Count != inventoryIds.Length) return new Error("Invoices.ItemUnavailable", "أحد الأصناف لم يعد متاحًا للبيع.");
-        foreach (var line in dto.Lines.Where(x => x.InventoryItemId.HasValue))
+        foreach (var group in dto.Lines.Where(x => x.InventoryItemId.HasValue).GroupBy(x => x.InventoryItemId!.Value))
         {
-            var item = items[line.InventoryItemId!.Value];
-            if (line.Quantity > item.Quantity) return new Error("Invoices.InsufficientStock", $"الكمية المتاحة من «{item.Name}» هي {item.Quantity}.");
+            var item = items[group.Key];
+            var requested = group.Sum(x => x.Quantity);
+            if (requested > item.Quantity) return new Error("Invoices.InsufficientStock", $"الكمية المتاحة من «{item.Name}» هي {item.Quantity}.");
         }
         var now = DateTimeOffset.Now;
         var year = now.Year;

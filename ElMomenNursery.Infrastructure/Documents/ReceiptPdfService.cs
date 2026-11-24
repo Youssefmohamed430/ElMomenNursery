@@ -6,6 +6,8 @@ using QuestPDF.Fluent;
 using QuestPDF.Drawing;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
+using Serilog;
+using System.Diagnostics;
 
 namespace ElMomenNursery.Infrastructure.Documents;
 
@@ -19,11 +21,14 @@ public sealed class ReceiptPdfService(string dataDirectory) : IReceiptPdfService
 
     public Task<Result<string>> CreateReceiptFileAsync(PaymentReceiptDto receipt, bool isCopy, CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        try
+        return Task.Run(() =>
         {
+        cancellationToken.ThrowIfCancellationRequested();
         var year = receipt.PaidAt.LocalDateTime.Year;
         var folder = Path.Combine(dataDirectory, "Receipts", year.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        var timer = Stopwatch.StartNew();
+        try
+        {
         Directory.CreateDirectory(folder);
         var safeNumber = string.Concat(receipt.ReceiptNumber.Where(c => char.IsLetterOrDigit(c) || c == '-'));
         var suffix = isCopy ? "-نسخة" : string.Empty;
@@ -62,14 +67,20 @@ public sealed class ReceiptPdfService(string dataDirectory) : IReceiptPdfService
                 column.Item().PaddingTop(20).Text("توقيع المستلم: ____________________");
             });
         })).GeneratePdf(path);
-        return Task.FromResult(Result.Success(path, "تم تجهيز ملف الإيصال."));
+        Log.ForContext<ReceiptPdfService>().Information("Receipt PDF generated; durationMs={DurationMs}; targetFolder={TargetFolder}", timer.ElapsedMilliseconds, folder);
+        return Result.Success(path, "تم تجهيز ملف الإيصال.");
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
-        catch (IOException exception) when ((exception.HResult & 0xFFFF) is 32 or 33) { return Task.FromResult(Result.Failure<string>(FileErrors.FileInUse)); }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        catch (Exception exception)
         {
-            return Task.FromResult(Result.Failure<string>(FileErrors.NotWritable));
+            var kind = exception is IOException io && (io.HResult & 0xFFFF) is 32 or 33 ? "in-use"
+                : exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException ? "not-writable" : "unknown";
+            Log.ForContext<ReceiptPdfService>().Warning("Receipt PDF generation failed; failureKind={FailureKind}; durationMs={DurationMs}; targetFolder={TargetFolder}", kind, timer.ElapsedMilliseconds, folder);
+            return Result.Failure<string>(exception is IOException && kind == "in-use" ? FileErrors.FileInUse
+                : kind == "not-writable" ? FileErrors.NotWritable
+                : new Error("Receipts.PdfFailed", "تعذر إنشاء ملف الإيصال."));
         }
+        }, cancellationToken);
     }
 
     private static void Pair(ColumnDescriptor column, string label, string value) =>

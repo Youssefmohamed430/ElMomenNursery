@@ -5,6 +5,8 @@ using QuestPDF.Fluent;
 using QuestPDF.Drawing;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
+using Serilog;
+using System.Diagnostics;
 
 namespace ElMomenNursery.Infrastructure.Documents;
 
@@ -18,35 +20,47 @@ public sealed class InvoicePdfService(string dataDirectory) : IInvoicePdfService
 
     public Task<Result<string>> CreateInvoiceFileAsync(InvoiceReceiptDto invoice, CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        try
+        return Task.Run(() =>
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var folder = Path.Combine(dataDirectory, "Invoices", invoice.CreatedAt.LocalDateTime.Year.ToString(System.Globalization.CultureInfo.InvariantCulture));
-            Directory.CreateDirectory(folder);
-            var path = Path.Combine(folder, $"{invoice.InvoiceNumber}.pdf");
-            Document.Create(document => document.Page(page =>
+            var timer = Stopwatch.StartNew();
+            try
             {
-                page.Size(PageSizes.A5); page.Margin(24); page.DefaultTextStyle(style => style.FontFamily("Noto Naskh Arabic").FontSize(11));
-                page.Content().Column(column =>
+                Directory.CreateDirectory(folder);
+                var path = Path.Combine(folder, $"{invoice.InvoiceNumber}.pdf");
+                Document.Create(document => document.Page(page =>
                 {
-                    column.Item().AlignCenter().Text("حضانة المؤمن").FontSize(20).Bold();
-                    column.Item().AlignCenter().Text("فاتورة بيع").FontSize(15).Bold();
-                    column.Item().PaddingVertical(8).Text($"رقم الفاتورة: {invoice.InvoiceNumber}    التاريخ: {invoice.CreatedAt.ToLocalTime():dd/MM/yyyy HH:mm}");
-                    if (!string.IsNullOrWhiteSpace(invoice.ChildName ?? invoice.CustomerName)) column.Item().Text($"العميل: {invoice.ChildName ?? invoice.CustomerName}");
-                    column.Item().PaddingTop(12).Table(table =>
+                    page.Size(PageSizes.A5); page.Margin(24); page.DefaultTextStyle(style => style.FontFamily("Noto Naskh Arabic").FontSize(11));
+                    page.Content().ContentFromRightToLeft().Column(column =>
                     {
-                        table.ColumnsDefinition(columns => { columns.RelativeColumn(4); columns.RelativeColumn(1); columns.RelativeColumn(2); columns.RelativeColumn(2); });
-                        table.Header(header => { header.Cell().Element(Cell).Text("البيان").Bold(); header.Cell().Element(Cell).Text("الكمية").Bold(); header.Cell().Element(Cell).Text("السعر").Bold(); header.Cell().Element(Cell).Text("الإجمالي").Bold(); });
-                        foreach (var line in invoice.Lines) { table.Cell().Element(Cell).Text(line.Description); table.Cell().Element(Cell).Text(line.Quantity.ToString()); table.Cell().Element(Cell).Text(line.UnitPrice.ToString("N2")); table.Cell().Element(Cell).Text(line.Total.ToString("N2")); }
-                        static QuestPDF.Infrastructure.IContainer Cell(QuestPDF.Infrastructure.IContainer c) => c.BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingVertical(5).PaddingHorizontal(3);
+                        column.Item().AlignCenter().Text("حضانة المؤمن").FontSize(20).Bold();
+                        column.Item().AlignCenter().Text("فاتورة بيع").FontSize(15).Bold();
+                        column.Item().PaddingVertical(8).Text($"رقم الفاتورة: {invoice.InvoiceNumber}    التاريخ: {invoice.CreatedAt.ToLocalTime():dd/MM/yyyy HH:mm}");
+                        if (!string.IsNullOrWhiteSpace(invoice.ChildName ?? invoice.CustomerName)) column.Item().Text($"العميل: {invoice.ChildName ?? invoice.CustomerName}");
+                        column.Item().PaddingTop(12).Table(table =>
+                        {
+                            table.ColumnsDefinition(columns => { columns.RelativeColumn(4); columns.RelativeColumn(1); columns.RelativeColumn(2); columns.RelativeColumn(2); });
+                            table.Header(header => { header.Cell().Element(Cell).Text("البيان").Bold(); header.Cell().Element(Cell).Text("الكمية").Bold(); header.Cell().Element(Cell).Text("السعر").Bold(); header.Cell().Element(Cell).Text("الإجمالي").Bold(); });
+                            foreach (var line in invoice.Lines) { table.Cell().Element(Cell).Text(line.Description); table.Cell().Element(Cell).Text(line.Quantity.ToString()); table.Cell().Element(Cell).Text(line.UnitPrice.ToString("N2")); table.Cell().Element(Cell).Text(line.Total.ToString("N2")); }
+                            static QuestPDF.Infrastructure.IContainer Cell(QuestPDF.Infrastructure.IContainer c) => c.BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingVertical(5).PaddingHorizontal(3);
+                        });
+                        column.Item().PaddingTop(12).AlignLeft().Text($"الإجمالي: {invoice.TotalAmount:N2} ج.م").FontSize(16).Bold();
+                        column.Item().Text($"طريقة الدفع: {invoice.PaymentMethod switch { Domain.Enums.PaymentMethod.Cash => "نقدًا", Domain.Enums.PaymentMethod.BankTransfer => "تحويل بنكي", _ => "أخرى" }}");
+                        if (!string.IsNullOrWhiteSpace(invoice.Reference)) column.Item().Text($"المرجع: {invoice.Reference}");
                     });
-                    column.Item().PaddingTop(12).AlignLeft().Text($"الإجمالي: {invoice.TotalAmount:N2} ج.م").FontSize(16).Bold();
-                    column.Item().Text($"طريقة الدفع: {invoice.PaymentMethod switch { Domain.Enums.PaymentMethod.Cash => "نقدًا", Domain.Enums.PaymentMethod.BankTransfer => "تحويل بنكي", _ => "أخرى" }}");
-                    if (!string.IsNullOrWhiteSpace(invoice.Reference)) column.Item().Text($"المرجع: {invoice.Reference}");
-                });
-            })).GeneratePdf(path);
-            return Task.FromResult<Result<string>>(Result.Success<string>(path));
-        }
-        catch (Exception ex) { return Task.FromResult<Result<string>>(Result.Failure<string>(new Error("Invoices.PdfFailed", $"تعذر إنشاء ملف الفاتورة: {ex.Message}"))); }
+                })).GeneratePdf(path);
+                Log.ForContext<InvoicePdfService>().Information("Invoice PDF generated; durationMs={DurationMs}; targetFolder={TargetFolder}", timer.ElapsedMilliseconds, folder);
+                return Result.Success<string>(path);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+            catch (Exception ex)
+            {
+                var kind = (ex is IOException io && (io.HResult & 0xFFFF) is 32 or 33) ? "in-use"
+                    : ex is UnauthorizedAccessException or IOException or ArgumentException or NotSupportedException ? "not-writable" : "unknown";
+                Log.ForContext<InvoicePdfService>().Warning("Invoice PDF generation failed; failureKind={FailureKind}; durationMs={DurationMs}; targetFolder={TargetFolder}", kind, timer.ElapsedMilliseconds, folder);
+                return Result.Failure<string>(new Error("Invoices.PdfFailed", "تم حفظ الفاتورة، لكن تعذر إنشاء ملف PDF."));
+            }
+        }, cancellationToken);
     }
 }

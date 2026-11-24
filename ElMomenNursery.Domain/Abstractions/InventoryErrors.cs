@@ -8,6 +8,8 @@ public static class InventoryErrors
     public static readonly Error InvalidData = new("Inventory.InvalidData", "البيانات المدخلة غير مكتملة أو غير صحيحة.");
     public static readonly Error InvalidPrice = new("Inventory.InvalidPrice", "يجب أن يكون السعر صفرًا أو أكثر وبحد أقصى منزلتين عشريتين.");
     public static readonly Error InvalidQuantity = new("Inventory.InvalidQuantity", "يجب أن تكون الكمية عددًا صحيحًا يساوي صفرًا أو أكثر.");
+    public static readonly Error QuantityChanged = new("Inventory.QuantityChanged", "تغيرت كمية الصنف منذ فتح الشاشة. أعد تحميل البيانات ثم حاول مجددًا.");
+    public static readonly Error QuantityAdjustmentReasonRequired = new("Inventory.QuantityAdjustmentReasonRequired", "أدخل سبب تعديل كمية الصنف.");
     public static readonly Error DuplicateCategoryName = new("Inventory.DuplicateCategoryName", "توجد فئة أخرى بالاسم نفسه.");
     public static readonly Error DuplicateItemName = new("Inventory.DuplicateItemName", "يوجد صنف آخر بالاسم نفسه ضمن هذه الفئة.");
     public static readonly Error CategoryInactive = new("Inventory.CategoryInactive", "لا يمكن إضافة الصنف إلى فئة موقوفة.");

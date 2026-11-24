@@ -34,6 +34,12 @@ public interface IFinanceService
         CreateManualIncomeDto dto,
         CancellationToken cancellationToken = default);
 
+    Task<Result<FinanceTransactionDto>> CreateAbsenceFineAsync(
+        Guid childId,
+        DateOnly fineDate,
+        string? notes = null,
+        CancellationToken cancellationToken = default);
+
     Task<Result<FinanceTransactionDto>> UpdateManualIncomeAsync(
         Guid id,
         UpdateManualIncomeDto dto,

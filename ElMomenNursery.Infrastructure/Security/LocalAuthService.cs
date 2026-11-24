@@ -57,6 +57,13 @@ public sealed class LocalAuthService(NurseryDbContext db, ISessionManager sessio
             return AuthErrors.LockedOut;
         }
 
+        if (user.LockoutEnd is not null)
+        {
+            user.FailedLoginAttempts = 0;
+            user.LockoutEnd = null;
+            logger.LogInformation("Expired login lockout reset; userId={UserId}", user.Id);
+        }
+
         var passwordValidation = await ValidatePassword(password, user, cancellationToken);
         if (passwordValidation.Failure is not null) return passwordValidation.Failure;
         var verification = passwordValidation.Verification;
@@ -181,6 +188,7 @@ public sealed class LocalAuthService(NurseryDbContext db, ISessionManager sessio
         try
         {
             var bytes = Convert.FromBase64String(passwordHash);
+            if (bytes.Length == 0) return false;
             return (bytes[0] == 0 && bytes.Length == 49) || (bytes[0] == 1 && bytes.Length >= 26);
         }
         catch (FormatException)

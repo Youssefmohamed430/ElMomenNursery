@@ -32,7 +32,7 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
 {
     public void Configure(EntityTypeBuilder<Employee> b)
     {
-        b.ToTable("Employees", t => t.HasCheckConstraint("CK_Employees_SalaryNonNegative", "\"Salary\" >= 0"));
+        b.ToTable("Employees", t => t.HasCheckConstraint("CK_Employees_SalaryNonNegative", "CAST(\"Salary\" AS REAL) >= 0"));
         b.HasKey(x => x.Id);
         b.Property(x => x.FullName).IsRequired();
         b.Property(x => x.NationalIdNumber).IsRequired();
@@ -164,7 +164,7 @@ internal sealed class SubscriptionPlanConfiguration : IEntityTypeConfiguration<S
 {
     public void Configure(EntityTypeBuilder<SubscriptionPlan> b)
     {
-        b.ToTable("SubscriptionPlans", t => t.HasCheckConstraint("CK_SubscriptionPlans_DefaultFeeNonNegative", "\"DefaultFee\" >= 0"));
+        b.ToTable("SubscriptionPlans", t => t.HasCheckConstraint("CK_SubscriptionPlans_DefaultFeeNonNegative", "CAST(\"DefaultFee\" AS REAL) >= 0"));
         b.HasKey(x => x.Id);
         b.Property(x => x.Name).IsRequired();
         b.Property(x => x.DefaultFee).HasPrecision(18, 2);
@@ -178,7 +178,7 @@ internal sealed class SubscriptionConfiguration : IEntityTypeConfiguration<Subsc
     public void Configure(EntityTypeBuilder<Subscription> b)
     {
         b.ToTable("Subscriptions", t => {
-            t.HasCheckConstraint("CK_Subscriptions_AmountDueNonNegative", "\"AmountDue\" >= 0");
+            t.HasCheckConstraint("CK_Subscriptions_AmountDueNonNegative", "CAST(\"AmountDue\" AS REAL) >= 0");
             t.HasCheckConstraint("CK_Subscriptions_PeriodRange", "\"PeriodEnd\" >= \"PeriodStart\"");
         });
         b.HasKey(x => x.Id);
@@ -208,12 +208,13 @@ internal sealed class InventoryItemConfiguration : IEntityTypeConfiguration<Inve
     {
         b.ToTable("InventoryItems", t =>
         {
-            t.HasCheckConstraint("CK_InventoryItems_UnitPriceNonNegative", "\"UnitPrice\" >= 0");
+            t.HasCheckConstraint("CK_InventoryItems_UnitPriceNonNegative", "CAST(\"UnitPrice\" AS REAL) >= 0");
             t.HasCheckConstraint("CK_InventoryItems_QuantityNonNegative", "\"Quantity\" >= 0");
         });
         b.HasKey(x => x.Id);
         b.Property(x => x.Name).IsRequired();
         b.Property(x => x.UnitPrice).HasPrecision(18, 2);
+        b.Property(x => x.Quantity).IsConcurrencyToken();
         b.HasIndex(x => new { x.CategoryId, x.Name }).HasDatabaseName("IX_InventoryItems_Category_Name");
         b.HasMany(x => x.StockMovements).WithOne(x => x.InventoryItem).HasForeignKey(x => x.InventoryItemId).OnDelete(DeleteBehavior.Restrict);
         b.HasMany(x => x.InvoiceLines).WithOne(x => x.InventoryItem).HasForeignKey(x => x.InventoryItemId).OnDelete(DeleteBehavior.Restrict);
@@ -241,7 +242,7 @@ internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
 {
     public void Configure(EntityTypeBuilder<Payment> b)
     {
-        b.ToTable("Payments", t => t.HasCheckConstraint("CK_Payments_AmountNonNegative", "\"Amount\" >= 0"));
+        b.ToTable("Payments", t => t.HasCheckConstraint("CK_Payments_AmountNonNegative", "CAST(\"Amount\" AS REAL) >= 0"));
         b.HasKey(x => x.Id);
         b.Property(x => x.Amount).HasPrecision(18, 2);
         b.Property(x => x.PaymentMethod).HasConversion<string>().HasMaxLength(32).IsRequired();
@@ -260,7 +261,7 @@ internal sealed class PaymentAllocationConfiguration : IEntityTypeConfiguration<
 {
     public void Configure(EntityTypeBuilder<PaymentAllocation> b)
     {
-        b.ToTable("PaymentAllocations", t => t.HasCheckConstraint("CK_PaymentAllocations_AmountAppliedNonNegative", "\"AmountApplied\" >= 0"));
+        b.ToTable("PaymentAllocations", t => t.HasCheckConstraint("CK_PaymentAllocations_AmountAppliedNonNegative", "CAST(\"AmountApplied\" AS REAL) >= 0"));
         b.HasKey(x => x.Id);
         b.Property(x => x.AmountApplied).HasPrecision(18, 2);
         b.HasIndex(x => x.PaymentId).HasDatabaseName("IX_PaymentAllocations_PaymentId");
@@ -317,7 +318,7 @@ internal sealed class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
 {
     public void Configure(EntityTypeBuilder<Invoice> b)
     {
-        b.ToTable("Invoices", t => t.HasCheckConstraint("CK_Invoices_TotalAmountNonNegative", "\"TotalAmount\" >= 0"));
+        b.ToTable("Invoices", t => t.HasCheckConstraint("CK_Invoices_TotalAmountNonNegative", "CAST(\"TotalAmount\" AS REAL) >= 0"));
         b.HasKey(x => x.Id);
         b.Property(x => x.InvoiceNumber).IsRequired();
         b.Property(x => x.TotalAmount).HasPrecision(18, 2);
@@ -337,7 +338,7 @@ internal sealed class InvoiceLineConfiguration : IEntityTypeConfiguration<Invoic
     {
         b.ToTable("InvoiceLines", t => {
             t.HasCheckConstraint("CK_InvoiceLines_QuantityPositive", "\"Quantity\" > 0");
-            t.HasCheckConstraint("CK_InvoiceLines_LineTotalNonNegative", "\"LineTotal\" >= 0");
+            t.HasCheckConstraint("CK_InvoiceLines_LineTotalNonNegative", "CAST(\"LineTotal\" AS REAL) >= 0");
         });
         b.HasKey(x => x.Id);
         b.Property(x => x.ItemNameSnapshot).IsRequired();
@@ -353,7 +354,7 @@ internal sealed class ExpenseConfiguration : IEntityTypeConfiguration<Expense>
 {
     public void Configure(EntityTypeBuilder<Expense> b)
     {
-        b.ToTable("Expenses", t => t.HasCheckConstraint("CK_Expenses_AmountNonNegative", "\"Amount\" >= 0"));
+        b.ToTable("Expenses", t => t.HasCheckConstraint("CK_Expenses_AmountNonNegative", "CAST(\"Amount\" AS REAL) >= 0"));
         b.HasKey(x => x.Id);
         b.Property(x => x.Category).IsRequired();
         b.Property(x => x.Description).IsRequired();
@@ -369,7 +370,7 @@ internal sealed class PayrollRecordConfiguration : IEntityTypeConfiguration<Payr
     {
         b.ToTable("PayrollRecords", t => {
             t.HasCheckConstraint("CK_PayrollRecords_PeriodRange", "\"PeriodEnd\" >= \"PeriodStart\"");
-            t.HasCheckConstraint("CK_PayrollRecords_SalaryNonNegative", "\"AgreedSalary\" >= 0 AND \"AmountPaid\" >= 0");
+            t.HasCheckConstraint("CK_PayrollRecords_SalaryNonNegative", "CAST(\"AgreedSalary\" AS REAL) >= 0 AND CAST(\"AmountPaid\" AS REAL) >= 0");
         });
         b.HasKey(x => x.Id);
         b.Property(x => x.AgreedSalary).HasPrecision(18, 2);
@@ -377,6 +378,7 @@ internal sealed class PayrollRecordConfiguration : IEntityTypeConfiguration<Payr
         b.Property(x => x.Deductions).HasPrecision(18, 2);
         b.Property(x => x.AmountPaid).HasPrecision(18, 2);
         b.Property(x => x.AdvanceDeduction).HasPrecision(18, 2);
+        b.Property(x => x.InsuranceFunds).HasPrecision(18, 2);
         b.HasIndex(x => new { x.EmployeeId, x.PeriodStart }).HasDatabaseName("IX_PayrollRecords_Employee_PeriodStart");
         b.HasOne(x => x.Employee).WithMany(x => x.PayrollRecords).HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Restrict);
     }
@@ -387,7 +389,7 @@ internal sealed class EmployeeAdvanceConfiguration : IEntityTypeConfiguration<Em
     public void Configure(EntityTypeBuilder<EmployeeAdvance> b)
     {
         b.ToTable("EmployeeAdvances", t => {
-            t.HasCheckConstraint("CK_EmployeeAdvances_Amounts", "\"OriginalAmount\" > 0 AND \"RemainingAmount\" >= 0 AND \"RemainingAmount\" <= \"OriginalAmount\"");
+            t.HasCheckConstraint("CK_EmployeeAdvances_Amounts", "CAST(\"OriginalAmount\" AS REAL) > 0 AND CAST(\"RemainingAmount\" AS REAL) >= 0 AND CAST(\"RemainingAmount\" AS REAL) <= CAST(\"OriginalAmount\" AS REAL)");
         });
         b.HasKey(x => x.Id);
         b.Property(x => x.OriginalAmount).HasPrecision(18, 2);
@@ -402,7 +404,7 @@ internal sealed class EmployeeAdvanceRepaymentConfiguration : IEntityTypeConfigu
 {
     public void Configure(EntityTypeBuilder<EmployeeAdvanceRepayment> b)
     {
-        b.ToTable("EmployeeAdvanceRepayments", t => t.HasCheckConstraint("CK_EmployeeAdvanceRepayments_Amount", "\"Amount\" > 0"));
+        b.ToTable("EmployeeAdvanceRepayments", t => t.HasCheckConstraint("CK_EmployeeAdvanceRepayments_Amount", "CAST(\"Amount\" AS REAL) > 0"));
         b.HasKey(x => x.Id);
         b.Property(x => x.Amount).HasPrecision(18, 2);
         b.HasIndex(x => new { x.EmployeeAdvanceId, x.PayrollRecordId }).IsUnique();
@@ -465,11 +467,12 @@ internal sealed class ManualIncomeConfiguration : IEntityTypeConfiguration<Manua
 {
     public void Configure(EntityTypeBuilder<ManualIncome> b)
     {
-        b.ToTable("ManualIncomes", t => t.HasCheckConstraint("CK_ManualIncomes_AmountPositive", "\"Amount\" > 0"));
+        b.ToTable("ManualIncomes", t => t.HasCheckConstraint("CK_ManualIncomes_AmountPositive", "CAST(\"Amount\" AS REAL) > 0"));
         b.HasKey(x => x.Id);
         b.Property(x => x.Source).IsRequired();
         b.Property(x => x.Description).IsRequired();
         b.Property(x => x.Amount).HasPrecision(18, 2);
+        b.HasIndex(x => x.IdempotencyKey).IsUnique().HasFilter("\"IdempotencyKey\" IS NOT NULL");
         b.HasIndex(x => x.IncomeDate).HasDatabaseName("IX_ManualIncomes_IncomeDate");
         b.HasOne(x => x.RecordedByUser).WithMany().HasForeignKey(x => x.RecordedByUserId).IsRequired(false).OnDelete(DeleteBehavior.SetNull);
     }

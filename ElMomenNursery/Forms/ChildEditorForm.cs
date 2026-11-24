@@ -1,10 +1,9 @@
 using ElMomenNursery.Application.DTOs;
+using ElMomenNursery.Application.Common;
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Controls;
-using ElMomenNursery.Domain.Enums;
 using ElMomenNursery.Domain.Entities;
-using ElMomenNursery.Application.Abstractions.Persistence;
-using Microsoft.EntityFrameworkCore;
+using ElMomenNursery.Domain.Enums;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using System.Text.RegularExpressions;
@@ -16,6 +15,7 @@ public sealed class ChildEditorForm : Form
     private static readonly ILogger _log = Log.ForContext<ChildEditorForm>();
     private readonly IServiceScopeFactory _scopes;
     private readonly ChildDto? _child;
+    private readonly bool _canManageClasses;
 
     private readonly TextBox _fullName = CreateTextBox(100);
     private readonly TextBox _address = CreateTextBox(200, multiline: true);
@@ -36,12 +36,15 @@ public sealed class ChildEditorForm : Form
     private readonly CheckBox _hasMedicalConditions = CreateCheckBox("لديه حالة طبية");
     private readonly CheckBox _previouslyAttended = CreateCheckBox("سبق له الالتحاق بحضانة");
     private readonly Button _saveButton = CreateButton("حفظ", primary: true);
+    private Guid? _createdChildId;
     private readonly Dictionary<AttachmentType, (Label Label, string? Source, string? Destination)> _documents = new();
 
-    public ChildEditorForm(IServiceScopeFactory scopes, ChildDto? child = null)
+    public ChildEditorForm(IServiceScopeFactory scopes, ChildDto? child = null, bool canManageClasses = false)
     {
         _scopes = scopes;
         _child = child;
+        _canManageClasses = canManageClasses;
+        _classroom.Enabled = canManageClasses;
         Text = child is null ? "إضافة طفل" : "تعديل بيانات الطفل";
         StartPosition = FormStartPosition.CenterParent;
         MinimumSize = new Size(820, 640);
@@ -188,7 +191,7 @@ public sealed class ChildEditorForm : Form
             var childService = scope.ServiceProvider.GetRequiredService<IChildService>();
             var gender = ((GenderOption)_gender.SelectedItem!).Value;
             Guid childId;
-            if (_child is null)
+            if (_child is null && _createdChildId is null)
             {
                 var result = await childService.CreateChildAsync(new CreateChildDTO
                 {
@@ -212,10 +215,12 @@ public sealed class ChildEditorForm : Form
                 });
                 if (!ResultPresenter.Present(this, "الأطفال", result)) return;
                 childId = result.Value.Id;
+                _createdChildId = childId;
             }
             else
             {
-                var result = await childService.UpdateChildAsync(_child.Id, new UpdateChildDTO
+                var existingChildId = _child?.Id ?? _createdChildId!.Value;
+                var result = await childService.UpdateChildAsync(existingChildId, new UpdateChildDTO
                 {
                     FullName = _fullName.Text.Trim(),
                     Address = _address.Text.Trim(),
@@ -236,7 +241,7 @@ public sealed class ChildEditorForm : Form
                     PreviouslyAttendedNursery = _previouslyAttended.Checked
                 });
                 if (!ResultPresenter.Present(this, "الأطفال", result)) return;
-                childId = _child.Id;
+                childId = existingChildId;
             }
 
             foreach (var (type, document) in _documents)
@@ -256,29 +261,11 @@ public sealed class ChildEditorForm : Form
                 }
             }
 
-            await SaveClassroomAssignmentAsync(childId, enrollmentDate);
+            if (!await SaveClassroomAssignmentAsync(childId, enrollmentDate)) return;
 
             if (IsDisposed) return;
             DialogResult = DialogResult.OK;
             Close();
-        }
-        catch (DbUpdateException exception)
-        {
-            var details = exception.GetBaseException().Message;
-            var constraintKind = details.Contains("CHECK constraint", StringComparison.OrdinalIgnoreCase) ? "CHECK"
-                : details.Contains("UNIQUE constraint", StringComparison.OrdinalIgnoreCase) ? "UNIQUE"
-                : details.Contains("FOREIGN KEY constraint", StringComparison.OrdinalIgnoreCase) ? "FOREIGN KEY"
-                : "UNKNOWN";
-            _log.Warning(exception, "Child save rejected by database constraint; childId={ChildId}; constraintKind={ConstraintKind}", _child?.Id, constraintKind);
-            var message = details.Contains("CK_Children_DateOrder", StringComparison.OrdinalIgnoreCase)
-                ? "يجب أن يكون تاريخ الالتحاق في يوم الميلاد أو بعده."
-                : constraintKind switch
-                {
-                    "UNIQUE" => "تعذر حفظ البيانات لوجود سجل مكرر.",
-                    "FOREIGN KEY" => "تعذر حفظ البيانات لوجود سجلات مرتبطة.",
-                    _ => "تعذر حفظ بيانات الطفل. راجع البيانات ثم أعد المحاولة."
-                };
-            if (!IsDisposed) ShowValidationError(message);
         }
         catch (Exception exception)
         {
@@ -294,55 +281,38 @@ public sealed class ChildEditorForm : Form
 
     private async Task LoadClassroomsAsync()
     {
+        if (!_canManageClasses) return;
         try
         {
             await using var scope = _scopes.CreateAsyncScope();
-            var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+            var service = scope.ServiceProvider.GetRequiredService<IClassroomService>();
             _classroom.Items.Clear();
             _classroom.Items.Add(new ClassroomOption(null, "بدون فصل"));
-            foreach (var room in await uow.Repository<Classroom>().Query().Where(x => x.IsActive).OrderBy(x => x.Name).ToListAsync())
-                _classroom.Items.Add(new ClassroomOption(room.Id, room.Name));
+            var rooms = await service.GetClassroomsAsync();
+            if (rooms.IsFailure) { ShowValidationError(rooms.Error.Description); return; }
+            foreach (var room in rooms.Value) _classroom.Items.Add(new ClassroomOption(room.Id, room.Name));
             _classroom.SelectedIndex = 0;
             if (_child is not null)
             {
-                var enrollment = await uow.Repository<ChildClassEnrollment>().Query()
-                    .Where(x => x.ChildId == _child.Id && x.StartDate <= DateOnly.FromDateTime(DateTime.Today) && (x.EndDate == null || x.EndDate >= DateOnly.FromDateTime(DateTime.Today)))
-                    .OrderByDescending(x => x.StartDate).FirstOrDefaultAsync();
+                var current = await service.GetChildClassroomAsync(_child.Id);
+                if (current.IsFailure) { ShowValidationError(current.Error.Description); return; }
                 for (var index = 0; index < _classroom.Items.Count; index++)
-                    if (_classroom.Items[index] is ClassroomOption option && option.Id == enrollment?.ClassroomId) _classroom.SelectedIndex = index;
+                    if (_classroom.Items[index] is ClassroomOption option && option.Id == current.Value) _classroom.SelectedIndex = index;
             }
         }
         catch (Exception exception) { _log.Warning(exception, "Unable to load classroom choices for child form"); }
     }
 
-    private async Task SaveClassroomAssignmentAsync(Guid childId, DateOnly startDate)
+    private async Task<bool> SaveClassroomAssignmentAsync(Guid childId, DateOnly startDate)
     {
+        if (!_canManageClasses) return true;
         var requestedId = (_classroom.SelectedItem as ClassroomOption)?.Id;
         await using var scope = _scopes.CreateAsyncScope();
-        var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-        var today = DateOnly.FromDateTime(DateTime.Today);
-        var current = await uow.Repository<ChildClassEnrollment>().Query(false)
-            .Where(x => x.ChildId == childId && x.StartDate <= today && (x.EndDate == null || x.EndDate >= today)).ToListAsync();
-        if (current.Any(x => x.ClassroomId == requestedId)) return;
-        foreach (var enrollment in current) enrollment.EndDate = today;
-        if (requestedId.HasValue)
-        {
-            var room = await uow.Repository<Classroom>().FirstOrDefaultAsync(x => x.Id == requestedId.Value, asNoTracking: false);
-            var child = await uow.Repository<Child>().FirstOrDefaultAsync(x => x.Id == childId, asNoTracking: false);
-            if (room is not null && child is not null)
-            {
-                var effectiveStartDate = _child is null ? startDate : today;
-                var repository = uow.Repository<ChildClassEnrollment>();
-                var sameDayEnrollment = await repository.FirstOrDefaultAsync(
-                    x => x.ChildId == childId && x.ClassroomId == room.Id && x.StartDate == effectiveStartDate,
-                    asNoTracking: false);
-                if (sameDayEnrollment is not null)
-                    sameDayEnrollment.EndDate = null;
-                else
-                    await repository.AddAsync(new ChildClassEnrollment { ChildId = childId, ClassroomId = room.Id, StartDate = effectiveStartDate, Child = child, Classroom = room });
-            }
-        }
-        await uow.SaveChangesAsync();
+        var effectiveStartDate = _child is null ? startDate : DateOnly.FromDateTime(DateTime.Today);
+        var result = await scope.ServiceProvider.GetRequiredService<IClassroomService>()
+            .AssignChildAsync(childId, requestedId, effectiveStartDate);
+        if (result.IsFailure) { ShowValidationError(result.Error.Description); return false; }
+        return true;
     }
 
     private sealed record ClassroomOption(Guid? Id, string Name) { public override string ToString() => Name; }

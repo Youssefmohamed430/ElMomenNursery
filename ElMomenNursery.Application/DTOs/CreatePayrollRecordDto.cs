@@ -14,6 +14,6 @@ namespace ElMomenNursery.Application.DTOs
         public DateOnly? PaymentDate { get; set; }
         public bool IsPaid { get; set; } = false;
         public string? Notes { get; set; }
-        public decimal Insurancefunds { get; set; }
+        public decimal InsuranceFunds { get; set; }
     }
 }

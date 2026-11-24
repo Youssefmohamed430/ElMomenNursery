@@ -1,6 +1,7 @@
 using System.Drawing;
 using Serilog;
 using ElMomenNursery.Application.DTOs;
+using ElMomenNursery.Application.Common;
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Controls;
 using ElMomenNursery.Domain.Abstractions;
@@ -197,11 +198,11 @@ internal sealed class EmployeesPage : UserControl
 
         void RenderEmployees()
         {
-            var query = showingDeleted ? string.Empty : search.Text.Trim();
+            var query = showingDeleted ? string.Empty : ArabicNameNormalizer.Normalize(search.Text);
             var visibleEmployees = string.IsNullOrEmpty(query)
                 ? employees
                 : employees.Where(employee =>
-                    employee.FullName.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
+                    ArabicNameNormalizer.Normalize(employee.FullName).Contains(query, StringComparison.Ordinal) ||
                     employee.NationalIdNumber.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
                     employee.JobDesignation.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
                     employee.Phone.Contains(query, StringComparison.CurrentCultureIgnoreCase)).ToList();

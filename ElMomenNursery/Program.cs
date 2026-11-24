@@ -25,6 +25,7 @@ internal static class Program
             var configuration = new ConfigurationBuilder()
                 .SetBasePath(AppContext.BaseDirectory)
                 .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
+                .AddJsonFile("appsettings.Development.json", optional: true, reloadOnChange: false)
                 .Build();
             ConfigureLogging(configuration);
             Log.ForContext("AppVersion", Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown")

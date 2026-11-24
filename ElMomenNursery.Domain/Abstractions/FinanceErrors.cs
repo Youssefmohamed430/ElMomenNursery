@@ -9,5 +9,7 @@ public static class FinanceErrors
     public static readonly Error CategoryRequired = new("Finance.CategoryRequired", "فئة المصروف مطلوبة.");
     public static readonly Error SourceRequired = new("Finance.SourceRequired", "مصدر الإيراد مطلوب.");
     public static readonly Error NonManualNotEditable = new("Finance.NonManualNotEditable", "لا يمكن تعديل أو حذف هذه الحركة المالية من شاشة الماليات لأنها مسجلة تلقائياً من شاشة أخرى.");
+    public static readonly Error AbsenceFineSubscriptionNotFound = new("Finance.AbsenceFineSubscriptionNotFound", "لا يوجد اشتراك يغطي تاريخ الغرامة المحدد.");
+    public static readonly Error AbsenceFineAlreadyExists = new("Finance.AbsenceFineAlreadyExists", "تم تسجيل غرامة الغياب لهذا الطفل وفترة الاشتراك من قبل.");
 }
 

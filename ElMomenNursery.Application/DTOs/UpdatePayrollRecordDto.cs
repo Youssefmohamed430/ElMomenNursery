@@ -9,5 +9,5 @@ public class UpdatePayrollRecordDto
     public decimal Deductions { get; set; }
     public DateOnly? PaymentDate { get; set; }
     public string? Notes { get; set; }
-    public decimal Insurancefunds { get; set; }
+    public decimal InsuranceFunds { get; set; }
 }

@@ -118,7 +118,7 @@ internal sealed class ChildAttendancePage : UserControl
         try
         {
             await using var scope = _scopes.CreateAsyncScope();
-            var service = scope.ServiceProvider.GetRequiredService<IChildService>();
+            var service = scope.ServiceProvider.GetRequiredService<IChildAttendanceService>();
             var result = await service.GetClassroomsForFilterAsync();
             if (IsDisposed) return;
             if (result.IsFailure) { ShowError(result.Error.Description); return; }
@@ -170,6 +170,11 @@ internal sealed class ChildAttendancePage : UserControl
     private async Task RecordAsync(AttendanceStatus status)
     {
         var row = Selected(); if (row is null || row.IsMarked) return;
+        if (status is AttendanceStatus.Present or AttendanceStatus.Late && row.Date < DateOnly.FromDateTime(DateTime.Today))
+        {
+            await OpenEditorAsync(correction: false);
+            return;
+        }
         var now = DateTimeOffset.Now;
         try
         {
@@ -187,6 +192,11 @@ internal sealed class ChildAttendancePage : UserControl
     private async Task CheckOutAsync()
     {
         var row = Selected(); if (row is null) return;
+        if (row.Date < DateOnly.FromDateTime(DateTime.Today))
+        {
+            await OpenEditorAsync(correction: true);
+            return;
+        }
         try
         {
             await using var scope = _scopes.CreateAsyncScope();
@@ -200,6 +210,11 @@ internal sealed class ChildAttendancePage : UserControl
 
     private async Task MarkAllAsync()
     {
+        if (DateOnly.FromDateTime(_date.Value) < DateOnly.FromDateTime(DateTime.Today))
+        {
+            ShowError("للتسجيل في يوم سابق، اختر كل طفل وسجّل وقت الحضور من محرر الحضور.");
+            return;
+        }
         var classroom = _classroom.SelectedItem as ClassroomFilterOptionDto;
         var candidates = _rows.Count(x => !x.IsMarked);
         if (candidates == 0) { ShowError("لا يوجد أطفال غير مسجلين في النطاق المحدد."); return; }
@@ -352,6 +367,11 @@ internal sealed class EmployeeAttendancePage : UserControl
     private async Task RecordAsync(AttendanceStatus status)
     {
         var row = Current(); if (row is null || row.IsMarked) return;
+        if (status is AttendanceStatus.Present or AttendanceStatus.Late && row.AttendanceDate < DateOnly.FromDateTime(DateTime.Today))
+        {
+            await OpenEditorAsync();
+            return;
+        }
         try { await using var scope = _scopes.CreateAsyncScope(); var service = scope.ServiceProvider.GetRequiredService<IEmployeeAttendanceService>();
             var result = await service.MarkManualAttendanceAsync(new CreateEmployeeAttendanceDto { EmployeeId = row.EmployeeId, AttendanceDate = row.AttendanceDate, Status = status, CheckInTime = status is AttendanceStatus.Present or AttendanceStatus.Late ? DateTimeOffset.Now : null });
             if (result.IsFailure) { AppDialog.ShowInformation((IWin32Window?)FindForm() ?? this, "حضور الموظفين", result.Error.Description); return; }
@@ -361,6 +381,11 @@ internal sealed class EmployeeAttendancePage : UserControl
     private async Task CheckoutAsync()
     {
         var row = Current(); if (row is null) return;
+        if (row.AttendanceDate < DateOnly.FromDateTime(DateTime.Today))
+        {
+            await OpenEditorAsync();
+            return;
+        }
         try { await using var scope = _scopes.CreateAsyncScope(); var service = scope.ServiceProvider.GetRequiredService<IEmployeeAttendanceService>();
             var result = await service.RecordCheckOutAsync(row.EmployeeId, row.AttendanceDate, DateTimeOffset.Now);
             if (result.IsFailure) { AppDialog.ShowInformation((IWin32Window?)FindForm() ?? this, "حضور الموظفين", result.Error.Description); return; }

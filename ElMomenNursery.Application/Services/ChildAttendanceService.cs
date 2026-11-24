@@ -1,13 +1,3 @@
-using ElMomenNursery.Application.Abstractions;
-using ElMomenNursery.Application.Abstractions.Persistence;
-using ElMomenNursery.Application.DTOs;
-using ElMomenNursery.Application.IServices;
-using ElMomenNursery.Domain.Abstractions;
-using ElMomenNursery.Domain.Entities;
-using ElMomenNursery.Domain.Enums;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-
 namespace ElMomenNursery.Application.Services;
 
 public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<ChildAttendanceService> logger,
@@ -57,6 +47,7 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
                 Notes = record?.Notes
             };
         }).ToArray();
+
         return Result.Success(rows);
     }
 
@@ -74,10 +65,23 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
     {
         var permissionError = PermissionGuard.Check(permissions, "Attendance.View", AttendanceErrors.PermissionDenied);
         if (permissionError is not null) return permissionError;
+
         var children = await unitOfWork.Repository<Child>().ListAsync(cancellationToken: cancellationToken);
         IReadOnlyList<AttendanceChildOptionDto> result = children.OrderBy(x => x.FullName)
             .Select(x => new AttendanceChildOptionDto(x.Id, x.FullName)).ToArray();
+
         return Result.Success(result);
+    }
+
+    public async Task<Result<IReadOnlyList<ClassroomFilterOptionDto>>> GetClassroomsForFilterAsync(CancellationToken cancellationToken = default)
+    {
+        var permissionError = PermissionGuard.Check(permissions, "Attendance.View", AttendanceErrors.PermissionDenied);
+        if (permissionError is not null) return permissionError;
+
+        var classrooms = await unitOfWork.Repository<Classroom>().ListAsync(x => x.IsActive, cancellationToken: cancellationToken);
+
+        return Result.Success<IReadOnlyList<ClassroomFilterOptionDto>>(classrooms.OrderBy(x => x.Name)
+            .Select(x => new ClassroomFilterOptionDto(x.Id, x.Name)).ToArray());
     }
 
     public async Task<Result<ChildAttendanceDto>> MarkManualAttendanceAsync(CreateChildAttendanceDto dto, CancellationToken cancellationToken = default)
@@ -108,11 +112,13 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
 
         await unitOfWork.Repository<ChildAttendance>().AddAsync(item, cancellationToken);
         await AddAuditAsync(item, "ChildAttendance.Created", "—", Values(item), null, cancellationToken);
+
         try { await unitOfWork.SaveChangesAsync(cancellationToken); }
         catch (DbUpdateException ex) when (IsDuplicate(ex)) { logger.LogWarning("Duplicate child attendance rejected; childId={ChildId}", child.Id); return AttendanceErrors.AlreadyRecorded; }
         catch (DbUpdateException ex) { logger.LogWarning(ex, "Child attendance persistence failed; errorCode={ErrorCode}", PersistenceErrorMapper.FromException(ex).Code); return PersistenceErrorMapper.FromException(ex); }
 
         var alert = await GetSubscriptionAndAbsenceAlertAsync(child.Id, dto.Date, cancellationToken);
+
         return Result.Success(ToDto(item) with { Alert = alert }, alert ?? "تم تسجيل الحضور.");
     } 
     
@@ -228,11 +234,11 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
             x => x.ChildId == childId && x.PeriodStart <= attendanceDate && x.PeriodEnd >= attendanceDate,
             cancellationToken: ct);
         if (subscription is not null && subscription.Status is not (SubscriptionStatus.Cancelled or SubscriptionStatus.Waived)
-            && attendanceDate >= subscription.PeriodStart.AddDays(3))
+            && attendanceDate >= subscription.PeriodStart.AddDays(await GetIntegerSettingAsync("Attendance.SubscriptionAlertAfterDays", 3, ct)))
         {
-            var paid = await unitOfWork.Repository<PaymentAllocation>().Query()
+            var paid = (await unitOfWork.Repository<PaymentAllocation>().Query()
                 .Where(x => x.SubscriptionId == subscription.Id && x.Payment.Status == PaymentStatus.Posted)
-                .SumAsync(x => (decimal?)x.AmountApplied, ct) ?? 0m;
+                .Select(x => x.AmountApplied).ToListAsync(ct)).Sum();
             if (paid < subscription.AmountDue)
                 messages.Add($"تنبيه: اشتراك الطفل غير مسدد بالكامل بعد مرور 3 أيام من بدايته. المتبقي {subscription.AmountDue - paid:0.##} جنيه.");
         }
@@ -242,8 +248,10 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
             var absentDays = await unitOfWork.Repository<ChildAttendance>().Query()
                 .CountAsync(x => x.ChildId == childId && x.AttendanceDate >= subscription.PeriodStart
                     && x.AttendanceDate <= attendanceDate && x.Status == AttendanceStatus.Absent, ct);
-            if (absentDays >= 15)
-                messages.Add("تنبيه: تم تسجيل غياب الطفل 15 يومًا منذ بداية الاشتراك. الغرامة المستحقة 50 جنيهًا.");
+            var fineAfterDays = await GetIntegerSettingAsync("Attendance.AbsenceFineAfterDays", 15, ct);
+            var fineAmount = await GetIntegerSettingAsync("Attendance.AbsenceFineAmount", 50, ct);
+            if (absentDays >= fineAfterDays)
+                messages.Add($"تنبيه: تم تسجيل غياب الطفل {fineAfterDays} يومًا منذ بداية الاشتراك. الغرامة المستحقة {fineAmount} جنيهًا.");
         }
 
         return messages.Count == 0 ? null : string.Join(Environment.NewLine, messages);
@@ -251,6 +259,13 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
 
     private static string Values(ChildAttendance x) => $"Date={x.AttendanceDate:yyyy-MM-dd};Status={x.Status};CheckIn={x.CheckInTime?.ToString("O", System.Globalization.CultureInfo.InvariantCulture) ?? "—"};CheckOut={x.CheckOutTime?.ToString("O", System.Globalization.CultureInfo.InvariantCulture) ?? "—"}";
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private async Task<int> GetIntegerSettingAsync(string key, int defaultValue, CancellationToken cancellationToken)
+    {
+        var setting = await unitOfWork.Repository<AppSetting>().FirstOrDefaultAsync(x => x.Key == key,
+            cancellationToken: cancellationToken);
+        return setting is not null && int.TryParse(setting.Value, System.Globalization.NumberStyles.Integer,
+            System.Globalization.CultureInfo.InvariantCulture, out var value) && value > 0 ? value : defaultValue;
+    }
     private static ChildAttendanceDto ToDto(ChildAttendance x) => new(x.Id, x.ChildId, x.AttendanceDate, x.Status, x.CheckInTime, x.CheckOutTime, x.EntryMethod, x.Notes);
     private static bool IsDuplicate(DbUpdateException ex) => ex.GetBaseException().Message.Contains("UNIQUE constraint failed", StringComparison.OrdinalIgnoreCase) && ex.GetBaseException().Message.Contains("ChildAttendances", StringComparison.OrdinalIgnoreCase);
 }

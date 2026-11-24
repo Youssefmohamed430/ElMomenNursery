@@ -1,4 +1,4 @@
-﻿using ElMomenNursery.Application.DTOs;
+using ElMomenNursery.Application.DTOs;
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Domain.Abstractions;
 using ElMomenNursery.Controls;
@@ -85,7 +85,7 @@ internal sealed class PayrollPage : UserControl
             (!_filterTo.Checked || record.PeriodStart <= DateOnly.FromDateTime(_filterTo.Value))).ToArray(); _grid.Rows.Clear();
         foreach (var record in _records)
         {
-            var index = _grid.Rows.Add(record.EmployeeName, $"{record.PeriodStart:dd/MM/yyyy} - {record.PeriodEnd:dd/MM/yyyy}", record.AgreedSalary.ToString("N2"), record.DailySalary.ToString("N2"), record.AbsenceDays, record.Insurancefunds.ToString("N2"), record.AdvanceDeduction.ToString("N2"), record.AmountPaid.ToString("N2"), record.IsPaid ? "تم الصرف" : record.IsCalculated ? "جاهز للصرف" : "غير محسوب");
+            var index = _grid.Rows.Add(record.EmployeeName, $"{record.PeriodStart:dd/MM/yyyy} - {record.PeriodEnd:dd/MM/yyyy}", record.AgreedSalary.ToString("N2"), record.DailySalary.ToString("N2"), record.AbsenceDays, record.InsuranceFunds.ToString("N2"), record.AdvanceDeduction.ToString("N2"), record.AmountPaid.ToString("N2"), record.IsPaid ? "تم الصرف" : record.IsCalculated ? "جاهز للصرف" : "غير محسوب");
             _grid.Rows[index].Tag = record.Id;
         }
     }
@@ -113,7 +113,7 @@ internal sealed class PayrollPage : UserControl
         _employee.SelectedItem = _employee.Items.Cast<EmployeeDto>().FirstOrDefault(x => x.Id == record.EmployeeId);
         _from.Value = record.PeriodStart.ToDateTime(TimeOnly.MinValue); _to.Value = record.PeriodEnd.ToDateTime(TimeOnly.MinValue);
         _salary.Value = Math.Min(_salary.Maximum, record.AgreedSalary); _additions.Value = Math.Min(_additions.Maximum, record.Additions);
-        _deductions.Value = Math.Min(_deductions.Maximum, record.Deductions); _insurance.Value = Math.Min(_insurance.Maximum, record.Insurancefunds);
+        _deductions.Value = Math.Min(_deductions.Maximum, record.Deductions); _insurance.Value = Math.Min(_insurance.Maximum, record.InsuranceFunds);
         _paymentDate.Value = (record.PaymentDate ?? DateOnly.FromDateTime(DateTime.Today)).ToDateTime(TimeOnly.MinValue);
         _notes.Text = record.Notes ?? string.Empty; _savePayroll.Text = "حفظ التعديل وإعادة الحساب";
     }
@@ -139,13 +139,13 @@ internal sealed class PayrollPage : UserControl
             ? await service.UpdatePayRollRecordAsync(editingId, new UpdatePayrollRecordDto
             {
                 PeriodStart = periodStart, PeriodEnd = periodEnd, AgreedSalary = _salary.Value,
-                Additions = _additions.Value, Deductions = _deductions.Value, Insurancefunds = _insurance.Value,
+                Additions = _additions.Value, Deductions = _deductions.Value, InsuranceFunds = _insurance.Value,
                 PaymentDate = DateOnly.FromDateTime(_paymentDate.Value), Notes = string.IsNullOrWhiteSpace(_notes.Text) ? null : _notes.Text.Trim()
             })
             : await service.CreatePayRollRecord(new CreatePayrollRecordDto
             {
                 EmployeeId = employee.Id, PeriodStart = periodStart, PeriodEnd = periodEnd, AgreedSalary = _salary.Value,
-                Additions = _additions.Value, Deductions = _deductions.Value, Insurancefunds = _insurance.Value,
+                Additions = _additions.Value, Deductions = _deductions.Value, InsuranceFunds = _insurance.Value,
                 PaymentDate = DateOnly.FromDateTime(_paymentDate.Value), Notes = string.IsNullOrWhiteSpace(_notes.Text) ? null : _notes.Text.Trim()
             });
         if (result.IsFailure) { AppDialog.ShowInformation(this, "الرواتب", result.Error.Description); return; }

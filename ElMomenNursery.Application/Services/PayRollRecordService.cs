@@ -1,17 +1,9 @@
-using ElMomenNursery.Application.Abstractions.Persistence;
-using ElMomenNursery.Application.DTOs;
-using ElMomenNursery.Application.IServices;
-using ElMomenNursery.Domain.Abstractions;
-using ElMomenNursery.Domain.Entities;
-using ElMomenNursery.Domain.Enums;
-using Microsoft.Extensions.Logging;
-
 namespace ElMomenNursery.Application.Services;
 
 public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRollRecordService> logger,
     IPermissionService permissions, IFinanceService financeService) : IPayRollRecordService
 {
-    private const int PaidDaysPerMonth = 22;
+    private const int DefaultPaidDaysPerMonth = 22;
 
     public async Task<Result<PayrollRecordDto>> CalculateFinalSalary(Guid payrollRecordId)
     {
@@ -23,13 +15,17 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
 
         try
         {
-            var absences = await unitOfWork.Repository<EmployeeAttendance>().ListAsync(x =>
+            var paidDaysPerMonth = await GetPaidDaysPerMonthAsync();
+            var attendanceRows = await unitOfWork.Repository<EmployeeAttendance>().ListAsync(x =>
                 x.EmployeeId == record.EmployeeId && x.AttendanceDate >= record.PeriodStart &&
-                x.AttendanceDate <= record.PeriodEnd && x.Status == AttendanceStatus.Absent);
-            var absenceDays = absences.Select(x => x.AttendanceDate).Distinct().Count();
-            var dailySalary = record.AgreedSalary / PaidDaysPerMonth;
-            var payableDays = Math.Max(0, PaidDaysPerMonth - absenceDays);
-            var salaryBeforeAdvances = Math.Max(0m, decimal.Round(dailySalary * payableDays + record.Additions - record.Deductions - record.Insurancefunds, 2, MidpointRounding.AwayFromZero));
+                x.AttendanceDate <= record.PeriodEnd);
+            if (attendanceRows.Count == 0)
+                logger.LogWarning("Payroll calculated without attendance records; payrollRecordId={PayrollRecordId}; employeeId={EmployeeId}; periodStart={PeriodStart}; periodEnd={PeriodEnd}",
+                    record.Id, record.EmployeeId, record.PeriodStart, record.PeriodEnd);
+            var absenceDays = attendanceRows.Where(x => x.Status == AttendanceStatus.Absent).Select(x => x.AttendanceDate).Distinct().Count();
+            var dailySalary = record.AgreedSalary / paidDaysPerMonth;
+            var payableDays = Math.Max(0, paidDaysPerMonth - absenceDays);
+            var salaryBeforeAdvances = Math.Max(0m, decimal.Round(dailySalary * payableDays + record.Additions - record.Deductions - record.InsuranceFunds, 2, MidpointRounding.AwayFromZero));
             var advances = await unitOfWork.Repository<EmployeeAdvance>().ListAsync(x => x.EmployeeId == record.EmployeeId &&
                 x.AdvanceDate <= record.PeriodEnd && x.RemainingAmount > 0);
             var outstandingAdvances = advances.Sum(x => x.RemainingAmount);
@@ -37,7 +33,7 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
             record.AmountPaid = salaryBeforeAdvances - record.AdvanceDeduction;
             record.IsCalculated = true;
             await unitOfWork.SaveChangesAsync();
-            var dto = ToDto(record, record.Employee.FullName);
+            var dto = ToDto(record, record.Employee.FullName, paidDaysPerMonth);
             dto.DailySalary = decimal.Round(dailySalary, 2, MidpointRounding.AwayFromZero);
             dto.AbsenceDays = absenceDays;
             return Result.Success(dto, PayrollRecordErrors.CalculatedFinalSalary.Description);
@@ -53,7 +49,7 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
     {
         if (!permissions.HasPermission("Payroll.Manage")) return PayrollRecordErrors.PermissionDenied;
         if (dto is null || dto.EmployeeId == Guid.Empty || dto.PeriodStart == default || dto.PeriodEnd < dto.PeriodStart ||
-            dto.AgreedSalary < 0 || (dto.Additions ?? 0) < 0 || (dto.Deductions ?? 0) < 0 || dto.Insurancefunds < 0 || dto.IsPaid)
+            dto.AgreedSalary < 0 || (dto.Additions ?? 0) < 0 || (dto.Deductions ?? 0) < 0 || dto.InsuranceFunds < 0 || dto.IsPaid)
             return PayrollRecordErrors.InvalidData;
         if (!await unitOfWork.Repository<Employee>().AnyAsync(x => x.Id == dto.EmployeeId)) return EmployeeErrors.NotFound;
         var duplicate = await unitOfWork.Repository<PayrollRecord>().AnyAsync(x => x.EmployeeId == dto.EmployeeId &&
@@ -61,11 +57,11 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
         if (duplicate) return PayrollRecordErrors.InvalidData;
         var record = new PayrollRecord { EmployeeId = dto.EmployeeId, Employee = null!, PeriodStart = dto.PeriodStart,
             PeriodEnd = dto.PeriodEnd, AgreedSalary = dto.AgreedSalary, Additions = dto.Additions ?? 0,
-            Deductions = dto.Deductions ?? 0, Insurancefunds = dto.Insurancefunds, Notes = Clean(dto.Notes) };
+            Deductions = dto.Deductions ?? 0, InsuranceFunds = dto.InsuranceFunds, Notes = Clean(dto.Notes) };
         await unitOfWork.Repository<PayrollRecord>().AddAsync(record);
         try { await unitOfWork.SaveChangesAsync(); }
         catch (Exception ex) { logger.LogError(ex, "Payroll record creation failed"); return PayrollRecordErrors.PersistenceFailure; }
-        return Result.Success(ToDto(record, ""));
+        return Result.Success(ToDto(record, "", await GetPaidDaysPerMonthAsync()));
     }
 
     public async Task<Result<PayrollBatchResultDto>> CreatePayrollRecordsForAllEmployeesAsync(DateOnly startDate, DateOnly endDate, CancellationToken cancellationToken = default)
@@ -105,18 +101,18 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
         var record = await unitOfWork.Repository<PayrollRecord>().FirstOrDefaultAsync(x => x.Id == id, false, [nameof(PayrollRecord.Employee)]);
         if (record is null) return PayrollRecordErrors.NotFound;
         if (record.IsPaid || dto.PeriodStart == default || dto.PeriodEnd < dto.PeriodStart || dto.AgreedSalary < 0 ||
-            dto.Additions < 0 || dto.Deductions < 0 || dto.Insurancefunds < 0) return PayrollRecordErrors.InvalidData;
+            dto.Additions < 0 || dto.Deductions < 0 || dto.InsuranceFunds < 0) return PayrollRecordErrors.InvalidData;
         var overlaps = await unitOfWork.Repository<PayrollRecord>().AnyAsync(x => x.Id != id && x.EmployeeId == record.EmployeeId &&
             x.PeriodStart <= dto.PeriodEnd && x.PeriodEnd >= dto.PeriodStart);
         if (overlaps) return PayrollRecordErrors.InvalidData;
         record.PeriodStart = dto.PeriodStart; record.PeriodEnd = dto.PeriodEnd; record.AgreedSalary = dto.AgreedSalary;
-        record.Additions = dto.Additions; record.Deductions = dto.Deductions; record.Insurancefunds = dto.Insurancefunds;
+        record.Additions = dto.Additions; record.Deductions = dto.Deductions; record.InsuranceFunds = dto.InsuranceFunds;
         record.AmountPaid = 0; record.PaymentDate = dto.PaymentDate; record.Notes = Clean(dto.Notes);
         record.AdvanceDeduction = 0;
         record.IsCalculated = false;
         try { await unitOfWork.SaveChangesAsync(); }
         catch (Exception ex) { logger.LogError(ex, "Payroll update failed; id={PayrollRecordId}", id); return PayrollRecordErrors.PersistenceFailure; }
-        return Result.Success(ToDto(record, record.Employee.FullName));
+        return Result.Success(ToDto(record, record.Employee.FullName, await GetPaidDaysPerMonthAsync()));
     }
 
     public async Task<Result<PayrollRecordDto>> MarkRecordAsPaid(Guid id)
@@ -181,7 +177,7 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
             logger.LogError(ex, "Payroll payment posting failed; id={PayrollRecordId}", id);
             return PayrollRecordErrors.PersistenceFailure;
         }
-        return Result.Success(ToDto(record, record.Employee.FullName));
+        return Result.Success(ToDto(record, record.Employee.FullName, await GetPaidDaysPerMonthAsync()));
     }
 
     public async Task<Result> DeletePayRollRecordAsync(Guid id)
@@ -195,7 +191,7 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
     }
 
     public Task<Result<IReadOnlyList<PayrollRecordDto>>> GetAllPayrollRecordsAsync() => GetRecordsAsync(x => !x.IsDeleted);
-    public Task<Result<IReadOnlyList<PayrollRecordDto>>> GetDeletedPayrollRecordsAsync(CancellationToken cancellationToken = default) => GetRecordsAsync(x => x.IsDeleted);
+    public Task<Result<IReadOnlyList<PayrollRecordDto>>> GetDeletedPayrollRecordsAsync(CancellationToken cancellationToken = default) => GetRecordsAsync(x => x.IsDeleted, includeDeleted: true);
     public Task<Result<IReadOnlyList<PayrollRecordDto>>> GetPayrollRecordsByDateAsync(DateOnly start, DateOnly end) =>
         GetRecordsAsync(x => !x.IsDeleted && x.PeriodStart <= end && x.PeriodEnd >= start);
     public Task<Result<IReadOnlyList<PayrollRecordDto>>> GetPayrollRecordsByEmployeeNameAsync(string name) =>
@@ -203,28 +199,47 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
     public Task<Result<IReadOnlyList<PayrollRecordDto>>> GetPayrollRecordsByEmployeeNameByRangeAsync(string name, DateOnly start, DateOnly end) =>
         GetRecordsAsync(x => !x.IsDeleted && x.Employee.FullName == name && x.PeriodStart <= end && x.PeriodEnd >= start);
 
-    private async Task<Result<IReadOnlyList<PayrollRecordDto>>> GetRecordsAsync(System.Linq.Expressions.Expression<Func<PayrollRecord, bool>> predicate)
+    private async Task<Result<IReadOnlyList<PayrollRecordDto>>> GetRecordsAsync(System.Linq.Expressions.Expression<Func<PayrollRecord, bool>> predicate, bool includeDeleted = false)
     {
         if (!permissions.HasPermission("Payroll.Manage")) return PayrollRecordErrors.PermissionDenied;
-        var items = await unitOfWork.Repository<PayrollRecord>().ListAsync(predicate, includeProperties: [nameof(PayrollRecord.Employee)]);
+        var query = unitOfWork.Repository<PayrollRecord>().Query();
+        if (includeDeleted) query = query.IgnoreQueryFilters();
+        var items = await query.Where(predicate).Include(x => x.Employee).ToListAsync();
+        var employeeIds = items.Select(x => x.EmployeeId).Distinct().ToArray();
+        var earliestPeriodStart = items.Count == 0 ? default : items.Min(record => record.PeriodStart);
+        var latestPeriodEnd = items.Count == 0 ? default : items.Max(record => record.PeriodEnd);
+        var attendanceRows = employeeIds.Length == 0 ? [] : await unitOfWork.Repository<EmployeeAttendance>().Query()
+            .Where(x => employeeIds.Contains(x.EmployeeId)
+                && x.AttendanceDate >= earliestPeriodStart
+                && x.AttendanceDate <= latestPeriodEnd
+                && x.Status == AttendanceStatus.Absent)
+            .Select(x => new { x.EmployeeId, x.AttendanceDate }).ToListAsync();
+        var paidDaysPerMonth = await GetPaidDaysPerMonthAsync();
         var result = new List<PayrollRecordDto>(items.Count);
         foreach (var item in items)
         {
-            var dto = ToDto(item, item.Employee.FullName);
-            var absences = await unitOfWork.Repository<EmployeeAttendance>().ListAsync(x => x.EmployeeId == item.EmployeeId &&
-                x.AttendanceDate >= item.PeriodStart && x.AttendanceDate <= item.PeriodEnd && x.Status == AttendanceStatus.Absent);
-            dto.AbsenceDays = absences.Select(x => x.AttendanceDate).Distinct().Count();
+            var dto = ToDto(item, item.Employee.FullName, paidDaysPerMonth);
+            dto.AbsenceDays = attendanceRows.Where(x => x.EmployeeId == item.EmployeeId
+                && x.AttendanceDate >= item.PeriodStart && x.AttendanceDate <= item.PeriodEnd)
+                .Select(x => x.AttendanceDate).Distinct().Count();
             result.Add(dto);
         }
         return Result.Success<IReadOnlyList<PayrollRecordDto>>(result);
     }
 
-    private static PayrollRecordDto ToDto(PayrollRecord x, string name) => new()
+    private static PayrollRecordDto ToDto(PayrollRecord x, string name, int paidDaysPerMonth = DefaultPaidDaysPerMonth) => new()
     { Id = x.Id, EmployeeId = x.EmployeeId, EmployeeName = name, PeriodStart = x.PeriodStart, PeriodEnd = x.PeriodEnd,
-      DailySalary = decimal.Round(x.AgreedSalary / PaidDaysPerMonth, 2, MidpointRounding.AwayFromZero),
+      DailySalary = decimal.Round(x.AgreedSalary / paidDaysPerMonth, 2, MidpointRounding.AwayFromZero),
       AgreedSalary = x.AgreedSalary, Additions = x.Additions, Deductions = x.Deductions, AmountPaid = x.AmountPaid,
       PaymentDate = x.PaymentDate, IsPaid = x.IsPaid, IsCalculated = x.IsCalculated, Notes = x.Notes,
-      Insurancefunds = x.Insurancefunds, AdvanceDeduction = x.AdvanceDeduction };
+      InsuranceFunds = x.InsuranceFunds, AdvanceDeduction = x.AdvanceDeduction };
+    private async Task<int> GetPaidDaysPerMonthAsync(CancellationToken cancellationToken = default)
+    {
+        var setting = await unitOfWork.Repository<AppSetting>().FirstOrDefaultAsync(
+            x => x.Key == "Payroll.PaidDaysPerMonth", cancellationToken: cancellationToken);
+        return setting is not null && int.TryParse(setting.Value, out var days) && days > 0
+            ? days : DefaultPaidDaysPerMonth;
+    }
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     public async Task<Result<EmployeeAdvanceDto>> CreateEmployeeAdvanceAsync(CreateEmployeeAdvanceDto dto, CancellationToken cancellationToken = default)

@@ -1,10 +1,7 @@
-using ElMomenNursery.Application.Abstractions.Persistence;
 using ElMomenNursery.Application.DTOs;
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Controls;
-using ElMomenNursery.Domain.Entities;
 using ElMomenNursery.Styling;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using static ElMomenNursery.Forms.MainForm;
 
@@ -32,9 +29,9 @@ internal sealed class ClassesPage : UserControl
         {
             if (Selected() is not ClassroomRow row) return;
             if (MessageBox.Show(this, "سيتم نقل الفصل إلى المحذوفات وإنهاء إسناداته الحالية. هل تريد المتابعة؟", "حذف فصل", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign) != DialogResult.Yes) return;
-            await using var scope = _scopes.CreateAsyncScope(); var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-            var room = await uow.Repository<Classroom>().Query(false).Include(x => x.ChildEnrollments).Include(x => x.TeacherAssignments).SingleOrDefaultAsync(x => x.Id == row.Id);
-            if (room != null) { uow.Repository<Classroom>().Remove(room); var today = DateOnly.FromDateTime(DateTime.Today); foreach (var x in room.ChildEnrollments.Where(x => x.EndDate == null)) x.EndDate = today < x.StartDate ? x.StartDate : today; foreach (var x in room.TeacherAssignments.Where(x => x.EndDate == null)) x.EndDate = today < x.StartDate ? x.StartDate : today; await uow.SaveChangesAsync(); }
+            await using var scope = _scopes.CreateAsyncScope();
+            var result = await scope.ServiceProvider.GetRequiredService<IClassroomService>().DeleteClassroomAsync(row.Id);
+            if (!ResultPresenter.Present(this, "الفصول", result)) return;
             await Load();
         };
         children.Click += async (_, _) => { if (Selected() is not ClassroomRow row) return; using var d = new ClassroomChildrenDialog(_scopes, row.Id, row.Name); if (d.ShowDialog(this) == DialogResult.OK) await Load(row.Id); };
@@ -45,10 +42,11 @@ internal sealed class ClassesPage : UserControl
         ClassroomRow? Selected() => grid.SelectedRows.Count > 0 ? grid.SelectedRows[0].Tag as ClassroomRow : null;
         async Task Load(Guid? select = null)
         {
-            await using var scope = _scopes.CreateAsyncScope(); var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-            var rooms = await uow.Repository<Classroom>().Query().AsSplitQuery().Include(x => x.TeacherAssignments).ThenInclude(x => x.Employee).Include(x => x.ChildEnrollments).ToListAsync();
-            grid.Rows.Clear(); foreach (var room in rooms.OrderBy(x => x.Name)) { var teacher = room.TeacherAssignments.Where(x => x.EndDate == null).OrderByDescending(x => x.StartDate).FirstOrDefault(); var id = grid.Rows.Add(room.Name, teacher?.Employee.FullName ?? "غير مسند", room.ChildEnrollments.Count(x => x.EndDate == null)); grid.Rows[id].Tag = new ClassroomRow(room.Id, room.Name, teacher?.EmployeeId); }
-            count.Text = $"عدد الفصول: {rooms.Count}"; if (select.HasValue) foreach (DataGridViewRow r in grid.Rows) if (r.Tag is ClassroomRow cr && cr.Id == select) r.Selected = true;
+            await using var scope = _scopes.CreateAsyncScope();
+            var result = await scope.ServiceProvider.GetRequiredService<IClassroomService>().GetClassroomsAsync();
+            if (result.IsFailure) { AppDialog.ShowInformation(this, "الفصول", result.Error.Description); return; }
+            grid.Rows.Clear(); foreach (var room in result.Value) { var id = grid.Rows.Add(room.Name, room.TeacherName ?? "غير مسند", room.ChildCount); grid.Rows[id].Tag = new ClassroomRow(room.Id, room.Name, room.TeacherId); }
+            count.Text = $"عدد الفصول: {result.Value.Count}"; if (select.HasValue) foreach (DataGridViewRow r in grid.Rows) if (r.Tag is ClassroomRow cr && cr.Id == select) r.Selected = true;
         }
     }
 
@@ -73,25 +71,21 @@ internal sealed class ClassesPage : UserControl
                 if ((_teacher.SelectedItem as TeacherOption)?.Id is not Guid teacherId) { MessageBox.Show(this, "اختر المدرس المسؤول عن الفصل."); return; }
                 try
                 {
-                    await using var scope = _scopes.CreateAsyncScope(); var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-                    var rooms = uow.Repository<Classroom>(); var now = DateOnly.FromDateTime(DateTime.Today);
-                    if (_id is null) { var room = new Classroom { Name = _name.Text.Trim() }; await rooms.AddAsync(room); await uow.Repository<ClassTeacherAssignment>().AddAsync(new ClassTeacherAssignment { ClassroomId = room.Id, Classroom = room, EmployeeId = teacherId, Employee = await uow.Repository<Employee>().FirstOrDefaultAsync(x => x.Id == teacherId, asNoTracking: false) ?? throw new InvalidOperationException("الموظف غير موجود."), StartDate = now }); }
-                    else { var room = await rooms.Query(false).Include(x => x.TeacherAssignments).SingleAsync(x => x.Id == _id); room.Name = _name.Text.Trim(); var current = room.TeacherAssignments.FirstOrDefault(x => x.EndDate == null); if (current?.EmployeeId != teacherId) { if (current != null) current.EndDate = now < current.StartDate ? current.StartDate : now; await uow.Repository<ClassTeacherAssignment>().AddAsync(new ClassTeacherAssignment { ClassroomId = room.Id, Classroom = room, EmployeeId = teacherId, Employee = await uow.Repository<Employee>().FirstOrDefaultAsync(x => x.Id == teacherId, asNoTracking: false) ?? throw new InvalidOperationException("الموظف غير موجود."), StartDate = now }); } }
-                    await uow.SaveChangesAsync(); DialogResult = DialogResult.OK; Close();
+                    await using var scope = _scopes.CreateAsyncScope();
+                    var result = await scope.ServiceProvider.GetRequiredService<IClassroomService>().SaveClassroomAsync(_id, _name.Text, teacherId);
+                    if (!ResultPresenter.Present(this, "الفصول", result)) return;
+                    DialogResult = DialogResult.OK; Close();
                 }
-                catch (DbUpdateException exception)
+                catch (Exception exception)
                 {
-                    var details = exception.GetBaseException().Message;
-                    var message = details.Contains("UNIQUE constraint failed: Classrooms.Name", StringComparison.OrdinalIgnoreCase)
-                        ? "اسم الفصل مستخدم بالفعل. اختر اسمًا آخر."
-                        : "تعذر حفظ الفصل وإسناد المدرس. أعد المحاولة، وإذا استمرت المشكلة راجع بيانات الموظف.";
-                    MessageBox.Show(this, message, "الفصول", MessageBoxButtons.OK, MessageBoxIcon.Error, MessageBoxDefaultButton.Button1, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+                    Serilog.Log.ForContext<ClassroomEditor>().Error(exception, "Classroom save failed; classroomId={ClassroomId}", _id);
+                    AppDialog.ShowInformation(this, "الفصول", "تعذر حفظ الفصل وإسناد المدرس.");
                 }
             };
             Shown += async (_, _) =>
             {
-                await using var scope = _scopes.CreateAsyncScope(); var employees = await scope.ServiceProvider.GetRequiredService<IEmployeeService>().GetEmployees();
-                _teacher.Items.Add(new TeacherOption(null, "اختر المدرس")); if (employees.IsSuccess) foreach (var employee in employees.Value) _teacher.Items.Add(new TeacherOption(employee.Id, employee.FullName));
+                await using var scope = _scopes.CreateAsyncScope(); var employees = await scope.ServiceProvider.GetRequiredService<IClassroomService>().GetTeachersAsync();
+                _teacher.Items.Add(new TeacherOption(null, "اختر المدرس")); if (employees.IsSuccess) foreach (var employee in employees.Value) _teacher.Items.Add(new TeacherOption(employee.Id, employee.Name));
                 _teacher.SelectedIndex = 0; for (var i = 0; i < _teacher.Items.Count; i++) if (_teacher.Items[i] is TeacherOption option && option.Id == teacherId) _teacher.SelectedIndex = i;
             };
         }
@@ -111,53 +105,21 @@ internal sealed class ClassesPage : UserControl
                 try
                 {
                     await using var scope = _scopes.CreateAsyncScope();
-                    var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-                    var today = DateOnly.FromDateTime(DateTime.Today);
                     var selected = _children.CheckedItems.Cast<ChildOption>().Select(x => x.Id).ToHashSet();
-                    var activeRows = await uow.Repository<ChildClassEnrollment>().Query(false)
-                        .Where(x => x.EndDate == null && x.StartDate <= today).ToListAsync();
-
-                    foreach (var row in activeRows.Where(x => x.ClassroomId == _classroomId && !selected.Contains(x.ChildId)))
-                        row.EndDate = today < row.StartDate ? row.StartDate : today;
-
-                    var room = await uow.Repository<Classroom>().FirstOrDefaultAsync(x => x.Id == _classroomId, asNoTracking: false)
-                        ?? throw new InvalidOperationException("الفصل غير موجود.");
-                    foreach (var childId in selected)
-                    {
-                        if (activeRows.Any(x => x.ChildId == childId && x.ClassroomId == _classroomId))
-                            continue;
-
-                        foreach (var previous in activeRows.Where(x => x.ChildId == childId && x.ClassroomId != _classroomId))
-                            previous.EndDate = today < previous.StartDate ? previous.StartDate : today;
-
-                        var child = await uow.Repository<Child>().FirstOrDefaultAsync(x => x.Id == childId, asNoTracking: false)
-                            ?? throw new InvalidOperationException("الطفل غير موجود.");
-                        var enrollmentRepository = uow.Repository<ChildClassEnrollment>();
-                        var sameDayEnrollment = await enrollmentRepository.FirstOrDefaultAsync(
-                            x => x.ChildId == childId && x.ClassroomId == _classroomId && x.StartDate == today,
-                            asNoTracking: false);
-                        if (sameDayEnrollment is not null)
-                            sameDayEnrollment.EndDate = null;
-                        else
-                            await enrollmentRepository.AddAsync(new ChildClassEnrollment
-                        {
-                            ChildId = childId, ClassroomId = _classroomId, StartDate = today, Child = child, Classroom = room
-                        });
-                    }
-
-                    await uow.SaveChangesAsync();
+                    var result = await scope.ServiceProvider.GetRequiredService<IClassroomService>().AssignChildrenAsync(_classroomId, selected);
+                    if (!ResultPresenter.Present(this, "الفصول", result)) return;
                     DialogResult = DialogResult.OK;
                     Close();
                 }
-                catch (DbUpdateException)
+                catch (Exception exception)
                 {
-                    MessageBox.Show(this, "تعذر حفظ إسناد الأطفال. أعد المحاولة.", "الفصول", MessageBoxButtons.OK, MessageBoxIcon.Error,
-                        MessageBoxDefaultButton.Button1, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+                    Serilog.Log.ForContext<ClassroomChildrenDialog>().Error(exception, "Classroom child assignment failed; classroomId={ClassroomId}", _classroomId);
+                    AppDialog.ShowInformation(this, "الفصول", "تعذر حفظ إسناد الأطفال. أعد المحاولة.");
                 }
                 finally { if (!IsDisposed) save.Enabled = true; }
             };
         }
-        private async Task LoadChildren() { await using var scope = _scopes.CreateAsyncScope(); var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>(); var active = await uow.Repository<ChildClassEnrollment>().Query().Where(x => x.ClassroomId == _classroomId && x.EndDate == null).Select(x => x.ChildId).ToListAsync(); var kids = await uow.Repository<Child>().Query().OrderBy(x => x.FullName).ToListAsync(); foreach (var child in kids) { var item = new ChildOption(child.Id, child.FullName, active.Contains(child.Id)); _children.Items.Add(item, item.Selected); } }
+        private async Task LoadChildren() { await using var scope = _scopes.CreateAsyncScope(); var result = await scope.ServiceProvider.GetRequiredService<IClassroomService>().GetChildrenAsync(_classroomId); if (result.IsFailure) { AppDialog.ShowInformation(this, "الفصول", result.Error.Description); return; } foreach (var child in result.Value) { var item = new ChildOption(child.Id, child.Name, child.IsAssigned); _children.Items.Add(item, item.Selected); } }
         private sealed record ChildOption(Guid Id, string Name, bool Selected) { public override string ToString() => Name; }
     }
 }

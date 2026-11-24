@@ -39,7 +39,30 @@ public sealed class AttendanceRulesTests
         AttendanceRules.Validate(DateOnly.FromDateTime(DateTime.Today), AttendanceStatus.Present, null, null));
 
     [Fact]
+    public void Attendance_times_must_match_local_attendance_date()
+    {
+        var pastDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-1));
+        Assert.Equal(AttendanceErrors.InvalidTimes,
+            AttendanceRules.Validate(pastDate, AttendanceStatus.Present, DateTimeOffset.Now, null));
+        Assert.Null(AttendanceRules.Validate(pastDate, AttendanceStatus.Present, DateTimeOffset.Now.AddDays(-1), null));
+    }
+
+    [Fact]
     public void Correction_requires_reason() => Assert.False(AttendanceRules.HasCorrectionReason("  "));
+
+    [Fact]
+    public async Task Attendance_classroom_filter_does_not_require_students_permission()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:"); await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<NurseryDbContext>().UseSqlite(connection).Options;
+        await using var db = new NurseryDbContext(options); await db.Database.EnsureCreatedAsync();
+        var service = new ChildAttendanceService(new TestUnitOfWork(db), NullLogger<ChildAttendanceService>.Instance,
+            new TestPermissionService("Students.View"), new TestSessionManager(null));
+
+        var result = await service.GetClassroomsForFilterAsync();
+
+        Assert.True(result.IsSuccess);
+    }
 
     [Fact]
     public async Task Child_service_update_persists_tracked_changes()
@@ -96,6 +119,49 @@ public sealed class AttendanceRulesTests
         var saved = await db.Employees.AsNoTracking().SingleAsync();
         Assert.Null(saved.Qualification);
         Assert.Null(saved.AlternatePhone);
+    }
+
+    [Fact]
+    public async Task Employee_attendance_rejects_date_before_hire_date()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:"); await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<NurseryDbContext>().UseSqlite(connection).Options;
+        await using var db = new NurseryDbContext(options); await db.Database.EnsureCreatedAsync();
+        var employee = new Employee
+        {
+            FullName = "موظف", NationalIdNumber = "12345678901234", Address = "عنوان",
+            Phone = "01000000000", JobDesignation = "إداري", HireDate = DateOnly.FromDateTime(DateTime.Today)
+        };
+        db.Employees.Add(employee); await db.SaveChangesAsync();
+        var service = new EmployeeAttendanceService(new TestUnitOfWork(db), NullLogger<EmployeeAttendanceService>.Instance,
+            new TestPermissionService(), new TestSessionManager(null));
+        var result = await service.MarkManualAttendanceAsync(new CreateEmployeeAttendanceDto
+        {
+            EmployeeId = employee.Id, AttendanceDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-1)),
+            Status = AttendanceStatus.Absent
+        });
+        Assert.Equal(AttendanceErrors.PersonNotFound, result.Error);
+    }
+
+    [Fact]
+    public async Task Child_search_matches_arabic_normalized_hamza()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:"); await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<NurseryDbContext>().UseSqlite(connection).Options;
+        await using var db = new NurseryDbContext(options); await db.Database.EnsureCreatedAsync();
+        var child = new Child
+        {
+            FullName = "آدم أحمد", Address = "عنوان", EnrollmentDate = DateOnly.FromDateTime(DateTime.Today),
+            DateOfBirth = DateOnly.FromDateTime(DateTime.Today.AddYears(-4)), FatherName = "الأب", FatherPhone = "01000000000",
+            MotherName = "الأم", MotherPhone = "01100000000"
+        };
+        db.Children.Add(child); await db.SaveChangesAsync();
+        var service = new ChildService(new TestUnitOfWork(db), NullLogger<ChildService>.Instance, new TestPermissionService());
+
+        var result = await service.GetChildrenAsync(new ChildFilter { SearchText = "ادم احمد" });
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(result.Value);
     }
 
     [Fact]

@@ -2,9 +2,8 @@ namespace ElMomenNursery.Domain.Abstractions;
 
 public static class ClassroomErrors
 {
-    public static readonly Error PermissionDenied = new("Classrooms.PermissionDenied", "لا تملك الصلاحية اللازمة لإدارة الفصول.");
-    public static readonly Error NotFound = new("Classrooms.NotFound", "الفصل غير موجود.");
-    public static readonly Error InvalidData = new("Classrooms.InvalidData", "بيانات الفصل غير مكتملة أو غير صحيحة.");
-    public static readonly Error DuplicateName = new("Classrooms.DuplicateName", "اسم الفصل مستخدم بالفعل.");
-    public static readonly Error PersistenceFailure = new("Classrooms.PersistenceFailure", "تعذر حفظ بيانات الفصل. أعد المحاولة.");
+    public static readonly Error PermissionDenied = new("Classes.PermissionDenied", "لا تملك الصلاحية اللازمة لإدارة الفصول.");
+    public static readonly Error NotFound = new("Classes.NotFound", "لم يتم العثور على الفصل.");
+    public static readonly Error InvalidData = new("Classes.InvalidData", "أدخل اسم الفصل واختر مدرسًا صحيحًا.");
+    public static readonly Error PersistenceFailure = new("Classes.PersistenceFailure", "تعذر حفظ بيانات الفصل. أعد المحاولة.");
 }

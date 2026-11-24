@@ -17,7 +17,7 @@ public sealed class PayrollRecord : ISoftDeletable
     public bool IsPaid { get; set; }
     public bool IsCalculated { get; set; }
     public string? Notes { get; set; }
-    public decimal Insurancefunds { get; set; }
+    public decimal InsuranceFunds { get; set; }
     public decimal AdvanceDeduction { get; set; }
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? UpdatedAt { get; set; }

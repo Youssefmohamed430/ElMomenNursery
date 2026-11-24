@@ -571,7 +571,7 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.ToTable("Employees", null, t =>
                         {
-                            t.HasCheckConstraint("CK_Employees_SalaryNonNegative", "\"Salary\" >= 0");
+                            t.HasCheckConstraint("CK_Employees_SalaryNonNegative", "CAST(\"Salary\" AS REAL) >= 0");
                         });
                 });
 
@@ -611,7 +611,7 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.ToTable("EmployeeAdvances", null, t =>
                         {
-                            t.HasCheckConstraint("CK_EmployeeAdvances_Amounts", "\"OriginalAmount\" > 0 AND \"RemainingAmount\" >= 0 AND \"RemainingAmount\" <= \"OriginalAmount\"");
+                            t.HasCheckConstraint("CK_EmployeeAdvances_Amounts", "CAST(\"OriginalAmount\" AS REAL) > 0 AND CAST(\"RemainingAmount\" AS REAL) >= 0 AND CAST(\"RemainingAmount\" AS REAL) <= CAST(\"OriginalAmount\" AS REAL)");
                         });
                 });
 
@@ -646,7 +646,7 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.ToTable("EmployeeAdvanceRepayments", null, t =>
                         {
-                            t.HasCheckConstraint("CK_EmployeeAdvanceRepayments_Amount", "\"Amount\" > 0");
+                            t.HasCheckConstraint("CK_EmployeeAdvanceRepayments_Amount", "CAST(\"Amount\" AS REAL) > 0");
                         });
                 });
 
@@ -762,7 +762,7 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.ToTable("Expenses", null, t =>
                         {
-                            t.HasCheckConstraint("CK_Expenses_AmountNonNegative", "\"Amount\" >= 0");
+                            t.HasCheckConstraint("CK_Expenses_AmountNonNegative", "CAST(\"Amount\" AS REAL) >= 0");
                         });
                 });
 
@@ -893,6 +893,7 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Quantity")
+                        .IsConcurrencyToken()
                         .HasColumnType("INTEGER");
 
                     b.Property<decimal>("UnitPrice")
@@ -908,7 +909,7 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_InventoryItems_QuantityNonNegative", "\"Quantity\" >= 0");
 
-                            t.HasCheckConstraint("CK_InventoryItems_UnitPriceNonNegative", "\"UnitPrice\" >= 0");
+                            t.HasCheckConstraint("CK_InventoryItems_UnitPriceNonNegative", "CAST(\"UnitPrice\" AS REAL) >= 0");
                         });
                 });
 
@@ -976,7 +977,7 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.ToTable("Invoices", null, t =>
                         {
-                            t.HasCheckConstraint("CK_Invoices_TotalAmountNonNegative", "\"TotalAmount\" >= 0");
+                            t.HasCheckConstraint("CK_Invoices_TotalAmountNonNegative", "CAST(\"TotalAmount\" AS REAL) >= 0");
                         });
                 });
 
@@ -1017,7 +1018,7 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.ToTable("InvoiceLines", null, t =>
                         {
-                            t.HasCheckConstraint("CK_InvoiceLines_LineTotalNonNegative", "\"LineTotal\" >= 0");
+                            t.HasCheckConstraint("CK_InvoiceLines_LineTotalNonNegative", "CAST(\"LineTotal\" AS REAL) >= 0");
 
                             t.HasCheckConstraint("CK_InvoiceLines_QuantityPositive", "\"Quantity\" > 0");
                         });
@@ -1046,6 +1047,9 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("IdempotencyKey")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("IncomeDate")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -1071,6 +1075,10 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique()
+                        .HasFilter("\"IdempotencyKey\" IS NOT NULL");
+
                     b.HasIndex("IncomeDate")
                         .HasDatabaseName("IX_ManualIncomes_IncomeDate");
 
@@ -1078,7 +1086,7 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.ToTable("ManualIncomes", null, t =>
                         {
-                            t.HasCheckConstraint("CK_ManualIncomes_AmountPositive", "\"Amount\" > 0");
+                            t.HasCheckConstraint("CK_ManualIncomes_AmountPositive", "CAST(\"Amount\" AS REAL) > 0");
                         });
                 });
 
@@ -1145,7 +1153,7 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.ToTable("Payments", null, t =>
                         {
-                            t.HasCheckConstraint("CK_Payments_AmountNonNegative", "\"Amount\" >= 0");
+                            t.HasCheckConstraint("CK_Payments_AmountNonNegative", "CAST(\"Amount\" AS REAL) >= 0");
                         });
                 });
 
@@ -1180,7 +1188,7 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.ToTable("PaymentAllocations", null, t =>
                         {
-                            t.HasCheckConstraint("CK_PaymentAllocations_AmountAppliedNonNegative", "\"AmountApplied\" >= 0");
+                            t.HasCheckConstraint("CK_PaymentAllocations_AmountAppliedNonNegative", "CAST(\"AmountApplied\" AS REAL) >= 0");
                         });
                 });
 
@@ -1223,7 +1231,8 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<decimal>("Insurancefunds")
+                    b.Property<decimal>("InsuranceFunds")
+                        .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsCalculated")
@@ -1261,7 +1270,7 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_PayrollRecords_PeriodRange", "\"PeriodEnd\" >= \"PeriodStart\"");
 
-                            t.HasCheckConstraint("CK_PayrollRecords_SalaryNonNegative", "\"AgreedSalary\" >= 0 AND \"AmountPaid\" >= 0");
+                            t.HasCheckConstraint("CK_PayrollRecords_SalaryNonNegative", "CAST(\"AgreedSalary\" AS REAL) >= 0 AND CAST(\"AmountPaid\" AS REAL) >= 0");
                         });
                 });
 
@@ -1451,7 +1460,7 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.ToTable("Subscriptions", null, t =>
                         {
-                            t.HasCheckConstraint("CK_Subscriptions_AmountDueNonNegative", "\"AmountDue\" >= 0");
+                            t.HasCheckConstraint("CK_Subscriptions_AmountDueNonNegative", "CAST(\"AmountDue\" AS REAL) >= 0");
 
                             t.HasCheckConstraint("CK_Subscriptions_PeriodRange", "\"PeriodEnd\" >= \"PeriodStart\"");
                         });
@@ -1495,7 +1504,7 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.ToTable("SubscriptionPlans", null, t =>
                         {
-                            t.HasCheckConstraint("CK_SubscriptionPlans_DefaultFeeNonNegative", "\"DefaultFee\" >= 0");
+                            t.HasCheckConstraint("CK_SubscriptionPlans_DefaultFeeNonNegative", "CAST(\"DefaultFee\" AS REAL) >= 0");
                         });
                 });
 

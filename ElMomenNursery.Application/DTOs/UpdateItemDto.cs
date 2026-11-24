@@ -6,5 +6,7 @@ public sealed class UpdateItemDto
     public Guid CategoryId { get; init; }
     public decimal UnitPrice { get; init; }
     public required int Quantity { get; init; }
+    public int? ExpectedQuantity { get; init; }
+    public string? QuantityAdjustmentReason { get; init; }
     public bool IsActive { get; init; }
 }

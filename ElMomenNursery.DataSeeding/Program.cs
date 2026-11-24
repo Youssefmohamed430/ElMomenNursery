@@ -155,7 +155,7 @@ static async Task SeedMockupAsync(NurseryDbContext db)
     for (var month = 0; month < 3; month++)
     {
         var start = new DateOnly(today.Year, today.Month, 1).AddMonths(-month);
-        payroll.Add(new PayrollRecord { Employee = employees[i], PeriodStart = start, PeriodEnd = start.AddMonths(1).AddDays(-1), AgreedSalary = employees[i].Salary, Additions = i % 3 == 0 ? 150 : 0, Deductions = i % 4 == 0 ? 100 : 0, AdvanceDeduction = i % 5 == 0 ? 300 : 0, Insurancefunds = i % 2 == 0 ? 50 : 0, AmountPaid = month == 0 && i % 4 == 0 ? 0 : employees[i].Salary, IsPaid = !(month == 0 && i % 4 == 0), IsCalculated = true, PaymentDate = month == 0 && i % 4 == 0 ? null : start.AddDays(27), Notes = i % 4 == 0 ? "خصم تجريبي" : null });
+        payroll.Add(new PayrollRecord { Employee = employees[i], PeriodStart = start, PeriodEnd = start.AddMonths(1).AddDays(-1), AgreedSalary = employees[i].Salary, Additions = i % 3 == 0 ? 150 : 0, Deductions = i % 4 == 0 ? 100 : 0, AdvanceDeduction = i % 5 == 0 ? 300 : 0, InsuranceFunds = i % 2 == 0 ? 50 : 0, AmountPaid = month == 0 && i % 4 == 0 ? 0 : employees[i].Salary, IsPaid = !(month == 0 && i % 4 == 0), IsCalculated = true, PaymentDate = month == 0 && i % 4 == 0 ? null : start.AddDays(27), Notes = i % 4 == 0 ? "خصم تجريبي" : null });
     }
     db.AddRange(payroll);
     var advances = employees.Take(8).Select((e, i) => new EmployeeAdvance { Employee = e, OriginalAmount = 9000, RemainingAmount = 5000, AdvanceDate = today.AddDays(-20 - i * 4), Notes = "سلفة تجريبية مع رصيد متبقٍ" }).ToList();
