@@ -74,7 +74,7 @@ internal sealed class EmployeeAttendanceHistoryForm : Form
 
     private async Task LoadEmployeesAsync()
     {
-        try
+        await UiGuard.RunAsync(this, "EmployeeAttendanceHistory.LoadEmployees", async () =>
         {
             await using var scope = _scopes.CreateAsyncScope();
             var service = scope.ServiceProvider.GetRequiredService<IEmployeeAttendanceService>();
@@ -83,8 +83,7 @@ internal sealed class EmployeeAttendanceHistoryForm : Form
             if (result.IsFailure) { ShowError(result.Error.Description); return; }
             _allEmployees = result.Value.ToList();
             FilterEmployees();
-        }
-        catch { if (!IsDisposed) ShowError("تعذر تحميل قائمة الموظفين."); }
+        }, "تعذر تحميل قائمة الموظفين.");
     }
 
     private void FilterEmployees()
@@ -116,14 +115,16 @@ internal sealed class EmployeeAttendanceHistoryForm : Form
         _show.Enabled = false;
         try
         {
-            await using var scope = _scopes.CreateAsyncScope();
-            var service = scope.ServiceProvider.GetRequiredService<IEmployeeAttendanceService>();
-            var result = await service.GetEmployeeAttendanceByRangeAsync(selectedEmployee.Id, start, end);
-            if (IsDisposed || version != _loadVersion) return;
-            if (result.IsFailure) { ShowError(result.Error.Description); return; }
-            RenderHistory(selectedEmployee.FullName, result.Value);
+            await UiGuard.RunAsync(this, "EmployeeAttendanceHistory.LoadHistory", async () =>
+            {
+                await using var scope = _scopes.CreateAsyncScope();
+                var service = scope.ServiceProvider.GetRequiredService<IEmployeeAttendanceService>();
+                var result = await service.GetEmployeeAttendanceByRangeAsync(selectedEmployee.Id, start, end);
+                if (IsDisposed || version != _loadVersion) return;
+                if (result.IsFailure) { ShowError(result.Error.Description); return; }
+                RenderHistory(selectedEmployee.FullName, result.Value);
+            }, "تعذر تحميل سجل حضور الموظف.");
         }
-        catch { if (!IsDisposed && version == _loadVersion) ShowError("تعذر تحميل سجل حضور الموظف."); }
         finally { if (!IsDisposed && version == _loadVersion) _show.Enabled = true; }
     }
 

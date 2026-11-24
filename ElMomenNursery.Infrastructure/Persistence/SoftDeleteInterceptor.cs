@@ -2,10 +2,11 @@ using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Logging;
 
 namespace ElMomenNursery.Infrastructure.Persistence;
 
-public sealed class SoftDeleteInterceptor(ISessionManager sessionManager) : SaveChangesInterceptor
+public sealed class SoftDeleteInterceptor(ISessionManager sessionManager, ILogger<SoftDeleteInterceptor>? logger = null) : SaveChangesInterceptor
 {
     private void ConvertDeletes(DbContext? context)
     {
@@ -14,9 +15,19 @@ public sealed class SoftDeleteInterceptor(ISessionManager sessionManager) : Save
         var actor = sessionManager.CurrentUser?.UserId;
         foreach (var entry in context.ChangeTracker.Entries<ISoftDeletable>().Where(x => x.State == EntityState.Deleted).ToArray())
         {
-            if (entry.Entity is Role { IsSystemRole: true })
+            if (entry.Entity is Role { IsSystemRole: true } systemRole)
             {
                 entry.State = EntityState.Unchanged;
+                if (logger is not null)
+                {
+                    logger.LogWarning("System role deletion blocked; operation={Operation}; roleId={RoleId}; roleName={RoleName}",
+                        "ConvertDeletes", systemRole.Id, systemRole.Name);
+                }
+                else
+                {
+                    Serilog.Log.ForContext<SoftDeleteInterceptor>().Warning("System role deletion blocked; operation={Operation}; roleId={RoleId}; roleName={RoleName}",
+                        "ConvertDeletes", systemRole.Id, systemRole.Name);
+                }
                 continue;
             }
             var entityType = entry.Metadata.ClrType.Name;

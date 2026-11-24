@@ -85,12 +85,12 @@ public sealed class InventoryPage : UserControl
         deleted.Click += async (_, _) => { showingDeleted = !showingDeleted; loadVersion++; deleted.Text = showingDeleted ? "عرض الأصناف" : "عرض المحذوفات"; restore.Visible = showingDeleted && _session?.HasPermission("Inventory.Restore") == true; add.Visible = edit.Visible = toggle.Visible = delete.Visible = !showingDeleted && canManage; export.Visible = !showingDeleted && _session?.HasPermission("Inventory.Export") == true; filters.Enabled = !showingDeleted; await LoadItems(); };
         restore.Click += async (_, _) => await RestoreItem();
         export.Click += async (_, _) => await GridExcelExport.SaveAsync(this, grid, _excel!, "تصدير الأصناف", "الأصناف");
-        if (_scopes is not null) _ = LoadLookups();
-        if (_scopes is not null) _ = LoadItems();
+        if (_scopes is not null) _ = UiGuard.RunAsync(this, "Inventory.LoadLookups", LoadLookups);
+        if (_scopes is not null) _ = UiGuard.RunAsync(this, "Inventory.LoadItems", LoadItems);
 
         async Task LoadLookups()
         {
-            try
+            await UiGuard.RunAsync(this, "Inventory.LoadLookups", async () =>
             {
                 await using var scope = _scopes!.CreateAsyncScope();
                 var result = await scope.ServiceProvider.GetRequiredService<IInventoryCategoryService>().GetCategoryLookupAsync(false);
@@ -98,8 +98,7 @@ public sealed class InventoryPage : UserControl
                 category.Items.Clear(); category.Items.Add("كل الفئات");
                 foreach (var option in result.Value) category.Items.Add(new CategoryChoice(option.Id, option.Name));
                 category.SelectedIndex = 0;
-            }
-            catch (Exception ex) { Log.Error(ex, "Failed to load inventory category filter"); }
+            }, "تعذر تحميل فئات المخزن.");
         }
         async Task LoadItems()
         {
@@ -124,8 +123,8 @@ public sealed class InventoryPage : UserControl
                 if (result.IsFailure) { ResultPresenter.Present(this, "المخزن", result); return; }
                 items = result.Value.ToList(); Render();
             }
-            catch (Exception ex) { Log.Error(ex, "Inventory item list failed"); if (!IsDisposed) AppDialog.ShowInformation(this, "المخزن", "تعذر تحميل الأصناف. أعد المحاولة."); }
-            finally { busy = false; if (reloadPending && !IsDisposed) { reloadPending = false; _ = LoadItems(); } }
+            catch (Exception ex) { await UiGuard.RunAsync(this, "Inventory.LoadItems", () => Task.FromException(ex), "تعذر تحميل الأصناف. أعد المحاولة."); }
+            finally { busy = false; if (reloadPending && !IsDisposed) { reloadPending = false; _ = UiGuard.RunAsync(this, "Inventory.LoadItems", LoadItems); } }
         }
         void Render()
         {
@@ -146,21 +145,33 @@ public sealed class InventoryPage : UserControl
         async Task ToggleItem()
         {
             var row = Selected(); if (row is null) { AppDialog.ShowInformation(this, "المخزن", "اختر صنفًا من الجدول أولًا."); return; }
-            await using var scope = _scopes!.CreateAsyncScope(); var result = await scope.ServiceProvider.GetRequiredService<IInventoryItemService>().SetItemActiveAsync(row.Id, !row.IsActive);
-            if (ResultPresenter.Present(this, "حالة الصنف", result)) await LoadItems();
+            await UiGuard.RunAsync(this, "Inventory.ToggleItem", async () =>
+            {
+                await using var scope = _scopes!.CreateAsyncScope();
+                var result = await scope.ServiceProvider.GetRequiredService<IInventoryItemService>().SetItemActiveAsync(row.Id, !row.IsActive);
+                if (ResultPresenter.Present(this, "حالة الصنف", result)) await LoadItems();
+            }, "تعذر تغيير حالة الصنف.");
         }
         async Task DeleteItem()
         {
             var row = Selected(); if (row is null) { AppDialog.ShowInformation(this, "المخزن", "اختر صنفًا من الجدول أولًا."); return; }
             if (!AppDialog.Confirm(this, "حذف صنف", "هل تريد نقل الصنف المحدد إلى المحذوفات؟ سيختفي من القوائم النشطة مع الاحتفاظ بسجله التاريخي.")) return;
-            await using var scope = _scopes!.CreateAsyncScope(); var result = await scope.ServiceProvider.GetRequiredService<IInventoryItemService>().DeleteItemAsync(row.Id);
-            if (ResultPresenter.Present(this, "حذف صنف", result)) await LoadItems();
+            await UiGuard.RunAsync(this, "Inventory.DeleteItem", async () =>
+            {
+                await using var scope = _scopes!.CreateAsyncScope();
+                var result = await scope.ServiceProvider.GetRequiredService<IInventoryItemService>().DeleteItemAsync(row.Id);
+                if (ResultPresenter.Present(this, "حذف صنف", result)) await LoadItems();
+            }, "تعذر حذف الصنف.");
         }
         async Task RestoreItem()
         {
             var row = Selected(); if (row is null) { AppDialog.ShowInformation(this, "المخزن", "اختر صنفًا من المحذوفات أولًا."); return; }
-            await using var scope = _scopes!.CreateAsyncScope(); var result = await scope.ServiceProvider.GetRequiredService<IInventoryItemService>().RestoreItemAsync(row.Id);
-            if (ResultPresenter.Present(this, "استعادة صنف", result)) await LoadItems();
+            await UiGuard.RunAsync(this, "Inventory.RestoreItem", async () =>
+            {
+                await using var scope = _scopes!.CreateAsyncScope();
+                var result = await scope.ServiceProvider.GetRequiredService<IInventoryItemService>().RestoreItemAsync(row.Id);
+                if (ResultPresenter.Present(this, "استعادة صنف", result)) await LoadItems();
+            }, "تعذر استعادة الصنف.");
         }
         return root;
     }
@@ -202,7 +213,7 @@ public sealed class InventoryPage : UserControl
         deleted.Click += async (_, _) => { showingDeleted = !showingDeleted; _categoryLoadVersion++; deleted.Text = showingDeleted ? "عرض الفئات" : "عرض المحذوفات"; restore.Visible = showingDeleted && _session?.HasPermission("Inventory.Restore") == true; add.Visible = edit.Visible = toggle.Visible = delete.Visible = !showingDeleted && canManage; export.Visible = !showingDeleted && _session?.HasPermission("Inventory.Export") == true; filters.Enabled = !showingDeleted; await Load(); };
         restore.Click += async (_, _) => await Restore();
         export.Click += async (_, _) => await GridExcelExport.SaveAsync(this, grid, _excel!, "تصدير الفئات", "الفئات");
-        if (_scopes is not null) _ = Load();
+        if (_scopes is not null) _ = UiGuard.RunAsync(this, "Inventory.LoadCategories", Load);
 
         async Task Load()
         {
@@ -221,14 +232,42 @@ public sealed class InventoryPage : UserControl
                 foreach (var row in rows) { var idx = grid.Rows.Add(row.Name, row.Description ?? string.Empty, row.ItemsCount, row.IsActive ? "نشط" : "موقوف"); grid.Rows[idx].Tag = row.Id; }
                 count.Text = $"عدد الفئات: {rows.Count}";
             }
-            catch (Exception ex) { Log.Error(ex, "Inventory category list failed"); if (!IsDisposed) AppDialog.ShowInformation(this, "المخزن", "تعذر تحميل الفئات. أعد المحاولة."); }
-            finally { busy = false; if (categoryReloadPending && !IsDisposed) { categoryReloadPending = false; _ = Load(); } }
+            catch (Exception ex) { await UiGuard.RunAsync(this, "Inventory.LoadCategories", () => Task.FromException(ex), "تعذر تحميل الفئات. أعد المحاولة."); }
+            finally { busy = false; if (categoryReloadPending && !IsDisposed) { categoryReloadPending = false; _ = UiGuard.RunAsync(this, "Inventory.LoadCategories", Load); } }
         }
         InventoryCategoryDto? Selected() => grid.SelectedRows.Count > 0 && grid.SelectedRows[0].Tag is Guid id ? rows.FirstOrDefault(x => x.Id == id) : null;
         async Task Edit() { var row = Selected(); if (row is null) { AppDialog.ShowInformation(this, "المخزن", "اختر فئة من الجدول أولًا."); return; } using var form = new InventoryCategoryEditorForm(_scopes, row); if (form.ShowDialog(this) == DialogResult.OK) await Load(); }
-        async Task Toggle() { var row = Selected(); if (row is null) { AppDialog.ShowInformation(this, "المخزن", "اختر فئة من الجدول أولًا."); return; } await using var scope = _scopes!.CreateAsyncScope(); var result = await scope.ServiceProvider.GetRequiredService<IInventoryCategoryService>().SetCategoryActiveAsync(row.Id, !row.IsActive); if (ResultPresenter.Present(this, "حالة الفئة", result)) await Load(); }
-        async Task Delete() { var row = Selected(); if (row is null) { AppDialog.ShowInformation(this, "المخزن", "اختر فئة من الجدول أولًا."); return; } if (!AppDialog.Confirm(this, "حذف فئة", "هل تريد نقل الفئة إلى المحذوفات؟ إذا كانت تحتوي على أصناف، يمكنك إيقافها بدلًا من حذفها.")) return; await using var scope = _scopes!.CreateAsyncScope(); var result = await scope.ServiceProvider.GetRequiredService<IInventoryCategoryService>().DeleteCategoryAsync(row.Id); if (ResultPresenter.Present(this, "حذف فئة", result)) await Load(); }
-        async Task Restore() { var row = Selected(); if (row is null) { AppDialog.ShowInformation(this, "المخزن", "اختر فئة من المحذوفات أولًا."); return; } await using var scope = _scopes!.CreateAsyncScope(); var result = await scope.ServiceProvider.GetRequiredService<IInventoryCategoryService>().RestoreCategoryAsync(row.Id); if (ResultPresenter.Present(this, "استعادة فئة", result)) await Load(); }
+        async Task Toggle()
+        {
+            var row = Selected(); if (row is null) { AppDialog.ShowInformation(this, "المخزن", "اختر فئة من الجدول أولًا."); return; }
+            await UiGuard.RunAsync(this, "Inventory.ToggleCategory", async () =>
+            {
+                await using var scope = _scopes!.CreateAsyncScope();
+                var result = await scope.ServiceProvider.GetRequiredService<IInventoryCategoryService>().SetCategoryActiveAsync(row.Id, !row.IsActive);
+                if (ResultPresenter.Present(this, "حالة الفئة", result)) await Load();
+            }, "تعذر تغيير حالة الفئة.");
+        }
+        async Task Delete()
+        {
+            var row = Selected(); if (row is null) { AppDialog.ShowInformation(this, "المخزن", "اختر فئة من الجدول أولًا."); return; }
+            if (!AppDialog.Confirm(this, "حذف فئة", "هل تريد نقل الفئة إلى المحذوفات؟ إذا كانت تحتوي على أصناف، يمكنك إيقافها بدلًا من حذفها.")) return;
+            await UiGuard.RunAsync(this, "Inventory.DeleteCategory", async () =>
+            {
+                await using var scope = _scopes!.CreateAsyncScope();
+                var result = await scope.ServiceProvider.GetRequiredService<IInventoryCategoryService>().DeleteCategoryAsync(row.Id);
+                if (ResultPresenter.Present(this, "حذف فئة", result)) await Load();
+            }, "تعذر حذف الفئة.");
+        }
+        async Task Restore()
+        {
+            var row = Selected(); if (row is null) { AppDialog.ShowInformation(this, "المخزن", "اختر فئة من المحذوفات أولًا."); return; }
+            await UiGuard.RunAsync(this, "Inventory.RestoreCategory", async () =>
+            {
+                await using var scope = _scopes!.CreateAsyncScope();
+                var result = await scope.ServiceProvider.GetRequiredService<IInventoryCategoryService>().RestoreCategoryAsync(row.Id);
+                if (ResultPresenter.Present(this, "استعادة فئة", result)) await Load();
+            }, "تعذر استعادة الفئة.");
+        }
         return root;
     }
 
@@ -242,7 +281,7 @@ public sealed class InventoryPage : UserControl
         if (keyData == Keys.F5)
         {
             var refresh = _tabs?.SelectedIndex == 1 ? _refreshCategories : _refreshItems;
-            if (refresh is not null) { _ = refresh(); return true; }
+            if (refresh is not null) { _ = UiGuard.RunAsync(this, "Inventory.Refresh", refresh); return true; }
         }
         return base.ProcessCmdKey(ref msg, keyData);
     }

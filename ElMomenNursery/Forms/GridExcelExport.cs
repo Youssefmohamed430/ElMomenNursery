@@ -41,6 +41,8 @@ internal static class GridExcelExport
         };
         if (dialog.ShowDialog(owner) != DialogResult.OK) return;
 
+        var targetFolder = Path.GetDirectoryName(dialog.FileName) ?? string.Empty;
+        var timer = System.Diagnostics.Stopwatch.StartNew();
         try
         {
             var data = new ExcelExportData(worksheetName,
@@ -48,8 +50,12 @@ internal static class GridExcelExport
             var result = await exporter.ExportAsync(data, dialog.FileName);
             ResultPresenter.Present(owner, title, result);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            var kind = ex is IOException io && (io.HResult & 0xFFFF) is 32 or 33 ? "in-use"
+                : ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException ? "not-writable" : "unknown";
+            Serilog.Log.ForContext(typeof(GridExcelExport)).Warning("Grid Excel export failed; operation={Operation}; failureKind={FailureKind}; durationMs={DurationMs}; targetFolder={TargetFolder}",
+                "SaveAsync", kind, timer.ElapsedMilliseconds, targetFolder);
             MessageBox.Show(owner, "تعذر إنشاء ملف Excel. تأكد من إمكانية الكتابة إلى المجلد ثم أعد المحاولة.",
                 title, MessageBoxButtons.OK, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1,
                 MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);

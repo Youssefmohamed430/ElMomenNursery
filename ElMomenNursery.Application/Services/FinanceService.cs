@@ -331,6 +331,7 @@ public sealed class FinanceService(
             }, cancellationToken);
 
             await unitOfWork.SaveChangesAsync(cancellationToken);
+            logger.LogInformation("Expense created; operation={Operation}; expenseId={ExpenseId}; amount={Amount}", "CreateExpense", expense.Id, expense.Amount);
 
             var result = new FinanceTransactionDto
             {
@@ -395,6 +396,7 @@ public sealed class FinanceService(
             }, cancellationToken);
 
             await unitOfWork.SaveChangesAsync(cancellationToken);
+            logger.LogInformation("Expense updated; operation={Operation}; expenseId={ExpenseId}; amount={Amount}", "UpdateExpense", expense.Id, expense.Amount);
 
             var result = new FinanceTransactionDto
             {
@@ -446,6 +448,7 @@ public sealed class FinanceService(
             }, cancellationToken);
 
             await unitOfWork.SaveChangesAsync(cancellationToken);
+            logger.LogInformation("Expense voided; operation={Operation}; expenseId={ExpenseId}; amount={Amount}", "VoidExpense", expense.Id, expense.Amount);
             return Result.Success();
         }
         catch (Exception ex)
@@ -490,6 +493,7 @@ public sealed class FinanceService(
             }, cancellationToken);
 
             await unitOfWork.SaveChangesAsync(cancellationToken);
+            logger.LogInformation("Manual income created; operation={Operation}; incomeId={IncomeId}; amount={Amount}", "CreateManualIncome", income.Id, income.Amount);
 
             var result = new FinanceTransactionDto
             {
@@ -606,6 +610,7 @@ public sealed class FinanceService(
             }, cancellationToken);
 
             await unitOfWork.SaveChangesAsync(cancellationToken);
+            logger.LogInformation("Manual income updated; operation={Operation}; incomeId={IncomeId}; amount={Amount}", "UpdateManualIncome", income.Id, income.Amount);
 
             var result = new FinanceTransactionDto
             {
@@ -657,6 +662,7 @@ public sealed class FinanceService(
             }, cancellationToken);
 
             await unitOfWork.SaveChangesAsync(cancellationToken);
+            logger.LogInformation("Manual income deleted; operation={Operation}; incomeId={IncomeId}; amount={Amount}", "DeleteManualIncome", income.Id, income.Amount);
             return Result.Success();
         }
         catch (Exception ex)

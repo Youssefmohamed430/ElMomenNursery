@@ -35,12 +35,20 @@ public sealed class InvoiceService(IUnitOfWork uow, ILogger<InvoiceService> logg
         var inventoryIds = dto.Lines.Where(x => x.InventoryItemId.HasValue).Select(x => x.InventoryItemId!.Value).Distinct().ToArray();
         var items = await uow.Repository<InventoryItem>().Query(asNoTracking:false).Include(x => x.Category)
             .Where(x => inventoryIds.Contains(x.Id) && x.IsActive && x.Category.IsActive).ToDictionaryAsync(x => x.Id, ct);
-        if (items.Count != inventoryIds.Length) return new Error("Invoices.ItemUnavailable", "أحد الأصناف لم يعد متاحًا للبيع.");
+        if (items.Count != inventoryIds.Length)
+        {
+            logger.LogWarning("Invoice creation rejected; inventory item unavailable; requestedCount={RequestedCount}; availableCount={AvailableCount}", inventoryIds.Length, items.Count);
+            return new Error("Invoices.ItemUnavailable", "أحد الأصناف لم يعد متاحًا للبيع.");
+        }
         foreach (var group in dto.Lines.Where(x => x.InventoryItemId.HasValue).GroupBy(x => x.InventoryItemId!.Value))
         {
             var item = items[group.Key];
             var requested = group.Sum(x => x.Quantity);
-            if (requested > item.Quantity) return new Error("Invoices.InsufficientStock", $"الكمية المتاحة من «{item.Name}» هي {item.Quantity}.");
+            if (requested > item.Quantity)
+            {
+                logger.LogWarning("Invoice creation rejected due to insufficient stock; itemId={ItemId}; requestedQuantity={RequestedQuantity}; availableQuantity={AvailableQuantity}", item.Id, requested, item.Quantity);
+                return new Error("Invoices.InsufficientStock", $"الكمية المتاحة من «{item.Name}» هي {item.Quantity}.");
+            }
         }
         var now = DateTimeOffset.Now;
         var year = now.Year;
@@ -70,6 +78,8 @@ public sealed class InvoiceService(IUnitOfWork uow, ILogger<InvoiceService> logg
             }
             await uow.Repository<AuditLog>().AddAsync(new AuditLog { Action="Invoice.Created", EntityType=nameof(Invoice), EntityId=invoice.Id.ToString("D"), UserAccountId=sessions.CurrentUser?.UserId, ChangeSummary=$"invoice={invoice.InvoiceNumber};total={invoice.TotalAmount};lines={invoice.Lines.Count}" }, ct);
             await uow.CommitTransactionAsync(ct);
+            logger.LogInformation("Invoice created successfully; operation={Operation}; invoiceNumber={InvoiceNumber}; totalAmount={TotalAmount}; lineCount={LineCount}",
+                "CreateInvoice", invoice.InvoiceNumber, invoice.TotalAmount, invoice.Lines.Count);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { await uow.RollbackTransactionAsync(CancellationToken.None); throw; }
         catch (Exception ex) { await uow.RollbackTransactionAsync(CancellationToken.None); logger.LogError(ex,"Invoice posting failed; invoiceId={InvoiceId}",invoice.Id); return PersistenceErrorMapper.FromException(ex); }

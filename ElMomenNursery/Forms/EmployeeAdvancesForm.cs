@@ -24,42 +24,48 @@ internal sealed class EmployeeAdvancesForm : Form
         var editor = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, WrapContents = true, RightToLeft = RightToLeft.Yes };
         AddField(editor, "الموظف", _employee); AddField(editor, "مبلغ السلفة", _amount); AddField(editor, "تاريخ السلفة", _date); AddField(editor, "ملاحظات", _notes);
         var add = new Button { Text = "تسجيل السلفة", AutoSize = true, Height = 36, Margin = new Padding(6, 22, 6, 4) };
-        add.Click += async (_, _) => await CreateAdvanceAsync(); editor.Controls.Add(add);
+        add.Click += (_, _) => _ = UiGuard.RunAsync(this, "EmployeeAdvances.Create", CreateAdvanceAsync); editor.Controls.Add(add);
         foreach (var (name, caption) in new[] { ("Employee", "الموظف"), ("Date", "التاريخ"), ("Amount", "قيمة السلفة"), ("Remaining", "الرصيد المتبقي"), ("Status", "الحالة"), ("Notes", "ملاحظات") }) _grid.Columns.Add(name, caption);
         root.Controls.Add(editor, 0, 0); root.Controls.Add(_grid, 0, 1); Controls.Add(root);
-        Load += async (_, _) => await LoadDataAsync();
+        Load += (_, _) => _ = UiGuard.RunAsync(this, "EmployeeAdvances.Load", LoadDataAsync);
     }
 
     private async Task LoadDataAsync()
     {
-        await using var scope = _scopes.CreateAsyncScope();
-        var employees = await scope.ServiceProvider.GetRequiredService<IEmployeeService>().GetEmployees();
-        if (employees.IsFailure) { AppDialog.ShowInformation(this, "السلف", employees.Error.Description); return; }
-        var selectedId = (_employee.SelectedItem as EmployeeDto)?.Id;
-        _employee.Items.Clear(); foreach (var employee in employees.Value) _employee.Items.Add(employee);
-        _employee.DisplayMember = nameof(EmployeeDto.FullName);
-        if (selectedId.HasValue) _employee.SelectedItem = employees.Value.FirstOrDefault(x => x.Id == selectedId.Value);
-        if (_employee.SelectedIndex < 0 && _employee.Items.Count > 0) _employee.SelectedIndex = 0;
-        var advances = await scope.ServiceProvider.GetRequiredService<IPayRollRecordService>().GetEmployeeAdvancesAsync();
-        if (advances.IsFailure) { AppDialog.ShowInformation(this, "السلف", advances.Error.Description); return; }
-        _grid.Rows.Clear();
-        foreach (var advance in advances.Value)
-            _grid.Rows.Add(advance.EmployeeName, advance.AdvanceDate.ToString("dd/MM/yyyy"), advance.OriginalAmount.ToString("N2"),
-                advance.RemainingAmount.ToString("N2"), advance.RemainingAmount == 0 ? "تم السداد" : "مستحقة", advance.Notes ?? "");
+        await UiGuard.RunAsync(this, "EmployeeAdvances.Load", async () =>
+        {
+            await using var scope = _scopes.CreateAsyncScope();
+            var employees = await scope.ServiceProvider.GetRequiredService<IEmployeeService>().GetEmployees();
+            if (employees.IsFailure) { AppDialog.ShowInformation(this, "السلف", employees.Error.Description); return; }
+            var selectedId = (_employee.SelectedItem as EmployeeDto)?.Id;
+            _employee.Items.Clear(); foreach (var employee in employees.Value) _employee.Items.Add(employee);
+            _employee.DisplayMember = nameof(EmployeeDto.FullName);
+            if (selectedId.HasValue) _employee.SelectedItem = employees.Value.FirstOrDefault(x => x.Id == selectedId.Value);
+            if (_employee.SelectedIndex < 0 && _employee.Items.Count > 0) _employee.SelectedIndex = 0;
+            var advances = await scope.ServiceProvider.GetRequiredService<IPayRollRecordService>().GetEmployeeAdvancesAsync();
+            if (advances.IsFailure) { AppDialog.ShowInformation(this, "السلف", advances.Error.Description); return; }
+            _grid.Rows.Clear();
+            foreach (var advance in advances.Value)
+                _grid.Rows.Add(advance.EmployeeName, advance.AdvanceDate.ToString("dd/MM/yyyy"), advance.OriginalAmount.ToString("N2"),
+                    advance.RemainingAmount.ToString("N2"), advance.RemainingAmount == 0 ? "تم السداد" : "مستحقة", advance.Notes ?? "");
+        }, "تعذر تحميل بيانات السلف.");
     }
 
     private async Task CreateAdvanceAsync()
     {
         if (_employee.SelectedItem is not EmployeeDto employee) { AppDialog.ShowInformation(this, "السلف", "اختر الموظف أولًا."); return; }
-        await using var scope = _scopes.CreateAsyncScope();
-        var result = await scope.ServiceProvider.GetRequiredService<IPayRollRecordService>().CreateEmployeeAdvanceAsync(new CreateEmployeeAdvanceDto
+        await UiGuard.RunAsync(this, "EmployeeAdvances.Create", async () =>
         {
-            EmployeeId = employee.Id, Amount = _amount.Value, AdvanceDate = DateOnly.FromDateTime(_date.Value),
-            Notes = string.IsNullOrWhiteSpace(_notes.Text) ? null : _notes.Text.Trim()
-        });
-        if (result.IsFailure) { AppDialog.ShowInformation(this, "السلف", result.Error.Description); return; }
-        _amount.Value = 0.01m; _notes.Clear(); await LoadDataAsync();
-        AppDialog.ShowInformation(this, "السلف", "تم تسجيل السلفة وإضافتها للمصروفات، وسيُخصم رصيدها من الراتب عند الصرف.");
+            await using var scope = _scopes.CreateAsyncScope();
+            var result = await scope.ServiceProvider.GetRequiredService<IPayRollRecordService>().CreateEmployeeAdvanceAsync(new CreateEmployeeAdvanceDto
+            {
+                EmployeeId = employee.Id, Amount = _amount.Value, AdvanceDate = DateOnly.FromDateTime(_date.Value),
+                Notes = string.IsNullOrWhiteSpace(_notes.Text) ? null : _notes.Text.Trim()
+            });
+            if (result.IsFailure) { AppDialog.ShowInformation(this, "السلف", result.Error.Description); return; }
+            _amount.Value = 0.01m; _notes.Clear(); await LoadDataAsync();
+            AppDialog.ShowInformation(this, "السلف", "تم تسجيل السلفة وإضافتها للمصروفات، وسيُخصم رصيدها من الراتب عند الصرف.");
+        }, "تعذر تسجيل السلفة.");
     }
 
     private static void AddField(Control parent, string label, Control input)

@@ -115,7 +115,7 @@ internal sealed class ChildAttendancePage : UserControl
 
     private async Task LoadClassroomsAsync()
     {
-        try
+        await UiGuard.RunAsync(this, "Attendance.LoadClassrooms", async () =>
         {
             await using var scope = _scopes.CreateAsyncScope();
             var service = scope.ServiceProvider.GetRequiredService<IChildAttendanceService>();
@@ -125,15 +125,13 @@ internal sealed class ChildAttendancePage : UserControl
             _classroom.Items.Clear(); _classroom.Items.Add(new ClassroomFilterOptionDto(Guid.Empty, "كل الفصول"));
             foreach (var value in result.Value) _classroom.Items.Add(value);
             _classroom.SelectedIndex = 0;
-        }
-        catch (UnauthorizedAccessException) { ShowError("لا تملك الصلاحية اللازمة لعرض الفصول."); }
-        catch { ShowError("تعذر تحميل قائمة الفصول."); }
+        }, "تعذر تحميل قائمة الفصول.");
     }
 
     private async Task LoadAsync()
     {
         var version = Interlocked.Increment(ref _loadVersion); var selected = SelectedId();
-        try
+        await UiGuard.RunAsync(this, "Attendance.LoadChildren", async () =>
         {
             var classId = (_classroom.SelectedItem as ClassroomFilterOptionDto)?.Id;
             await using var scope = _scopes.CreateAsyncScope();
@@ -142,8 +140,7 @@ internal sealed class ChildAttendancePage : UserControl
             if (IsDisposed || version != _loadVersion) return;
             if (result.IsFailure) { ShowError(result.Error.Description); return; }
             _rows = result.Value.ToList(); Render(); RestoreSelection(selected);
-        }
-        catch (Exception) { if (!IsDisposed && version == _loadVersion) ShowError("تعذر تحميل حضور الأطفال."); }
+        }, "تعذر تحميل حضور الأطفال.");
     }
 
     private void Render()
@@ -176,7 +173,7 @@ internal sealed class ChildAttendancePage : UserControl
             return;
         }
         var now = DateTimeOffset.Now;
-        try
+        await UiGuard.RunAsync(this, "Attendance.RecordChild", async () =>
         {
             await using var scope = _scopes.CreateAsyncScope();
             var service = scope.ServiceProvider.GetRequiredService<IChildAttendanceService>();
@@ -185,8 +182,7 @@ internal sealed class ChildAttendancePage : UserControl
             if (result.IsFailure) { ShowError(result.Error.Description); return; }
             if (!string.IsNullOrWhiteSpace(result.Value.Alert)) ShowError(result.Value.Alert);
             await LoadAsync();
-        }
-        catch { if (!IsDisposed) ShowError("تعذر تسجيل الحضور."); }
+        }, "تعذر تسجيل الحضور.");
     }
 
     private async Task CheckOutAsync()
@@ -197,15 +193,14 @@ internal sealed class ChildAttendancePage : UserControl
             await OpenEditorAsync(correction: true);
             return;
         }
-        try
+        await UiGuard.RunAsync(this, "Attendance.CheckOutChild", async () =>
         {
             await using var scope = _scopes.CreateAsyncScope();
             var service = scope.ServiceProvider.GetRequiredService<IChildAttendanceService>();
             var result = await service.RecordCheckOutAsync(row.ChildId, row.Date, DateTimeOffset.Now);
             if (result.IsFailure) { ShowError(result.Error.Description); return; }
             await LoadAsync();
-        }
-        catch { if (!IsDisposed) ShowError("تعذر تسجيل الانصراف."); }
+        }, "تعذر تسجيل الانصراف.");
     }
 
     private async Task MarkAllAsync()
@@ -220,15 +215,14 @@ internal sealed class ChildAttendancePage : UserControl
         if (candidates == 0) { ShowError("لا يوجد أطفال غير مسجلين في النطاق المحدد."); return; }
         var className = classroom?.Id == Guid.Empty ? "كل الفصول" : classroom?.Name ?? "كل الفصول";
         if (!AppDialog.Confirm(this, "تسجيل الكل حاضر", $"سيتم تسجيل {candidates} طفلًا بحالة حاضر في {className}. هل تريد المتابعة؟")) return;
-        try
+        await UiGuard.RunAsync(this, "Attendance.MarkAllChildren", async () =>
         {
             await using var scope = _scopes.CreateAsyncScope();
             var service = scope.ServiceProvider.GetRequiredService<IChildAttendanceService>();
             var result = await service.MarkAllPresentAsync(DateOnly.FromDateTime(_date.Value), classroom?.Id == Guid.Empty ? null : classroom?.Id);
             if (result.IsFailure) { ShowError(result.Error.Description); return; }
             await LoadAsync();
-        }
-        catch { if (!IsDisposed) ShowError("تعذر تسجيل الحضور الجماعي."); }
+        }, "تعذر تسجيل الحضور الجماعي.");
     }
 
     private async Task OpenEditorAsync(bool correction)
@@ -342,7 +336,7 @@ internal sealed class EmployeeAttendancePage : UserControl
     private async Task LoadAsync()
     {
         var version = Interlocked.Increment(ref _version); var selected = Current()?.EmployeeId;
-        try
+        await UiGuard.RunAsync((IWin32Window?)FindForm() ?? this, "Attendance.LoadEmployees", async () =>
         {
             await using var scope = _scopes.CreateAsyncScope(); var service = scope.ServiceProvider.GetRequiredService<IEmployeeAttendanceService>();
             var result = await service.GetDailyAttendanceAsync(DateOnly.FromDateTime(_date.Value));
@@ -350,9 +344,7 @@ internal sealed class EmployeeAttendancePage : UserControl
             _rows = result.Value.ToList();
             if (IsDisposed || version != _version) return; Render();
             if (selected is Guid id) foreach (DataGridViewRow row in _grid.Rows) if ((row.Tag as EmployeeDailyAttendanceDto)?.EmployeeId == id) { row.Selected = true; break; }
-        }
-        catch (UnauthorizedAccessException) { if (!IsDisposed) AppDialog.ShowInformation((IWin32Window?)FindForm() ?? this, "حضور الموظفين", "لا تملك الصلاحية اللازمة لعرض حضور الموظفين."); }
-        catch { if (!IsDisposed && version == _version) AppDialog.ShowInformation((IWin32Window?)FindForm() ?? this, "حضور الموظفين", "تعذر تحميل حضور الموظفين."); }
+        }, "تعذر تحميل حضور الموظفين.");
     }
 
     private void Render()
@@ -372,12 +364,16 @@ internal sealed class EmployeeAttendancePage : UserControl
             await OpenEditorAsync();
             return;
         }
-        try { await using var scope = _scopes.CreateAsyncScope(); var service = scope.ServiceProvider.GetRequiredService<IEmployeeAttendanceService>();
+        await UiGuard.RunAsync((IWin32Window?)FindForm() ?? this, "Attendance.RecordEmployee", async () =>
+        {
+            await using var scope = _scopes.CreateAsyncScope();
+            var service = scope.ServiceProvider.GetRequiredService<IEmployeeAttendanceService>();
             var result = await service.MarkManualAttendanceAsync(new CreateEmployeeAttendanceDto { EmployeeId = row.EmployeeId, AttendanceDate = row.AttendanceDate, Status = status, CheckInTime = status is AttendanceStatus.Present or AttendanceStatus.Late ? DateTimeOffset.Now : null });
             if (result.IsFailure) { AppDialog.ShowInformation((IWin32Window?)FindForm() ?? this, "حضور الموظفين", result.Error.Description); return; }
-            await LoadAsync(); }
-        catch { if (!IsDisposed) AppDialog.ShowInformation((IWin32Window?)FindForm() ?? this, "حضور الموظفين", "تعذر تسجيل الحضور."); }
+            await LoadAsync();
+        }, "تعذر تسجيل الحضور.");
     }
+
     private async Task CheckoutAsync()
     {
         var row = Current(); if (row is null) return;
@@ -386,11 +382,14 @@ internal sealed class EmployeeAttendancePage : UserControl
             await OpenEditorAsync();
             return;
         }
-        try { await using var scope = _scopes.CreateAsyncScope(); var service = scope.ServiceProvider.GetRequiredService<IEmployeeAttendanceService>();
+        await UiGuard.RunAsync((IWin32Window?)FindForm() ?? this, "Attendance.CheckoutEmployee", async () =>
+        {
+            await using var scope = _scopes.CreateAsyncScope();
+            var service = scope.ServiceProvider.GetRequiredService<IEmployeeAttendanceService>();
             var result = await service.RecordCheckOutAsync(row.EmployeeId, row.AttendanceDate, DateTimeOffset.Now);
             if (result.IsFailure) { AppDialog.ShowInformation((IWin32Window?)FindForm() ?? this, "حضور الموظفين", result.Error.Description); return; }
-            await LoadAsync(); }
-        catch { if (!IsDisposed) AppDialog.ShowInformation((IWin32Window?)FindForm() ?? this, "حضور الموظفين", "تعذر تسجيل الانصراف."); }
+            await LoadAsync();
+        }, "تعذر تسجيل الانصراف.");
     }
     private async Task OpenEditorAsync()
     {

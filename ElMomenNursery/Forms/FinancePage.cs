@@ -400,18 +400,14 @@ public sealed class FinancePage : UserControl
                 return;
 
             if (_scopes is null) return;
-            try
+            await UiGuard.RunAsync(this, "Finance.DeleteManualIncome", async () =>
             {
                 await using var scope = _scopes.CreateAsyncScope();
                 var svc = scope.ServiceProvider.GetRequiredService<IFinanceService>();
                 var res = await svc.DeleteManualIncomeAsync(selected.Id);
                 if (ResultPresenter.Present(this, "المقبوضات", res))
                     await LoadDataAsync();
-            }
-            catch (Exception)
-            {
-                AppDialog.ShowInformation(this, "خطأ", "تعذر حذف الإيراد.");
-            }
+            }, "تعذر حذف الإيراد.");
         };
 
         _exportIncomeBtn.Click += async (_, _) =>
@@ -448,18 +444,14 @@ public sealed class FinancePage : UserControl
                 return;
 
             if (_scopes is null) return;
-            try
+            await UiGuard.RunAsync(this, "Finance.DeleteExpense", async () =>
             {
                 await using var scope = _scopes.CreateAsyncScope();
                 var svc = scope.ServiceProvider.GetRequiredService<IFinanceService>();
                 var res = await svc.DeleteExpenseAsync(selected.Id);
                 if (ResultPresenter.Present(this, "المصروفات", res))
                     await LoadDataAsync();
-            }
-            catch (Exception)
-            {
-                AppDialog.ShowInformation(this, "خطأ", "تعذر إلغاء المصروف.");
-            }
+            }, "تعذر إلغاء المصروف.");
         };
 
         _exportExpenseBtn.Click += async (_, _) =>
@@ -481,7 +473,7 @@ public sealed class FinancePage : UserControl
 
         if (_scopes is null) return;
 
-        try
+        await UiGuard.RunAsync(this, "Finance.LoadData", async () =>
         {
             await using var scope = _scopes.CreateAsyncScope();
             var service = scope.ServiceProvider.GetRequiredService<IFinanceService>();
@@ -512,12 +504,7 @@ public sealed class FinancePage : UserControl
                 RenderExpenseGrid();
             }
             if (summaryRes.IsSuccess) RenderFilteredSummary(summaryRes.Value);
-        }
-        catch (Exception)
-        {
-            if (!IsDisposed && currentVersion == _loadVersion)
-                AppDialog.ShowInformation(this, "خطأ", "تعذر تحميل البيانات المالية.");
-        }
+        }, "تعذر تحميل البيانات المالية.");
     }
 
     private void RenderFilteredSummary(FinanceSummaryDto original)

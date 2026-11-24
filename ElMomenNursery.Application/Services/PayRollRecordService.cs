@@ -1,7 +1,7 @@
 namespace ElMomenNursery.Application.Services;
 
 public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRollRecordService> logger,
-    IPermissionService permissions, IFinanceService financeService) : IPayRollRecordService
+    IPermissionService permissions, IFinanceService financeService, ISessionManager? sessions = null) : IPayRollRecordService
 {
     private const int DefaultPaidDaysPerMonth = 22;
 
@@ -32,7 +32,17 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
             record.AdvanceDeduction = Math.Min(salaryBeforeAdvances, outstandingAdvances);
             record.AmountPaid = salaryBeforeAdvances - record.AdvanceDeduction;
             record.IsCalculated = true;
+            await unitOfWork.Repository<AuditLog>().AddAsync(new AuditLog
+            {
+                Action = "Payroll.Calculate",
+                EntityType = nameof(PayrollRecord),
+                EntityId = record.Id.ToString("D"),
+                UserAccountId = sessions?.CurrentUser?.UserId,
+                ChangeSummary = $"period={record.PeriodStart:yyyy-MM-dd}..{record.PeriodEnd:yyyy-MM-dd};absenceDays={absenceDays};advanceDeduction={record.AdvanceDeduction};amountPaid={record.AmountPaid}"
+            });
             await unitOfWork.SaveChangesAsync();
+            logger.LogInformation("Payroll record calculated; operation={Operation}; recordId={RecordId}; periodStart={PeriodStart}; periodEnd={PeriodEnd}; absenceDays={AbsenceDays}; advanceDeduction={AdvanceDeduction}; amountPaid={AmountPaid}",
+                "CalculateFinalSalary", record.Id, record.PeriodStart, record.PeriodEnd, absenceDays, record.AdvanceDeduction, record.AmountPaid);
             var dto = ToDto(record, record.Employee.FullName, paidDaysPerMonth);
             dto.DailySalary = decimal.Round(dailySalary, 2, MidpointRounding.AwayFromZero);
             dto.AbsenceDays = absenceDays;
@@ -59,8 +69,18 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
             PeriodEnd = dto.PeriodEnd, AgreedSalary = dto.AgreedSalary, Additions = dto.Additions ?? 0,
             Deductions = dto.Deductions ?? 0, InsuranceFunds = dto.InsuranceFunds, Notes = Clean(dto.Notes) };
         await unitOfWork.Repository<PayrollRecord>().AddAsync(record);
+        await unitOfWork.Repository<AuditLog>().AddAsync(new AuditLog
+        {
+            Action = "Payroll.Create",
+            EntityType = nameof(PayrollRecord),
+            EntityId = record.Id.ToString("D"),
+            UserAccountId = sessions?.CurrentUser?.UserId,
+            ChangeSummary = $"period={record.PeriodStart:yyyy-MM-dd}..{record.PeriodEnd:yyyy-MM-dd};absenceDays=0;advanceDeduction={record.AdvanceDeduction};amountPaid={record.AmountPaid}"
+        });
         try { await unitOfWork.SaveChangesAsync(); }
         catch (Exception ex) { logger.LogError(ex, "Payroll record creation failed"); return PayrollRecordErrors.PersistenceFailure; }
+        logger.LogInformation("Payroll record created; operation={Operation}; recordId={RecordId}; periodStart={PeriodStart}; periodEnd={PeriodEnd}; absenceDays={AbsenceDays}; advanceDeduction={AdvanceDeduction}; amountPaid={AmountPaid}",
+            "CreatePayRollRecord", record.Id, record.PeriodStart, record.PeriodEnd, 0, record.AdvanceDeduction, record.AmountPaid);
         return Result.Success(ToDto(record, "", await GetPaidDaysPerMonthAsync()));
     }
 
@@ -78,11 +98,22 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
             await unitOfWork.BeginTransactionAsync(cancellationToken);
             foreach (var employee in eligible)
             {
-                await unitOfWork.Repository<PayrollRecord>().AddAsync(new PayrollRecord
+                var newRecord = new PayrollRecord
                 {
                     EmployeeId = employee.Id, Employee = employee, PeriodStart = startDate, PeriodEnd = endDate,
                     AgreedSalary = employee.Salary
+                };
+                await unitOfWork.Repository<PayrollRecord>().AddAsync(newRecord, cancellationToken);
+                await unitOfWork.Repository<AuditLog>().AddAsync(new AuditLog
+                {
+                    Action = "Payroll.Create",
+                    EntityType = nameof(PayrollRecord),
+                    EntityId = newRecord.Id.ToString("D"),
+                    UserAccountId = sessions?.CurrentUser?.UserId,
+                    ChangeSummary = $"period={startDate:yyyy-MM-dd}..{endDate:yyyy-MM-dd};absenceDays=0;advanceDeduction={newRecord.AdvanceDeduction};amountPaid={newRecord.AmountPaid}"
                 }, cancellationToken);
+                logger.LogInformation("Payroll record created; operation={Operation}; recordId={RecordId}; periodStart={PeriodStart}; periodEnd={PeriodEnd}; absenceDays={AbsenceDays}; advanceDeduction={AdvanceDeduction}; amountPaid={AmountPaid}",
+                    "CreatePayrollRecordsForAllEmployees", newRecord.Id, startDate, endDate, 0, newRecord.AdvanceDeduction, newRecord.AmountPaid);
             }
             await unitOfWork.CommitTransactionAsync(cancellationToken);
             return Result.Success(new PayrollBatchResultDto(eligible.Length, employees.Count - eligible.Length));
@@ -110,8 +141,18 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
         record.AmountPaid = 0; record.PaymentDate = dto.PaymentDate; record.Notes = Clean(dto.Notes);
         record.AdvanceDeduction = 0;
         record.IsCalculated = false;
+        await unitOfWork.Repository<AuditLog>().AddAsync(new AuditLog
+        {
+            Action = "Payroll.Update",
+            EntityType = nameof(PayrollRecord),
+            EntityId = record.Id.ToString("D"),
+            UserAccountId = sessions?.CurrentUser?.UserId,
+            ChangeSummary = $"period={record.PeriodStart:yyyy-MM-dd}..{record.PeriodEnd:yyyy-MM-dd};absenceDays=0;advanceDeduction={record.AdvanceDeduction};amountPaid={record.AmountPaid}"
+        });
         try { await unitOfWork.SaveChangesAsync(); }
         catch (Exception ex) { logger.LogError(ex, "Payroll update failed; id={PayrollRecordId}", id); return PayrollRecordErrors.PersistenceFailure; }
+        logger.LogInformation("Payroll record updated; operation={Operation}; recordId={RecordId}; periodStart={PeriodStart}; periodEnd={PeriodEnd}; absenceDays={AbsenceDays}; advanceDeduction={AdvanceDeduction}; amountPaid={AmountPaid}",
+            "UpdatePayRollRecord", record.Id, record.PeriodStart, record.PeriodEnd, 0, record.AdvanceDeduction, record.AmountPaid);
         return Result.Success(ToDto(record, record.Employee.FullName, await GetPaidDaysPerMonthAsync()));
     }
 
@@ -123,9 +164,17 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
         if (record.IsPaid) return PayrollRecordErrors.AlreadyPaid;
         if (!record.IsCalculated) return PayrollRecordErrors.NotCalculated;
         var paymentDate = record.PaymentDate ?? DateOnly.FromDateTime(DateTime.Today);
+        int absenceDays = 0;
         try
         {
             await unitOfWork.BeginTransactionAsync();
+            var attendanceRows = await unitOfWork.Repository<EmployeeAttendance>().ListAsync(x =>
+                x.EmployeeId == record.EmployeeId &&
+                x.AttendanceDate >= record.PeriodStart &&
+                x.AttendanceDate <= record.PeriodEnd &&
+                x.Status == AttendanceStatus.Absent);
+            absenceDays = attendanceRows.Select(x => x.AttendanceDate).Distinct().Count();
+
             var advances = await unitOfWork.Repository<EmployeeAdvance>().ListAsync(
                 x => x.EmployeeId == record.EmployeeId && x.AdvanceDate <= record.PeriodEnd && x.RemainingAmount > 0,
                 asNoTracking: false);
@@ -169,7 +218,17 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
                 });
             }
             record.IsPaid = true; record.PaymentDate = paymentDate;
+            await unitOfWork.Repository<AuditLog>().AddAsync(new AuditLog
+            {
+                Action = "Payroll.MarkPaid",
+                EntityType = nameof(PayrollRecord),
+                EntityId = record.Id.ToString("D"),
+                UserAccountId = sessions?.CurrentUser?.UserId,
+                ChangeSummary = $"period={record.PeriodStart:yyyy-MM-dd}..{record.PeriodEnd:yyyy-MM-dd};absenceDays={absenceDays};advanceDeduction={record.AdvanceDeduction};amountPaid={record.AmountPaid}"
+            });
             await unitOfWork.CommitTransactionAsync();
+            logger.LogInformation("Payroll record marked paid; operation={Operation}; recordId={RecordId}; periodStart={PeriodStart}; periodEnd={PeriodEnd}; absenceDays={AbsenceDays}; advanceDeduction={AdvanceDeduction}; amountPaid={AmountPaid}",
+                "MarkRecordAsPaid", record.Id, record.PeriodStart, record.PeriodEnd, absenceDays, record.AdvanceDeduction, record.AmountPaid);
         }
         catch (Exception ex)
         {
@@ -272,9 +331,12 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
             await unitOfWork.Repository<AuditLog>().AddAsync(new AuditLog
             {
                 Action = "CreateEmployeeAdvance", EntityType = nameof(EmployeeAdvance), EntityId = advance.Id.ToString("D"),
-                ChangeSummary = $"تسجيل سلفة للموظف {employee.FullName} بقيمة {advance.OriginalAmount:N2}"
+                UserAccountId = sessions?.CurrentUser?.UserId,
+                ChangeSummary = $"employeeId={employee.Id};period={advance.AdvanceDate:yyyy-MM-dd};absenceDays=0;advanceDeduction=0;amountPaid=0;amount={advance.OriginalAmount:N2}"
             }, cancellationToken);
             await unitOfWork.CommitTransactionAsync(cancellationToken);
+            logger.LogInformation("Employee advance created; operation={Operation}; recordId={RecordId}; employeeId={EmployeeId}; period={Period}; absenceDays={AbsenceDays}; advanceDeduction={AdvanceDeduction}; amountPaid={AmountPaid}; amount={Amount}",
+                "CreateEmployeeAdvance", advance.Id, employee.Id, advance.AdvanceDate, 0, 0m, 0m, advance.OriginalAmount);
         }
         catch (Exception ex)
         {

@@ -1,6 +1,8 @@
 ﻿using ClosedXML.Excel;
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Domain.Abstractions;
+using Serilog;
+using System.Diagnostics;
 
 namespace ElMomenNursery.Infrastructure.Spreadsheet;
 
@@ -12,6 +14,8 @@ public sealed class ExcelExportService : IExcelExportService
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
         if (data.Headers.Count == 0) return CommonErrors.InvalidRequest;
 
+        var targetFolder = Path.GetDirectoryName(filePath) ?? string.Empty;
+        var timer = Stopwatch.StartNew();
         try
         {
             await Task.Run(() =>
@@ -51,13 +55,20 @@ public sealed class ExcelExportService : IExcelExportService
             worksheet.Columns(1, data.Headers.Count).AdjustToContents(10, 50);
                 workbook.SaveAs(filePath);
             }, cancellationToken);
+            Log.ForContext<ExcelExportService>().Information("Excel export completed; operation={Operation}; durationMs={DurationMs}; targetFolder={TargetFolder}",
+                "ExportExcel", timer.ElapsedMilliseconds, targetFolder);
             return Result.Success("تم حفظ ملف Excel بنجاح.");
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
-        catch (IOException exception) when ((exception.HResult & 0xFFFF) is 32 or 33) { return FileErrors.FileInUse; }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        catch (Exception exception)
         {
-            return FileErrors.NotWritable;
+            var kind = exception is IOException io && (io.HResult & 0xFFFF) is 32 or 33 ? "in-use"
+                : exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException ? "not-writable" : "unknown";
+            Log.ForContext<ExcelExportService>().Warning("Excel export failed; operation={Operation}; failureKind={FailureKind}; durationMs={DurationMs}; targetFolder={TargetFolder}",
+                "ExportExcel", kind, timer.ElapsedMilliseconds, targetFolder);
+            return exception is IOException && kind == "in-use" ? FileErrors.FileInUse
+                : kind == "not-writable" ? FileErrors.NotWritable
+                : CommonErrors.InvalidRequest;
         }
     }
 

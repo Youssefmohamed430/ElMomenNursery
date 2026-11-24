@@ -193,7 +193,7 @@ internal sealed class CashierInvoiceForm : Form
 
     private async Task LoadCatalogAsync()
     {
-        try
+        await UiGuard.RunAsync(this, "CashierInvoice.LoadCatalog", async () =>
         {
             await using var scope = _scopes.CreateAsyncScope();
             var result = await scope.ServiceProvider.GetRequiredService<IInvoiceService>().GetAvailableItemsAsync();
@@ -201,8 +201,7 @@ internal sealed class CashierInvoiceForm : Form
             _catalog = result.Value.ToList();
             foreach (var item in _catalog) _items.Items.Add(new ItemChoice(item));
             if (_items.Items.Count > 0) _items.SelectedIndex = 0;
-        }
-        catch { AppDialog.ShowInformation(this, Text, "تعذر تحميل منتجات المخزن."); }
+        }, "تعذر تحميل منتجات المخزن.");
     }
 
     private void AddCatalogItem()

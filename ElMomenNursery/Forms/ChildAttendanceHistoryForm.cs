@@ -73,7 +73,7 @@ internal sealed class ChildAttendanceHistoryForm : Form
 
     private async Task LoadChildrenAsync()
     {
-        try
+        await UiGuard.RunAsync(this, "ChildAttendanceHistory.LoadChildren", async () =>
         {
             await using var scope = _scopes.CreateAsyncScope();
             var service = scope.ServiceProvider.GetRequiredService<IChildAttendanceService>();
@@ -82,8 +82,7 @@ internal sealed class ChildAttendanceHistoryForm : Form
             if (result.IsFailure) { ShowError(result.Error.Description); return; }
             _allChildren = result.Value.ToList();
             FilterChildren();
-        }
-        catch { if (!IsDisposed) ShowError("تعذر تحميل قائمة الأطفال."); }
+        }, "تعذر تحميل قائمة الأطفال.");
     }
 
     private void FilterChildren()
@@ -113,14 +112,16 @@ internal sealed class ChildAttendanceHistoryForm : Form
         _show.Enabled = false;
         try
         {
-            await using var scope = _scopes.CreateAsyncScope();
-            var service = scope.ServiceProvider.GetRequiredService<IChildAttendanceService>();
-            var result = await service.GetChildAttendanceByRangeAsync(selectedChild.Id, start, end);
-            if (IsDisposed || version != _loadVersion) return;
-            if (result.IsFailure) { ShowError(result.Error.Description); return; }
-            RenderHistory(selectedChild.FullName, result.Value);
+            await UiGuard.RunAsync(this, "ChildAttendanceHistory.LoadHistory", async () =>
+            {
+                await using var scope = _scopes.CreateAsyncScope();
+                var service = scope.ServiceProvider.GetRequiredService<IChildAttendanceService>();
+                var result = await service.GetChildAttendanceByRangeAsync(selectedChild.Id, start, end);
+                if (IsDisposed || version != _loadVersion) return;
+                if (result.IsFailure) { ShowError(result.Error.Description); return; }
+                RenderHistory(selectedChild.FullName, result.Value);
+            }, "تعذر تحميل سجل حضور الطفل.");
         }
-        catch { if (!IsDisposed && version == _loadVersion) ShowError("تعذر تحميل سجل حضور الطفل."); }
         finally { if (!IsDisposed && version == _loadVersion) _show.Enabled = true; }
     }
 

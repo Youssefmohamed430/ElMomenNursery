@@ -229,7 +229,9 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
 
     private async Task<string?> GetSubscriptionAndAbsenceAlertAsync(Guid childId, DateOnly attendanceDate, CancellationToken ct)
     {
-        var messages = new List<string>();
+        try
+        {
+            var messages = new List<string>();
         var subscription = await unitOfWork.Repository<Subscription>().FirstOrDefaultAsync(
             x => x.ChildId == childId && x.PeriodStart <= attendanceDate && x.PeriodEnd >= attendanceDate,
             cancellationToken: ct);
@@ -254,7 +256,14 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
                 messages.Add($"تنبيه: تم تسجيل غياب الطفل {fineAfterDays} يومًا منذ بداية الاشتراك. الغرامة المستحقة {fineAmount} جنيهًا.");
         }
 
-        return messages.Count == 0 ? null : string.Join(Environment.NewLine, messages);
+            return messages.Count == 0 ? null : string.Join(Environment.NewLine, messages);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to compute attendance alerts; operation={Operation}; childId={ChildId}; attendanceDate={AttendanceDate}",
+                "GetSubscriptionAndAbsenceAlert", childId, attendanceDate);
+            return null;
+        }
     }
 
     private static string Values(ChildAttendance x) => $"Date={x.AttendanceDate:yyyy-MM-dd};Status={x.Status};CheckIn={x.CheckInTime?.ToString("O", System.Globalization.CultureInfo.InvariantCulture) ?? "—"};CheckOut={x.CheckOutTime?.ToString("O", System.Globalization.CultureInfo.InvariantCulture) ?? "—"}";

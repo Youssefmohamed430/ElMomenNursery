@@ -77,28 +77,39 @@ public sealed class SubscriptionsPage : UserControl
             _summary.SetBounds(margin, toolbar.Bottom + 4, width, 34);
             _grid.SetBounds(margin, _summary.Bottom + 4, width, Math.Max(140, ClientSize.Height - _summary.Bottom - margin));
         }
-        apply.Click += async (_, _) => await LoadAsync(); refresh.Click += async (_, _) => await LoadAsync();
-        clear.Click += async (_, _) => { _search.Clear(); _status.SelectedIndex = 0; _plan.SelectedIndex = 0; _classroom.SelectedIndex = 0; _from.Checked = _to.Checked = false; _balance.Checked = false; await LoadAsync(); };
-        _add.Click += async (_, _) => await EditAsync(null); _edit.Click += async (_, _) => { if (Selected() is { } row) await EditAsync(row); };
-        _invoice.Click += async (_, _) => { using var form = new CashierInvoiceForm(_scopes); if (form.ShowDialog(FindForm()) == DialogResult.OK) await LoadAsync(); };
+        apply.Click += (_, _) => _ = UiGuard.RunAsync(this, "Subscriptions.Load", LoadAsync);
+        refresh.Click += (_, _) => _ = UiGuard.RunAsync(this, "Subscriptions.Load", LoadAsync);
+        clear.Click += (_, _) => { _search.Clear(); _status.SelectedIndex = 0; _plan.SelectedIndex = 0; _classroom.SelectedIndex = 0; _from.Checked = _to.Checked = false; _balance.Checked = false; _ = UiGuard.RunAsync(this, "Subscriptions.Load", LoadAsync); };
+        _add.Click += (_, _) => _ = UiGuard.RunAsync(this, "Subscriptions.Add", () => EditAsync(null));
+        _edit.Click += (_, _) => { if (Selected() is { } row) _ = UiGuard.RunAsync(this, "Subscriptions.Edit", () => EditAsync(row)); };
+        _invoice.Click += (_, _) => _ = UiGuard.RunAsync(this, "Subscriptions.Invoice", async () => { using var form = new CashierInvoiceForm(_scopes); if (form.ShowDialog(FindForm()) == DialogResult.OK) await LoadAsync(); });
         _invoiceHistory.Click += (_, _) => { using var form = new InvoiceHistoryForm(_scopes); form.ShowDialog(FindForm()); };
-        _cancel.Click += async (_, _) => await CancelAsync(); _delete.Click += async (_, _) => await DeleteAsync();
-        _pay.Click += async (_, _) => await RecordPaymentAsync(); _fine.Click += async (_, _) => await RecordAbsenceFineAsync(); _receipt.Click += async (_, _) => await PrintAsync();
-        _export.Click += async (_, _) => await GridExcelExport.SaveAsync((IWin32Window?)FindForm() ?? this, _grid, _excel, "تصدير الاشتراكات", "الاشتراكات");
-        _grid.SelectionChanged += (_, _) => UpdateActions(); _grid.KeyDown += async (_, e) => { if (e.KeyCode == Keys.F5) { e.Handled = true; await LoadAsync(); } };
-        Load += async (_, _) => { await LoadPlansAsync(); await LoadClassroomsAsync(); await LoadAsync(); };
+        _cancel.Click += (_, _) => _ = UiGuard.RunAsync(this, "Subscriptions.Cancel", CancelAsync);
+        _delete.Click += (_, _) => _ = UiGuard.RunAsync(this, "Subscriptions.Delete", DeleteAsync);
+        _pay.Click += (_, _) => _ = UiGuard.RunAsync(this, "Subscriptions.Pay", RecordPaymentAsync);
+        _fine.Click += (_, _) => _ = UiGuard.RunAsync(this, "Subscriptions.AbsenceFine", RecordAbsenceFineAsync);
+        _receipt.Click += (_, _) => _ = UiGuard.RunAsync(this, "Subscriptions.Receipt", PrintAsync);
+        _export.Click += (_, _) => _ = UiGuard.RunAsync(this, "Subscriptions.Export", () => GridExcelExport.SaveAsync((IWin32Window?)FindForm() ?? this, _grid, _excel, "تصدير الاشتراكات", "الاشتراكات"));
+        _grid.SelectionChanged += (_, _) => UpdateActions();
+        _grid.KeyDown += (_, e) => { if (e.KeyCode == Keys.F5) { e.Handled = true; _ = UiGuard.RunAsync(this, "Subscriptions.Load", LoadAsync); } };
+        Load += (_, _) => _ = UiGuard.RunAsync(this, "Subscriptions.InitialLoad", async () => { await LoadPlansAsync(); await LoadClassroomsAsync(); await LoadAsync(); });
     }
 
     private async Task LoadPlansAsync()
     {
-        try { await using var s = _scopes.CreateAsyncScope(); var svc = s.ServiceProvider.GetRequiredService<ISubscriptionService>(); var res = await svc.GetPlansAsync();
-            if (res.IsFailure) return; foreach (var plan in res.Value) _plan.Items.Add(new PlanChoice(plan.Id, plan.Name)); }
-        catch { ShowError("تعذر تحميل خطط الاشتراك."); }
+        await UiGuard.RunAsync(this, "Subscriptions.LoadPlans", async () =>
+        {
+            await using var s = _scopes.CreateAsyncScope();
+            var svc = s.ServiceProvider.GetRequiredService<ISubscriptionService>();
+            var res = await svc.GetPlansAsync();
+            if (res.IsFailure) return;
+            foreach (var plan in res.Value) _plan.Items.Add(new PlanChoice(plan.Id, plan.Name));
+        }, "تعذر تحميل خطط الاشتراك.");
     }
 
     private async Task LoadClassroomsAsync()
     {
-        try
+        await UiGuard.RunAsync(this, "Subscriptions.LoadClassrooms", async () =>
         {
             await using var scope = _scopes.CreateAsyncScope();
             var service = scope.ServiceProvider.GetRequiredService<ISubscriptionService>();
@@ -108,24 +119,26 @@ public sealed class SubscriptionsPage : UserControl
             _classroom.Items.Add(new ClassroomFilterOptionDto(Guid.Empty, "كل الفصول"));
             foreach (var classroom in result.Value) _classroom.Items.Add(classroom);
             _classroom.SelectedIndex = 0;
-        }
-        catch { ShowError("تعذر تحميل قائمة الفصول."); }
+        }, "تعذر تحميل قائمة الفصول.");
     }
 
     private async Task LoadAsync()
     {
-        var version = Interlocked.Increment(ref _loadVersion); var selected = Selected()?.Id;
-        try
+        var version = Interlocked.Increment(ref _loadVersion);
+        var selected = Selected()?.Id;
+        await UiGuard.RunAsync(this, "Subscriptions.Load", async () =>
         {
             var status = _status.SelectedItem?.ToString() switch { "مستحق" => SubscriptionStatus.Pending, "مدفوع جزئيًا" => SubscriptionStatus.PartiallyPaid, "مدفوع" => SubscriptionStatus.Paid, "ملغي" => SubscriptionStatus.Cancelled, "معفى" => SubscriptionStatus.Waived, _ => (SubscriptionStatus?)null };
-            await using var scope = _scopes.CreateAsyncScope(); var svc = scope.ServiceProvider.GetRequiredService<ISubscriptionService>();
+            await using var scope = _scopes.CreateAsyncScope();
+            var svc = scope.ServiceProvider.GetRequiredService<ISubscriptionService>();
             var result = await svc.GetSubscriptionsAsync(new SubscriptionFilter { SearchText = _search.Text, Status = status, PlanId = (_plan.SelectedItem as PlanChoice)?.Id,
                 ClassroomId = (_classroom.SelectedItem as ClassroomFilterOptionDto)?.Id is Guid id && id != Guid.Empty ? id : null,
                 PeriodFrom = _from.Checked ? DateOnly.FromDateTime(_from.Value) : null, PeriodTo = _to.Checked ? DateOnly.FromDateTime(_to.Value) : null, OnlyWithBalance = _balance.Checked });
             if (IsDisposed || version != _loadVersion) return;
-            if (result.IsFailure) { ShowError(result.Error.Description); return; } _rows = result.Value.ToList(); Render(selected);
-        }
-        catch { if (!IsDisposed && version == _loadVersion) ShowError("تعذر تحميل الاشتراكات."); }
+            if (result.IsFailure) { ShowError(result.Error.Description); return; }
+            _rows = result.Value.ToList();
+            Render(selected);
+        }, "تعذر تحميل الاشتراكات.");
     }
 
     private void Render(Guid? keep = null)
@@ -149,9 +162,14 @@ public sealed class SubscriptionsPage : UserControl
     {
         if (Selected() is not { } row) return;
         var reason = Prompt("سبب إلغاء الاشتراك"); if (reason is null) return;
-        try { await using var scope = _scopes.CreateAsyncScope(); var svc = scope.ServiceProvider.GetRequiredService<ISubscriptionService>(); var res = await svc.CancelSubscriptionAsync(row.Id, reason);
-            if (!ResultPresenter.Present(this, "إلغاء الاشتراك", res)) return; await LoadAsync(); }
-        catch { ShowError("تعذر إلغاء الاشتراك."); }
+        await UiGuard.RunAsync(this, "Subscriptions.Cancel", async () =>
+        {
+            await using var scope = _scopes.CreateAsyncScope();
+            var svc = scope.ServiceProvider.GetRequiredService<ISubscriptionService>();
+            var res = await svc.CancelSubscriptionAsync(row.Id, reason);
+            if (!ResultPresenter.Present(this, "إلغاء الاشتراك", res)) return;
+            await LoadAsync();
+        }, "تعذر إلغاء الاشتراك.");
     }
 
     private async Task DeleteAsync()
@@ -159,48 +177,68 @@ public sealed class SubscriptionsPage : UserControl
         if (Selected() is not { } row) return;
         if (row.PaidAmount > 0) { ShowError(SubscriptionErrors.HasPayments.Description); return; }
         if (!AppDialog.Confirm(this, "تأكيد الحذف", "سيتم حذف الاشتراك المحدد. هل تريد المتابعة؟")) return;
-        try { await using var scope = _scopes.CreateAsyncScope(); var svc = scope.ServiceProvider.GetRequiredService<ISubscriptionService>(); var res = await svc.DeleteSubscriptionAsync(row.Id);
-            if (!ResultPresenter.Present(this, "حذف الاشتراك", res)) return; await LoadAsync(); }
-        catch { ShowError("تعذر حذف الاشتراك."); }
+        await UiGuard.RunAsync(this, "Subscriptions.Delete", async () =>
+        {
+            await using var scope = _scopes.CreateAsyncScope();
+            var svc = scope.ServiceProvider.GetRequiredService<ISubscriptionService>();
+            var res = await svc.DeleteSubscriptionAsync(row.Id);
+            if (!ResultPresenter.Present(this, "حذف الاشتراك", res)) return;
+            await LoadAsync();
+        }, "تعذر حذف الاشتراك.");
     }
 
     private async Task RecordAbsenceFineAsync()
     {
         using var form = new AbsenceFineForm(_scopes);
         if (form.ShowDialog(FindForm()) != DialogResult.OK || form.Child is null) return;
-        try
+        await UiGuard.RunAsync(this, "Subscriptions.RecordAbsenceFine", async () =>
         {
             await using var scope = _scopes.CreateAsyncScope();
             var finance = scope.ServiceProvider.GetRequiredService<IFinanceService>();
             var result = await finance.CreateAbsenceFineAsync(form.Child.Id, DateOnly.FromDateTime(form.FineDate), form.Notes);
             if (ResultPresenter.Present(this, "تسجيل غرامة الغياب", result)) await LoadAsync();
-        }
-        catch { ShowError("تعذر تسجيل غرامة الغياب."); }
+        }, "تعذر تسجيل غرامة الغياب.");
     }
 
     private async Task RecordPaymentAsync()
     {
-        if (Selected() is not { } row) return; using var form = new PaymentEditorForm(row.RemainingAmount);
+        if (Selected() is not { } row) return;
+        using var form = new PaymentEditorForm(row.RemainingAmount);
         if (form.ShowDialog(FindForm()) != DialogResult.OK || form.Values is null) return;
-        try { await using var scope = _scopes.CreateAsyncScope(); var svc = scope.ServiceProvider.GetRequiredService<ISubscriptionService>(); var result = await svc.RecordPaymentAsync(row.Id, form.Values);
-            if (!ResultPresenter.Present(this, "تسجيل دفعة", result)) return; await LoadAsync(); await CreateAndOpenReceiptAsync(result.Value, false); }
-        catch { ShowError("تعذر تسجيل الدفعة."); }
+        await UiGuard.RunAsync(this, "Subscriptions.RecordPayment", async () =>
+        {
+            await using var scope = _scopes.CreateAsyncScope();
+            var svc = scope.ServiceProvider.GetRequiredService<ISubscriptionService>();
+            var result = await svc.RecordPaymentAsync(row.Id, form.Values);
+            if (!ResultPresenter.Present(this, "تسجيل دفعة", result)) return;
+            await LoadAsync();
+            await CreateAndOpenReceiptAsync(result.Value, false);
+        }, "تعذر تسجيل الدفعة.");
     }
 
     private async Task PrintAsync()
     {
         if (Selected() is not { } row) return;
-        try { await using var scope = _scopes.CreateAsyncScope(); var svc = scope.ServiceProvider.GetRequiredService<ISubscriptionService>(); var payments = await svc.GetPaymentsForSubscriptionAsync(row.Id);
-            if (payments.IsFailure) { ShowError(payments.Error.Description); return; } if (payments.Value.Count == 0) { ShowError("لا توجد إيصالات لهذا الاشتراك."); return; }
+        await UiGuard.RunAsync(this, "Subscriptions.Print", async () =>
+        {
+            await using var scope = _scopes.CreateAsyncScope();
+            var svc = scope.ServiceProvider.GetRequiredService<ISubscriptionService>();
+            var payments = await svc.GetPaymentsForSubscriptionAsync(row.Id);
+            if (payments.IsFailure) { ShowError(payments.Error.Description); return; }
+            if (payments.Value.Count == 0) { ShowError("لا توجد إيصالات لهذا الاشتراك."); return; }
             var chosen = payments.Value.Count == 1 ? payments.Value[0] : SelectReceipt(payments.Value);
             if (chosen is null) return;
-            await CreateAndOpenReceiptAsync(chosen, true); }
-        catch { ShowError("تعذر تجهيز الإيصال."); }
+            await CreateAndOpenReceiptAsync(chosen, true);
+        }, "تعذر تجهيز الإيصال.");
     }
 
     private async Task CreateAndOpenReceiptAsync(PaymentReceiptDto receipt, bool copy)
     {
-        try { await using var scope = _scopes.CreateAsyncScope(); var pdf = scope.ServiceProvider.GetRequiredService<IReceiptPdfService>(); var fileResult = await pdf.CreateReceiptFileAsync(receipt, copy);
+        await UiGuard.RunAsync(this, "Subscriptions.CreateAndOpenReceipt", async () =>
+        {
+            await using var scope = _scopes.CreateAsyncScope();
+            var pdf = scope.ServiceProvider.GetRequiredService<IReceiptPdfService>();
+            var fileResult = await pdf.CreateReceiptFileAsync(receipt, copy);
             if (!ResultPresenter.Present(this, "الإيصال", fileResult)) return;
             var path = fileResult.Value;
             Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
@@ -208,8 +246,8 @@ public sealed class SubscriptionsPage : UserControl
             {
                 using var dialog = new SaveFileDialog { Filter = "ملف PDF (*.pdf)|*.pdf", DefaultExt = "pdf", AddExtension = true, FileName = Path.GetFileName(path), OverwritePrompt = true };
                 if (dialog.ShowDialog(this) == DialogResult.OK) File.Copy(path, dialog.FileName, true);
-            } }
-        catch { ShowError("تم حفظ الدفعة، لكن تعذر فتح الإيصال. يمكنك إعادة طباعته لاحقًا."); }
+            }
+        }, "تم حفظ الدفعة، لكن تعذر فتح الإيصال. يمكنك إعادة طباعته لاحقًا.");
     }
 
     private SubscriptionDto? Selected() => _grid.SelectedRows.Count == 0 ? null : _rows.FirstOrDefault(x => x.Id == _grid.SelectedRows[0].Tag as Guid?);
@@ -273,24 +311,37 @@ internal sealed class SubscriptionEditorForm : Form
     }
     private async Task LoadOptionsAsync()
     {
-        try { await using var scope = _scopes.CreateAsyncScope(); var svc = scope.ServiceProvider.GetRequiredService<ISubscriptionService>();
-            var children = await svc.GetChildLookupAsync(null); var plans = await svc.GetPlansAsync(); if (children.IsFailure || plans.IsFailure) { ShowError("تعذر تحميل بيانات الاختيار."); return; }
-            _loadingChildren = true; foreach (var c in children.Value) _child.Items.Add(c); _loadingChildren = false;
-            _plan.Items.Add(new PlanOption(null, "بدون خطة")); foreach (var p in plans.Value) _plan.Items.Add(p);
+        await UiGuard.RunAsync(this, "SubscriptionEditor.LoadOptions", async () =>
+        {
+            await using var scope = _scopes.CreateAsyncScope();
+            var svc = scope.ServiceProvider.GetRequiredService<ISubscriptionService>();
+            var children = await svc.GetChildLookupAsync(null);
+            var plans = await svc.GetPlansAsync();
+            if (children.IsFailure || plans.IsFailure) { ShowError("تعذر تحميل بيانات الاختيار."); return; }
+            _loadingChildren = true;
+            foreach (var c in children.Value) _child.Items.Add(c);
+            _loadingChildren = false;
+            _plan.Items.Add(new PlanOption(null, "بدون خطة"));
+            foreach (var p in plans.Value) _plan.Items.Add(p);
             _plan.SelectedIndex = 0;
             if (_item is null) return;
-            _child.Items.Add(new ChildLookupDto(_item.ChildId, _item.ChildName)); _child.SelectedItem = _child.Items.Cast<object>().OfType<ChildLookupDto>().First(x => x.Id == _item.ChildId);
-            _start.Value = _item.PeriodStart.ToDateTime(TimeOnly.MinValue); _end.Value = _item.PeriodEnd.ToDateTime(TimeOnly.MinValue); _due.Value = _item.AmountDue; _notes.Text = _item.Notes ?? string.Empty;
-            for (var i=0;i<_plan.Items.Count;i++) if (_plan.Items[i] is SubscriptionPlanOptionDto p && p.Id == _item.SubscriptionPlanId) _plan.SelectedIndex=i;
+            _child.Items.Add(new ChildLookupDto(_item.ChildId, _item.ChildName));
+            _child.SelectedItem = _child.Items.Cast<object>().OfType<ChildLookupDto>().First(x => x.Id == _item.ChildId);
+            _start.Value = _item.PeriodStart.ToDateTime(TimeOnly.MinValue);
+            _end.Value = _item.PeriodEnd.ToDateTime(TimeOnly.MinValue);
+            _due.Value = _item.AmountDue;
+            _notes.Text = _item.Notes ?? string.Empty;
+            for (var i = 0; i < _plan.Items.Count; i++)
+                if (_plan.Items[i] is SubscriptionPlanOptionDto p && p.Id == _item.SubscriptionPlanId) _plan.SelectedIndex = i;
             _initial.Enabled = _method.Enabled = _reference.Enabled = false;
-        } catch { _loadingChildren = false; ShowError("تعذر تحميل خيارات الاشتراك."); }
+        }, "تعذر تحميل خيارات الاشتراك.");
     }
     private async Task SearchChildrenAsync(string search)
     {
         _childSearchCancellation?.Cancel();
         _childSearchCancellation?.Dispose();
         var cancellation = _childSearchCancellation = new CancellationTokenSource();
-        try
+        await UiGuard.RunAsync(this, "SubscriptionEditor.SearchChildren", async () =>
         {
             await Task.Delay(250, cancellation.Token);
             await using var scope = _scopes.CreateAsyncScope();
@@ -299,14 +350,17 @@ internal sealed class SubscriptionEditorForm : Form
             if (cancellation.IsCancellationRequested || result.IsFailure || IsDisposed) return;
             var text = _child.Text;
             _loadingChildren = true;
-            _child.BeginUpdate(); _child.Items.Clear();
+            _child.BeginUpdate();
+            _child.Items.Clear();
             foreach (var child in result.Value) _child.Items.Add(child);
-            _child.Text = text; _child.SelectionStart = text.Length; _child.SelectionLength = 0;
-            _child.EndUpdate(); _loadingChildren = false;
+            _child.Text = text;
+            _child.SelectionStart = text.Length;
+            _child.SelectionLength = 0;
+            _child.EndUpdate();
+            _loadingChildren = false;
             if (_child.Focused && result.Value.Count > 0) _child.DroppedDown = true;
-        }
-        catch (OperationCanceledException) { }
-        catch { _loadingChildren = false; }
+        });
+        _loadingChildren = false;
     }
     private async Task SaveAsync()
     {
@@ -315,24 +369,40 @@ internal sealed class SubscriptionEditorForm : Form
         if (_end.Value.Date < _start.Value.Date) { ShowError("تاريخ نهاية الاشتراك يجب أن يكون بعد بدايته."); return; }
         if (_item is null && _initial.Value > _due.Value) { ShowError("المدفوع الآن أكبر من المستحق."); return; }
         _saveButton.Enabled = false;
-        try { await using var scope = _scopes.CreateAsyncScope(); var svc = scope.ServiceProvider.GetRequiredService<ISubscriptionService>();
-            if (_item is null)
+        try
+        {
+            await UiGuard.RunAsync(this, "SubscriptionEditor.Save", async () =>
             {
-                var overlapConfirmed = false;
-                while (true)
+                await using var scope = _scopes.CreateAsyncScope();
+                var svc = scope.ServiceProvider.GetRequiredService<ISubscriptionService>();
+                if (_item is null)
                 {
-                    var result = await svc.CreateSubscriptionAsync(new CreateSubscriptionDto { ChildId = child.Id, SubscriptionPlanId = (_plan.SelectedItem as SubscriptionPlanOptionDto)?.Id,
-                        PeriodStart = DateOnly.FromDateTime(_start.Value), PeriodEnd = DateOnly.FromDateTime(_end.Value), AmountDue = _due.Value, Notes = _notes.Text,
-                        InitialPayment = _initial.Value > 0 ? new InitialPaymentDto(_initial.Value, MethodValue(), _reference.Text) : null, ConfirmOverlappingPeriod = overlapConfirmed });
-                    if (result.IsFailure && result.Error.Code == "Subscriptions.OverlappingPeriod" && !overlapConfirmed)
-                    { if (AppDialog.Confirm(this, "فترة متقاطعة", "توجد فترة اشتراك متقاطعة لهذا الطفل. هل تريد المتابعة؟")) { overlapConfirmed = true; continue; } return; }
-                    if (!ResultPresenter.Present(this, "الاشتراكات والمدفوعات", result)) return; CreatedReceipt = result.Value.InitialPaymentReceipt; DialogResult = DialogResult.OK; Close(); return;
+                    var overlapConfirmed = false;
+                    while (true)
+                    {
+                        var result = await svc.CreateSubscriptionAsync(new CreateSubscriptionDto { ChildId = child.Id, SubscriptionPlanId = (_plan.SelectedItem as SubscriptionPlanOptionDto)?.Id,
+                            PeriodStart = DateOnly.FromDateTime(_start.Value), PeriodEnd = DateOnly.FromDateTime(_end.Value), AmountDue = _due.Value, Notes = _notes.Text,
+                            InitialPayment = _initial.Value > 0 ? new InitialPaymentDto(_initial.Value, MethodValue(), _reference.Text) : null, ConfirmOverlappingPeriod = overlapConfirmed });
+                        if (result.IsFailure && result.Error.Code == "Subscriptions.OverlappingPeriod" && !overlapConfirmed)
+                        {
+                            if (AppDialog.Confirm(this, "فترة متقاطعة", "توجد فترة اشتراك متقاطعة لهذا الطفل. هل تريد المتابعة؟")) { overlapConfirmed = true; continue; }
+                            return;
+                        }
+                        if (!ResultPresenter.Present(this, "الاشتراكات والمدفوعات", result)) return;
+                        CreatedReceipt = result.Value.InitialPaymentReceipt;
+                        DialogResult = DialogResult.OK;
+                        Close();
+                        return;
+                    }
                 }
-            }
-            var reason = PromptReason(); if (string.IsNullOrWhiteSpace(reason)) { ShowError("سبب التعديل مطلوب."); return; }
-            var updated = await svc.UpdateSubscriptionAsync(_item.Id, new UpdateSubscriptionDto { SubscriptionPlanId = (_plan.SelectedItem as SubscriptionPlanOptionDto)?.Id, PeriodStart = DateOnly.FromDateTime(_start.Value), PeriodEnd = DateOnly.FromDateTime(_end.Value), AmountDue = _due.Value, Notes = _notes.Text, Reason = reason });
-            if (!ResultPresenter.Present(this, "الاشتراكات والمدفوعات", updated)) return; DialogResult = DialogResult.OK; Close();
-        } catch { ShowError("تعذر حفظ الاشتراك."); }
+                var reason = PromptReason();
+                if (string.IsNullOrWhiteSpace(reason)) { ShowError("سبب التعديل مطلوب."); return; }
+                var updated = await svc.UpdateSubscriptionAsync(_item.Id, new UpdateSubscriptionDto { SubscriptionPlanId = (_plan.SelectedItem as SubscriptionPlanOptionDto)?.Id, PeriodStart = DateOnly.FromDateTime(_start.Value), PeriodEnd = DateOnly.FromDateTime(_end.Value), AmountDue = _due.Value, Notes = _notes.Text, Reason = reason });
+                if (!ResultPresenter.Present(this, "الاشتراكات والمدفوعات", updated)) return;
+                DialogResult = DialogResult.OK;
+                Close();
+            }, "تعذر حفظ الاشتراك.");
+        }
         finally { if (!IsDisposed) _saveButton.Enabled = true; }
     }
     private PaymentMethod MethodValue() => _method.SelectedIndex switch { 0 => PaymentMethod.Cash, 1 => PaymentMethod.BankTransfer, _ => PaymentMethod.Other };
@@ -380,7 +450,13 @@ internal sealed class AbsenceFineForm : Form
         var save = new Button { Text = "تسجيل الغرامة", Width = 130 }; var cancel = new Button { Text = "إلغاء", Width = 90, DialogResult = DialogResult.Cancel };
         save.Click += (_, _) => { if (Child is null) { AppDialog.ShowInformation(this, Text, "اختر الطفل."); return; } DialogResult = DialogResult.OK; Close(); };
         var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft }; actions.Controls.AddRange([save, cancel]); table.Controls.Add(actions, 0, fields.Length); table.SetColumnSpan(actions, 2); Controls.Add(table); AcceptButton = save; CancelButton = cancel;
-        Load += async (_, _) => { try { await using var scope = _scopes.CreateAsyncScope(); var result = await scope.ServiceProvider.GetRequiredService<ISubscriptionService>().GetChildLookupAsync(null); if (result.IsSuccess) foreach (var child in result.Value) _child.Items.Add(child); } catch { AppDialog.ShowInformation(this, Text, "تعذر تحميل قائمة الأطفال."); } };
+        Load += (_, _) => _ = UiGuard.RunAsync(this, "AbsenceFine.LoadChildren", async () =>
+        {
+            await using var scope = _scopes.CreateAsyncScope();
+            var result = await scope.ServiceProvider.GetRequiredService<ISubscriptionService>().GetChildLookupAsync(null);
+            if (result.IsSuccess)
+                foreach (var child in result.Value) _child.Items.Add(child);
+        }, "تعذر تحميل قائمة الأطفال.");
     }
 }
 

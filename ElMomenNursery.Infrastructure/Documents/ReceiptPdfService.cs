@@ -67,7 +67,7 @@ public sealed class ReceiptPdfService(string dataDirectory) : IReceiptPdfService
                 column.Item().PaddingTop(20).Text("توقيع المستلم: ____________________");
             });
         })).GeneratePdf(path);
-        Log.ForContext<ReceiptPdfService>().Information("Receipt PDF generated; durationMs={DurationMs}; targetFolder={TargetFolder}", timer.ElapsedMilliseconds, folder);
+        Log.ForContext<ReceiptPdfService>().Information("Receipt PDF generated; operation={Operation}; durationMs={DurationMs}; targetFolder={TargetFolder}", "CreateReceiptFile", timer.ElapsedMilliseconds, folder);
         return Result.Success(path, "تم تجهيز ملف الإيصال.");
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
@@ -75,7 +75,7 @@ public sealed class ReceiptPdfService(string dataDirectory) : IReceiptPdfService
         {
             var kind = exception is IOException io && (io.HResult & 0xFFFF) is 32 or 33 ? "in-use"
                 : exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException ? "not-writable" : "unknown";
-            Log.ForContext<ReceiptPdfService>().Warning("Receipt PDF generation failed; failureKind={FailureKind}; durationMs={DurationMs}; targetFolder={TargetFolder}", kind, timer.ElapsedMilliseconds, folder);
+            Log.ForContext<ReceiptPdfService>().Warning("Receipt PDF generation failed; operation={Operation}; failureKind={FailureKind}; durationMs={DurationMs}; targetFolder={TargetFolder}", "CreateReceiptFile", kind, timer.ElapsedMilliseconds, folder);
             return Result.Failure<string>(exception is IOException && kind == "in-use" ? FileErrors.FileInUse
                 : kind == "not-writable" ? FileErrors.NotWritable
                 : new Error("Receipts.PdfFailed", "تعذر إنشاء ملف الإيصال."));

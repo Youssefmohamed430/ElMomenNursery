@@ -42,18 +42,19 @@ internal sealed class PayrollPage : UserControl
         AddField(editor, "عرض من تاريخ", _filterFrom); AddField(editor, "إلى تاريخ", _filterTo);
         AddField(editor, "الراتب الشهري", _salary); AddField(editor, "إضافات", _additions); AddField(editor, "خصومات أخرى", _deductions);
         AddField(editor, "مصاريف التأمين", _insurance); AddField(editor, "تاريخ الصرف", _paymentDate); AddField(editor, "ملاحظات", _notes);
-        _savePayroll.Click += async (_, _) => await SaveAndCalculateAsync();
-        var calculate = Button("حساب المحدد"); calculate.Click += async (_, _) => await WithSelectedAsync((service, id) => service.CalculateFinalSalary(id), "تم حساب الراتب.");
-        var pay = Button("صرف الراتب"); pay.Click += async (_, _) => await PaySelectedAsync();
+        _savePayroll.Click += (_, _) => _ = UiGuard.RunAsync(this, "Payroll.SaveAndCalculate", SaveAndCalculateAsync);
+        var calculate = Button("حساب المحدد"); calculate.Click += (_, _) => _ = UiGuard.RunAsync(this, "Payroll.CalculateSelected", () => WithSelectedAsync((service, id) => service.CalculateFinalSalary(id), "تم حساب الراتب."));
+        var pay = Button("صرف الراتب"); pay.Click += (_, _) => _ = UiGuard.RunAsync(this, "Payroll.PaySelected", PaySelectedAsync);
         var edit = Button("تعديل المحدد"); edit.Click += (_, _) => BeginEdit();
         var cancelEdit = Button("إلغاء التعديل"); cancelEdit.Click += (_, _) => EndEdit();
-        var refresh = Button("تحديث"); refresh.Click += async (_, _) => await LoadAsync();
-        var advances = Button("سلف الموظفين"); advances.Click += async (_, _) => { using var dialog = new EmployeeAdvancesForm(_scopes); dialog.ShowDialog(this); await LoadAsync(); };
-        var generate = Button("إنشاء سجلات لكل الموظفين"); generate.Click += async (_, _) => await GenerateForAllEmployeesAsync();
-        var clearDateFilter = Button("إلغاء فلتر التاريخ"); clearDateFilter.Click += async (_, _) => { _filterFrom.Checked = _filterTo.Checked = false; await LoadAsync(); };
-        _filterFrom.ValueChanged += async (_, _) => { if (_filterFrom.Checked) await LoadAsync(); };
-        _filterTo.ValueChanged += async (_, _) => { if (_filterTo.Checked) await LoadAsync(); };
-        _filterFrom.MouseUp += async (_, _) => await LoadAsync(); _filterTo.MouseUp += async (_, _) => await LoadAsync();
+        var refresh = Button("تحديث"); refresh.Click += (_, _) => _ = UiGuard.RunAsync(this, "Payroll.Load", LoadAsync);
+        var advances = Button("سلف الموظفين"); advances.Click += (_, _) => _ = UiGuard.RunAsync(this, "Payroll.OpenAdvances", async () => { using var dialog = new EmployeeAdvancesForm(_scopes); dialog.ShowDialog(this); await LoadAsync(); });
+        var generate = Button("إنشاء سجلات لكل الموظفين"); generate.Click += (_, _) => _ = UiGuard.RunAsync(this, "Payroll.GenerateForAll", GenerateForAllEmployeesAsync);
+        var clearDateFilter = Button("إلغاء فلتر التاريخ"); clearDateFilter.Click += (_, _) => { _filterFrom.Checked = _filterTo.Checked = false; _ = UiGuard.RunAsync(this, "Payroll.Load", LoadAsync); };
+        _filterFrom.ValueChanged += (_, _) => { if (_filterFrom.Checked) _ = UiGuard.RunAsync(this, "Payroll.Load", LoadAsync); };
+        _filterTo.ValueChanged += (_, _) => { if (_filterTo.Checked) _ = UiGuard.RunAsync(this, "Payroll.Load", LoadAsync); };
+        _filterFrom.MouseUp += (_, _) => _ = UiGuard.RunAsync(this, "Payroll.Load", LoadAsync);
+        _filterTo.MouseUp += (_, _) => _ = UiGuard.RunAsync(this, "Payroll.Load", LoadAsync);
         editor.Controls.AddRange([_savePayroll, generate, clearDateFilter, edit, cancelEdit, calculate, pay, advances, refresh]);
         _grid.Columns.Add("Employee", "الموظف"); _grid.Columns.Add("Period", "الفترة"); _grid.Columns.Add("Salary", "الراتب الشهري");
         _grid.Columns.Add("Daily", "أجر اليوم"); _grid.Columns.Add("Absences", "أيام الغياب"); _grid.Columns.Add("Insurance", "التأمين");
@@ -64,30 +65,33 @@ internal sealed class PayrollPage : UserControl
             if (_editingPayrollId is null && _employee.SelectedItem is EmployeeDto employee) _salary.Value = Math.Min(_salary.Maximum, employee.Salary);
         };
         root.Controls.Add(title, 0, 0); root.Controls.Add(editor, 0, 1); root.Controls.Add(_grid, 0, 2); Controls.Add(root);
-        Load += async (_, _) => await LoadAsync();
+        Load += (_, _) => _ = UiGuard.RunAsync(this, "Payroll.InitialLoad", LoadAsync);
     }
 
     private async Task LoadAsync()
     {
-        await using var scope = _scopes.CreateAsyncScope();
-        var employees = await scope.ServiceProvider.GetRequiredService<IEmployeeService>().GetEmployees();
-        if (employees.IsFailure) { AppDialog.ShowInformation(this, "الرواتب", employees.Error.Description); return; }
-        var selectedId = (_employee.SelectedItem as EmployeeDto)?.Id;
-        _employee.Items.Clear(); foreach (var employee in employees.Value) _employee.Items.Add(employee);
-        _employee.DisplayMember = nameof(EmployeeDto.FullName);
-        if (selectedId.HasValue) _employee.SelectedItem = employees.Value.FirstOrDefault(x => x.Id == selectedId.Value);
-        if (_employee.SelectedIndex < 0 && _employee.Items.Count > 0) _employee.SelectedIndex = 0;
-        var service = scope.ServiceProvider.GetRequiredService<IPayRollRecordService>();
-        var result = await service.GetAllPayrollRecordsAsync();
-        if (result.IsFailure) { AppDialog.ShowInformation(this, "الرواتب", result.Error.Description); return; }
-        _records = result.Value.Where(record =>
-            (!_filterFrom.Checked || record.PeriodEnd >= DateOnly.FromDateTime(_filterFrom.Value)) &&
-            (!_filterTo.Checked || record.PeriodStart <= DateOnly.FromDateTime(_filterTo.Value))).ToArray(); _grid.Rows.Clear();
-        foreach (var record in _records)
+        await UiGuard.RunAsync(this, "Payroll.Load", async () =>
         {
-            var index = _grid.Rows.Add(record.EmployeeName, $"{record.PeriodStart:dd/MM/yyyy} - {record.PeriodEnd:dd/MM/yyyy}", record.AgreedSalary.ToString("N2"), record.DailySalary.ToString("N2"), record.AbsenceDays, record.InsuranceFunds.ToString("N2"), record.AdvanceDeduction.ToString("N2"), record.AmountPaid.ToString("N2"), record.IsPaid ? "تم الصرف" : record.IsCalculated ? "جاهز للصرف" : "غير محسوب");
-            _grid.Rows[index].Tag = record.Id;
-        }
+            await using var scope = _scopes.CreateAsyncScope();
+            var employees = await scope.ServiceProvider.GetRequiredService<IEmployeeService>().GetEmployees();
+            if (employees.IsFailure) { AppDialog.ShowInformation(this, "الرواتب", employees.Error.Description); return; }
+            var selectedId = (_employee.SelectedItem as EmployeeDto)?.Id;
+            _employee.Items.Clear(); foreach (var employee in employees.Value) _employee.Items.Add(employee);
+            _employee.DisplayMember = nameof(EmployeeDto.FullName);
+            if (selectedId.HasValue) _employee.SelectedItem = employees.Value.FirstOrDefault(x => x.Id == selectedId.Value);
+            if (_employee.SelectedIndex < 0 && _employee.Items.Count > 0) _employee.SelectedIndex = 0;
+            var service = scope.ServiceProvider.GetRequiredService<IPayRollRecordService>();
+            var result = await service.GetAllPayrollRecordsAsync();
+            if (result.IsFailure) { AppDialog.ShowInformation(this, "الرواتب", result.Error.Description); return; }
+            _records = result.Value.Where(record =>
+                (!_filterFrom.Checked || record.PeriodEnd >= DateOnly.FromDateTime(_filterFrom.Value)) &&
+                (!_filterTo.Checked || record.PeriodStart <= DateOnly.FromDateTime(_filterTo.Value))).ToArray(); _grid.Rows.Clear();
+            foreach (var record in _records)
+            {
+                var index = _grid.Rows.Add(record.EmployeeName, $"{record.PeriodStart:dd/MM/yyyy} - {record.PeriodEnd:dd/MM/yyyy}", record.AgreedSalary.ToString("N2"), record.DailySalary.ToString("N2"), record.AbsenceDays, record.InsuranceFunds.ToString("N2"), record.AdvanceDeduction.ToString("N2"), record.AmountPaid.ToString("N2"), record.IsPaid ? "تم الصرف" : record.IsCalculated ? "جاهز للصرف" : "غير محسوب");
+                _grid.Rows[index].Tag = record.Id;
+            }
+        }, "تعذر تحميل بيانات الرواتب.");
     }
 
     private async Task GenerateForAllEmployeesAsync()
@@ -95,11 +99,14 @@ internal sealed class PayrollPage : UserControl
         if (_from.Value.Date > _to.Value.Date) { AppDialog.ShowInformation(this, "الرواتب", "بداية الفترة يجب أن تسبق نهايتها."); return; }
         var start = DateOnly.FromDateTime(_from.Value); var end = DateOnly.FromDateTime(_to.Value);
         if (!AppDialog.Confirm(this, "إنشاء سجلات الرواتب", $"سيتم إنشاء سجل راتب لكل موظف ليس لديه سجل متداخل للفترة {start:dd/MM/yyyy} إلى {end:dd/MM/yyyy}. هل تريد المتابعة؟")) return;
-        await using var scope = _scopes.CreateAsyncScope();
-        var result = await scope.ServiceProvider.GetRequiredService<IPayRollRecordService>().CreatePayrollRecordsForAllEmployeesAsync(start, end);
-        if (result.IsFailure) { AppDialog.ShowInformation(this, "الرواتب", result.Error.Description); return; }
-        await LoadAsync();
-        AppDialog.ShowInformation(this, "الرواتب", $"تم إنشاء {result.Value.CreatedCount} سجل، وتخطي {result.Value.SkippedCount} موظف لوجود سجل متداخل للفترة.");
+        await UiGuard.RunAsync(this, "Payroll.GenerateForAll", async () =>
+        {
+            await using var scope = _scopes.CreateAsyncScope();
+            var result = await scope.ServiceProvider.GetRequiredService<IPayRollRecordService>().CreatePayrollRecordsForAllEmployeesAsync(start, end);
+            if (result.IsFailure) { AppDialog.ShowInformation(this, "الرواتب", result.Error.Description); return; }
+            await LoadAsync();
+            AppDialog.ShowInformation(this, "الرواتب", $"تم إنشاء {result.Value.CreatedCount} سجل، وتخطي {result.Value.SkippedCount} موظف لوجود سجل متداخل للفترة.");
+        }, "تعذر إنشاء سجلات الرواتب لجميع الموظفين.");
     }
 
     private void BeginEdit()
@@ -132,40 +139,46 @@ internal sealed class PayrollPage : UserControl
     {
         if (_employee.SelectedItem is not EmployeeDto employee) { AppDialog.ShowInformation(this, "الرواتب", "اختر الموظف أولًا."); return; }
         if (_from.Value.Date > _to.Value.Date) { AppDialog.ShowInformation(this, "الرواتب", "بداية الفترة يجب أن تسبق نهايتها."); return; }
-        await using var scope = _scopes.CreateAsyncScope();
-        var service = scope.ServiceProvider.GetRequiredService<IPayRollRecordService>();
-        var periodStart = DateOnly.FromDateTime(_from.Value); var periodEnd = DateOnly.FromDateTime(_to.Value);
-        var result = _editingPayrollId is Guid editingId
-            ? await service.UpdatePayRollRecordAsync(editingId, new UpdatePayrollRecordDto
-            {
-                PeriodStart = periodStart, PeriodEnd = periodEnd, AgreedSalary = _salary.Value,
-                Additions = _additions.Value, Deductions = _deductions.Value, InsuranceFunds = _insurance.Value,
-                PaymentDate = DateOnly.FromDateTime(_paymentDate.Value), Notes = string.IsNullOrWhiteSpace(_notes.Text) ? null : _notes.Text.Trim()
-            })
-            : await service.CreatePayRollRecord(new CreatePayrollRecordDto
-            {
-                EmployeeId = employee.Id, PeriodStart = periodStart, PeriodEnd = periodEnd, AgreedSalary = _salary.Value,
-                Additions = _additions.Value, Deductions = _deductions.Value, InsuranceFunds = _insurance.Value,
-                PaymentDate = DateOnly.FromDateTime(_paymentDate.Value), Notes = string.IsNullOrWhiteSpace(_notes.Text) ? null : _notes.Text.Trim()
-            });
-        if (result.IsFailure) { AppDialog.ShowInformation(this, "الرواتب", result.Error.Description); return; }
-        var calculated = await service.CalculateFinalSalary(result.Value.Id);
-        if (calculated.IsFailure) { AppDialog.ShowInformation(this, "الرواتب", calculated.Error.Description); return; }
-        EndEdit();
-        await LoadAsync();
-        var row = _grid.Rows.Cast<DataGridViewRow>().FirstOrDefault(x => x.Tag is Guid id && id == result.Value.Id);
-        if (row is not null) row.Selected = true;
-        AppDialog.ShowInformation(this, "الرواتب", $"صافي الراتب: {calculated.Value.AmountPaid:N2} جنيه.");
+        await UiGuard.RunAsync(this, "Payroll.SaveAndCalculate", async () =>
+        {
+            await using var scope = _scopes.CreateAsyncScope();
+            var service = scope.ServiceProvider.GetRequiredService<IPayRollRecordService>();
+            var periodStart = DateOnly.FromDateTime(_from.Value); var periodEnd = DateOnly.FromDateTime(_to.Value);
+            var result = _editingPayrollId is Guid editingId
+                ? await service.UpdatePayRollRecordAsync(editingId, new UpdatePayrollRecordDto
+                {
+                    PeriodStart = periodStart, PeriodEnd = periodEnd, AgreedSalary = _salary.Value,
+                    Additions = _additions.Value, Deductions = _deductions.Value, InsuranceFunds = _insurance.Value,
+                    PaymentDate = DateOnly.FromDateTime(_paymentDate.Value), Notes = string.IsNullOrWhiteSpace(_notes.Text) ? null : _notes.Text.Trim()
+                })
+                : await service.CreatePayRollRecord(new CreatePayrollRecordDto
+                {
+                    EmployeeId = employee.Id, PeriodStart = periodStart, PeriodEnd = periodEnd, AgreedSalary = _salary.Value,
+                    Additions = _additions.Value, Deductions = _deductions.Value, InsuranceFunds = _insurance.Value,
+                    PaymentDate = DateOnly.FromDateTime(_paymentDate.Value), Notes = string.IsNullOrWhiteSpace(_notes.Text) ? null : _notes.Text.Trim()
+                });
+            if (result.IsFailure) { AppDialog.ShowInformation(this, "الرواتب", result.Error.Description); return; }
+            var calculated = await service.CalculateFinalSalary(result.Value.Id);
+            if (calculated.IsFailure) { AppDialog.ShowInformation(this, "الرواتب", calculated.Error.Description); return; }
+            EndEdit();
+            await LoadAsync();
+            var row = _grid.Rows.Cast<DataGridViewRow>().FirstOrDefault(x => x.Tag is Guid id && id == result.Value.Id);
+            if (row is not null) row.Selected = true;
+            AppDialog.ShowInformation(this, "الرواتب", $"صافي الراتب: {calculated.Value.AmountPaid:N2} جنيه.");
+        }, "تعذر حفظ وحساب الراتب.");
     }
 
     private async Task WithSelectedAsync(Func<IPayRollRecordService, Guid, Task<Result<PayrollRecordDto>>> action, string success)
     {
         if (_grid.SelectedRows.Count == 0 || _grid.SelectedRows[0].Tag is not Guid payrollId)
         { AppDialog.ShowInformation(this, "الرواتب", "اختر سجل راتب."); return; }
-        await using var scope = _scopes.CreateAsyncScope();
-        var result = await action(scope.ServiceProvider.GetRequiredService<IPayRollRecordService>(), payrollId);
-        if (result.IsFailure) { AppDialog.ShowInformation(this, "الرواتب", result.Error.Description); return; }
-        await LoadAsync(); AppDialog.ShowInformation(this, "الرواتب", success);
+        await UiGuard.RunAsync(this, "Payroll.WithSelected", async () =>
+        {
+            await using var scope = _scopes.CreateAsyncScope();
+            var result = await action(scope.ServiceProvider.GetRequiredService<IPayRollRecordService>(), payrollId);
+            if (result.IsFailure) { AppDialog.ShowInformation(this, "الرواتب", result.Error.Description); return; }
+            await LoadAsync(); AppDialog.ShowInformation(this, "الرواتب", success);
+        }, "تعذر تنفيذ العملية على سجل الراتب.");
     }
 
     private async Task PaySelectedAsync()
@@ -180,7 +193,10 @@ internal sealed class PayrollPage : UserControl
             ? $"تنبيه: على الموظف سلفة متبقية، وسيُخصم منها {record.AdvanceDeduction:N2} جنيه.\nصافي المبلغ الذي سيُصرف: {record.AmountPaid:N2} جنيه.\nهل تريد تسجيل الصرف؟"
             : $"صافي المبلغ الذي سيُصرف: {record.AmountPaid:N2} جنيه. هل تريد تسجيل الصرف؟";
         if (!AppDialog.Confirm(this, "تأكيد صرف الراتب", warning)) return;
-        await WithSelectedAsync((service, payrollId) => service.MarkRecordAsPaid(payrollId), "تم صرف الراتب وتسجيل المصروف.");
+        await UiGuard.RunAsync(this, "Payroll.PaySelected", async () =>
+        {
+            await WithSelectedAsync((service, payrollId) => service.MarkRecordAsPaid(payrollId), "تم صرف الراتب وتسجيل المصروف.");
+        }, "تعذر صرف الراتب.");
     }
 
     private void SetEmployeeForSelected()

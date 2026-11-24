@@ -37,7 +37,7 @@ public sealed class LocalAuthService(NurseryDbContext db, ISessionManager sessio
             .FirstOrDefaultAsync(x => x.UsernameNormalized == normalized, cancellationToken);
         if (user is null)
         {
-            logger.LogWarning("Login rejected for unknown user");
+            logger.LogWarning("Login rejected for unknown user; operation={Operation}", "Login");
             db.AuthenticationAuditLogs.Add(Audit(null, string.Empty, "LoginFailed", false, "InvalidCredentials"));
             await SaveChangesWithLoggingAsync("UnknownUserLogin", null, cancellationToken);
             return CommonErrors.InvalidCredentials;
@@ -61,7 +61,7 @@ public sealed class LocalAuthService(NurseryDbContext db, ISessionManager sessio
         {
             user.FailedLoginAttempts = 0;
             user.LockoutEnd = null;
-            logger.LogInformation("Expired login lockout reset; userId={UserId}", user.Id);
+            logger.LogInformation("Expired login lockout reset; operation={Operation}; userId={UserId}; lockoutExpiredAt={LockoutExpiredAt}", "Login", user.Id, user.LockoutEnd);
         }
 
         var passwordValidation = await ValidatePassword(password, user, cancellationToken);

@@ -50,7 +50,7 @@ public sealed class InvoicePdfService(string dataDirectory) : IInvoicePdfService
                         if (!string.IsNullOrWhiteSpace(invoice.Reference)) column.Item().Text($"المرجع: {invoice.Reference}");
                     });
                 })).GeneratePdf(path);
-                Log.ForContext<InvoicePdfService>().Information("Invoice PDF generated; durationMs={DurationMs}; targetFolder={TargetFolder}", timer.ElapsedMilliseconds, folder);
+                Log.ForContext<InvoicePdfService>().Information("Invoice PDF generated; operation={Operation}; durationMs={DurationMs}; targetFolder={TargetFolder}", "CreateInvoiceFile", timer.ElapsedMilliseconds, folder);
                 return Result.Success<string>(path);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
@@ -58,7 +58,7 @@ public sealed class InvoicePdfService(string dataDirectory) : IInvoicePdfService
             {
                 var kind = (ex is IOException io && (io.HResult & 0xFFFF) is 32 or 33) ? "in-use"
                     : ex is UnauthorizedAccessException or IOException or ArgumentException or NotSupportedException ? "not-writable" : "unknown";
-                Log.ForContext<InvoicePdfService>().Warning("Invoice PDF generation failed; failureKind={FailureKind}; durationMs={DurationMs}; targetFolder={TargetFolder}", kind, timer.ElapsedMilliseconds, folder);
+                Log.ForContext<InvoicePdfService>().Warning("Invoice PDF generation failed; operation={Operation}; failureKind={FailureKind}; durationMs={DurationMs}; targetFolder={TargetFolder}", "CreateInvoiceFile", kind, timer.ElapsedMilliseconds, folder);
                 return Result.Failure<string>(new Error("Invoices.PdfFailed", "تم حفظ الفاتورة، لكن تعذر إنشاء ملف PDF."));
             }
         }, cancellationToken);
