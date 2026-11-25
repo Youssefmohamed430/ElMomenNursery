@@ -7,6 +7,7 @@ public interface IChildAttendanceService
 {
     Task<Result<IReadOnlyList<ChildDailyAttendanceDto>>> GetDailyAttendanceAsync(ChildDailyAttendanceQuery query, CancellationToken cancellationToken = default);
     Task<Result<IReadOnlyList<AttendanceChildOptionDto>>> GetChildrenForHistorySelectionAsync(CancellationToken cancellationToken = default);
+    Task<Result<IReadOnlyList<AttendanceChildOptionDto>>> GetChildrenForAttendanceSheetAsync(Guid classroomId, DateOnly start, DateOnly end, CancellationToken cancellationToken = default);
     Task<Result<IReadOnlyList<ClassroomFilterOptionDto>>> GetClassroomsForFilterAsync(CancellationToken cancellationToken = default);
     Task<Result<IReadOnlyList<ChildAttendanceDto>>> GetChildAttendanceByRangeAsync(Guid childId, DateOnly start, DateOnly end, CancellationToken cancellationToken = default);
     Task<Result<ChildAttendanceDto>> MarkManualAttendanceAsync(CreateChildAttendanceDto dto, CancellationToken cancellationToken = default);

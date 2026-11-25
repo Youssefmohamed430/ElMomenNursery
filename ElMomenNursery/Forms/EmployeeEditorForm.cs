@@ -24,6 +24,7 @@ public sealed class EmployeeEditorForm : ResponsiveForm
     private readonly TextBox _address = CreateTextBox(250, multiline: true);
     private readonly ComboBox _jobDesignation = new() { DropDownStyle = ComboBoxStyle.DropDown, MaxLength = 100, RightToLeft = RightToLeft.Yes };
     private readonly DateTimePicker _hireDate = CreateDatePicker();
+    private readonly ComboBox _shiftStartTime = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220, RightToLeft = RightToLeft.Yes };
     private readonly TextBox _salary = CreateTextBox(30);
     private readonly CheckBox _hasExperience = new() { Text = "لديه خبرة", AutoSize = true, RightToLeft = RightToLeft.Yes };
     private readonly Button _saveButton = CreateButton("حفظ", primary: true);
@@ -40,6 +41,7 @@ public sealed class EmployeeEditorForm : ResponsiveForm
         RightToLeftLayout = true;
         Font = new Font("Segoe UI", 10F);
         BackColor = Color.WhiteSmoke;
+        _shiftStartTime.Items.AddRange(["07:30 صباحًا", "12:00 ظهرًا"]); _shiftStartTime.SelectedIndex = 0;
 
         var content = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(14), BackColor = BackColor };
         var sections = new FlowLayoutPanel
@@ -65,8 +67,9 @@ public sealed class EmployeeEditorForm : ResponsiveForm
         }));
         sections.Controls.Add(CreateSection("بيانات العمل", table =>
         {
-            AddPair(table, "المسمى الوظيفي *", _jobDesignation, "تاريخ التعيين *", _hireDate);
-            AddPair(table, "الراتب *", _salary, "الخبرة", _hasExperience);
+            AddPair(table, "المسمى الوظيفي *", _jobDesignation, "موعد بداية الدوام *", _shiftStartTime);
+            AddPair(table, "تاريخ التعيين *", _hireDate, "الراتب *", _salary);
+            AddPair(table, "الخبرة", _hasExperience, "", new Label());
         }));
         content.Controls.Add(sections);
 
@@ -108,6 +111,7 @@ public sealed class EmployeeEditorForm : ResponsiveForm
         _address.Text = employee.Address;
         _jobDesignation.Text = employee.JobDesignation;
         _hireDate.Value = employee.HireDate.ToDateTime(TimeOnly.MinValue);
+        _shiftStartTime.SelectedIndex = employee.ShiftStartTime == "12:00" ? 1 : 0;
         _salary.Text = employee.Salary.ToString("0.00", CultureInfo.CurrentCulture);
         _hasExperience.Checked = employee.HasExperience;
     }
@@ -164,6 +168,7 @@ public sealed class EmployeeEditorForm : ResponsiveForm
                     AlternatePhone = OptionalText(_alternatePhone.Text),
                     JobDesignation = _jobDesignation.Text.Trim(),
                     HireDate = DateOnly.FromDateTime(_hireDate.Value),
+                    ShiftStartTime = _shiftStartTime.SelectedIndex == 1 ? "12:00" : "07:30",
                     Salary = salary
                 });
                 if (!ResultPresenter.Present(this, "الموظفون", result)) return;
@@ -183,6 +188,7 @@ public sealed class EmployeeEditorForm : ResponsiveForm
                     AlternatePhone = OptionalText(_alternatePhone.Text),
                     JobDesignation = _jobDesignation.Text.Trim(),
                     HireDate = DateOnly.FromDateTime(_hireDate.Value),
+                    ShiftStartTime = _shiftStartTime.SelectedIndex == 1 ? "12:00" : "07:30",
                     Salary = salary
                 });
                 if (!ResultPresenter.Present(this, "الموظفون", result)) return;

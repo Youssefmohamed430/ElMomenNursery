@@ -556,6 +556,13 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ShiftStartTime")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(5)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("07:30");
+
                     b.Property<long?>("UpdatedAt")
                         .HasColumnType("INTEGER");
 
@@ -856,12 +863,17 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ParentCategoryId")
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Name")
                         .IsUnique()
                         .HasDatabaseName("UX_InventoryCategories_Name")
                         .HasFilter("\"IsDeleted\" = 0");
+
+                    b.HasIndex("ParentCategoryId");
 
                     b.ToTable("InventoryCategories", (string)null);
                 });
@@ -1288,6 +1300,12 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsPaid")
                         .HasColumnType("INTEGER");
 
+                    b.Property<decimal>("LateDeduction")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("LateMinutes")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Notes")
                         .HasColumnType("TEXT");
 
@@ -1300,6 +1318,9 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("PeriodStart")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("ProratedSalary")
                         .HasColumnType("TEXT");
 
                     b.Property<long?>("UpdatedAt")
@@ -1812,6 +1833,16 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.Navigation("UploadedByUser");
                 });
 
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.InventoryCategory", b =>
+                {
+                    b.HasOne("ElMomenNursery.Domain.Entities.InventoryCategory", "ParentCategory")
+                        .WithMany("Children")
+                        .HasForeignKey("ParentCategoryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ParentCategory");
+                });
+
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.InventoryItem", b =>
                 {
                     b.HasOne("ElMomenNursery.Domain.Entities.InventoryCategory", "Category")
@@ -2069,6 +2100,8 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.InventoryCategory", b =>
                 {
+                    b.Navigation("Children");
+
                     b.Navigation("Items");
                 });
 

@@ -53,10 +53,10 @@ internal sealed class EmployeesPage : UserControl
         };
         var grid = CreateGrid([
             "اسم الموظف", "المسمى الوظيفي", "الهاتف", "الهاتف البديل", "المؤهل", "سنة التخرج",
-            "الخبرة", "الرقم القومي", "العنوان", "الحالة الاجتماعية", "تاريخ التعيين", "الراتب"
+            "الخبرة", "الرقم القومي", "العنوان", "الحالة الاجتماعية", "تاريخ التعيين", "موعد الدوام", "الراتب"
         ]);
         grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
-        var columnWidths = new[] { 190, 160, 130, 130, 160, 105, 90, 165, 230, 140, 130, 120 };
+        var columnWidths = new[] { 190, 160, 130, 130, 160, 105, 90, 165, 230, 140, 130, 130, 120 };
         for (var index = 0; index < grid.Columns.Count; index++)
             grid.Columns[index].Width = columnWidths[index];
 
@@ -222,6 +222,7 @@ internal sealed class EmployeesPage : UserControl
                     employee.Address,
                     GetMaritalStatusName(employee.MaritalStatus),
                     employee.HireDate.ToString("dd/MM/yyyy"),
+                    employee.ShiftStartTime == "12:00" ? "12:00 ظهرًا" : "07:30 صباحًا",
                     employee.Salary.ToString("N2"));
                 grid.Rows[index].Tag = employee.Id;
             }

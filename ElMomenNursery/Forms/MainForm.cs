@@ -290,7 +290,7 @@ public sealed class MainForm : ResponsiveForm
                 "الرئيسية" => BuildHomePage(),
                 "الأطفال" => new ChildrenPage(_scopeFactory, _session, _excelExportService),
                 "الموظفون" => new EmployeesPage(_scopeFactory, _session, _excelExportService),
-                "الرواتب" => new PayrollPage(_scopeFactory),
+                "الرواتب" => new PayrollPage(_scopeFactory, _excelExportService),
                 "الحضور" => new AttendancePage(_scopeFactory, _session, _excelExportService),
                 "الاشتراكات والمدفوعات" => new SubscriptionsPage(_scopeFactory, _session, _excelExportService),
                 "المخزن" => new InventoryPage(_scopeFactory, _session, _excelExportService),

@@ -1,6 +1,7 @@
 using ElMomenNursery.Application.DTOs;
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Domain.Abstractions;
+using System.Globalization;
 using ElMomenNursery.Controls;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -9,6 +10,7 @@ namespace ElMomenNursery.Forms;
 internal sealed class PayrollPage : UserControl
 {
     private readonly IServiceScopeFactory _scopes;
+    private readonly IExcelExportService _excel;
     private readonly ComboBox _employee = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
     private readonly DateTimePicker _from = new() { Format = DateTimePickerFormat.Short };
     private readonly DateTimePicker _to = new() { Format = DateTimePickerFormat.Short };
@@ -21,13 +23,14 @@ internal sealed class PayrollPage : UserControl
     private readonly NumericUpDown _deductions = MoneyInput();
     private readonly TextBox _notes = new() { Width = 220, MaxLength = 1000 };
     private readonly Button _savePayroll = Button("إنشاء وحساب الراتب");
+    private readonly Label _filteredTotal = new() { AutoSize = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), Margin = new Padding(8, 25, 8, 4) };
     private readonly DataGridView _grid = new() { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false };
     private IReadOnlyList<PayrollRecordDto> _records = [];
     private Guid? _editingPayrollId;
 
-    public PayrollPage(IServiceScopeFactory scopes)
+    public PayrollPage(IServiceScopeFactory scopes, IExcelExportService excel)
     {
-        _scopes = scopes;
+        _scopes = scopes; _excel = excel;
         var today = DateTime.Today;
         _from.Value = new DateTime(today.Year, today.Month, 1);
         _to.Value = new DateTime(today.Year, today.Month, DateTime.DaysInMonth(today.Year, today.Month));
@@ -51,14 +54,15 @@ internal sealed class PayrollPage : UserControl
         var advances = Button("سلف الموظفين"); advances.Click += (_, _) => _ = UiGuard.RunAsync(this, "Payroll.OpenAdvances", async () => { using var dialog = new EmployeeAdvancesForm(_scopes); dialog.ShowDialog(this); await LoadAsync(); });
         var generate = Button("إنشاء سجلات لكل الموظفين"); generate.Click += (_, _) => _ = UiGuard.RunAsync(this, "Payroll.GenerateForAll", GenerateForAllEmployeesAsync);
         var clearDateFilter = Button("إلغاء فلتر التاريخ"); clearDateFilter.Click += (_, _) => { _filterFrom.Checked = _filterTo.Checked = false; _ = UiGuard.RunAsync(this, "Payroll.Load", LoadAsync); };
+        var export = Button("تصدير Excel"); export.Click += async (_, _) => await ExportAsync();
         _filterFrom.ValueChanged += (_, _) => { if (_filterFrom.Checked) _ = UiGuard.RunAsync(this, "Payroll.Load", LoadAsync); };
         _filterTo.ValueChanged += (_, _) => { if (_filterTo.Checked) _ = UiGuard.RunAsync(this, "Payroll.Load", LoadAsync); };
         _filterFrom.MouseUp += (_, _) => _ = UiGuard.RunAsync(this, "Payroll.Load", LoadAsync);
         _filterTo.MouseUp += (_, _) => _ = UiGuard.RunAsync(this, "Payroll.Load", LoadAsync);
-        editor.Controls.AddRange([_savePayroll, generate, clearDateFilter, edit, cancelEdit, calculate, pay, advances, refresh]);
+        editor.Controls.AddRange([_savePayroll, generate, clearDateFilter, export, _filteredTotal, edit, cancelEdit, calculate, pay, advances, refresh]);
         _grid.Columns.Add("Employee", "الموظف"); _grid.Columns.Add("Period", "الفترة"); _grid.Columns.Add("Salary", "الراتب الشهري");
-        _grid.Columns.Add("Daily", "أجر اليوم"); _grid.Columns.Add("Absences", "أيام الغياب"); _grid.Columns.Add("Insurance", "التأمين");
-        _grid.Columns.Add("Advance", "خصم السلف"); _grid.Columns.Add("Net", "صافي الراتب"); _grid.Columns.Add("Paid", "الحالة");
+        _grid.Columns.Add("Daily", "أجر اليوم"); _grid.Columns.Add("Absences", "أيام الغياب"); _grid.Columns.Add("LateMinutes", "دقائق التأخير"); _grid.Columns.Add("LateDeduction", "خصم التأخير"); _grid.Columns.Add("Prorated", "الراتب حسب مدة العمل"); _grid.Columns.Add("Insurance", "التأمين");
+        _grid.Columns.Add("Deductions", "خصومات أخرى"); _grid.Columns.Add("Additions", "إضافات"); _grid.Columns.Add("Advance", "خصم السلف"); _grid.Columns.Add("Net", "صافي الراتب"); _grid.Columns.Add("Paid", "الحالة");
         _grid.SelectionChanged += (_, _) => SetEmployeeForSelected();
         _employee.SelectedIndexChanged += (_, _) =>
         {
@@ -88,10 +92,25 @@ internal sealed class PayrollPage : UserControl
                 (!_filterTo.Checked || record.PeriodStart <= DateOnly.FromDateTime(_filterTo.Value))).ToArray(); _grid.Rows.Clear();
             foreach (var record in _records)
             {
-                var index = _grid.Rows.Add(record.EmployeeName, $"{record.PeriodStart:dd/MM/yyyy} - {record.PeriodEnd:dd/MM/yyyy}", record.AgreedSalary.ToString("N2"), record.DailySalary.ToString("N2"), record.AbsenceDays, record.InsuranceFunds.ToString("N2"), record.AdvanceDeduction.ToString("N2"), record.AmountPaid.ToString("N2"), record.IsPaid ? "تم الصرف" : record.IsCalculated ? "جاهز للصرف" : "غير محسوب");
+                var index = _grid.Rows.Add(record.EmployeeName, $"{record.PeriodStart:dd/MM/yyyy} - {record.PeriodEnd:dd/MM/yyyy}", record.AgreedSalary.ToString("N2"), record.DailySalary.ToString("N2"), record.AbsenceDays, record.LateMinutes, record.LateDeduction.ToString("N2"), record.ProratedSalary.ToString("N2"), record.InsuranceFunds.ToString("N2"), record.Deductions.ToString("N2"), record.Additions.ToString("N2"), record.AdvanceDeduction.ToString("N2"), record.AmountPaid.ToString("N2"), record.IsPaid ? "تم الصرف" : record.IsCalculated ? "جاهز للصرف" : "غير محسوب");
                 _grid.Rows[index].Tag = record.Id;
             }
+            _filteredTotal.Text = $"إجمالي صافي الرواتب المعروضة: {_records.Sum(x => x.AmountPaid):N2} ج.م";
         }, "تعذر تحميل بيانات الرواتب.");
+    }
+
+    private async Task ExportAsync()
+    {
+        var start = _filterFrom.Checked ? DateOnly.FromDateTime(_filterFrom.Value) : (DateOnly?)null;
+        var end = _filterTo.Checked ? DateOnly.FromDateTime(_filterTo.Value) : (DateOnly?)null;
+        var description = start is null && end is null ? "كل الفترات" : $"من {start?.ToString("dd/MM/yyyy") ?? "البداية"} إلى {end?.ToString("dd/MM/yyyy") ?? "النهاية"}";
+        var headers = new[] { "الموظف", "الفترة", "الراتب الشهري", "الغياب بالأيام", "دقائق التأخير", "خصم التأخير", "الراتب حسب مدة العمل", "خصومات أخرى", "إضافات", "التأمين", "خصم السلف", "صافي الراتب", "الحالة" };
+        var rows = _records.Select(x => (IReadOnlyList<string?>)[x.EmployeeName, $"{x.PeriodStart:dd/MM/yyyy} - {x.PeriodEnd:dd/MM/yyyy}", x.AgreedSalary.ToString("N2", CultureInfo.CurrentCulture), x.AbsenceDays.ToString(CultureInfo.CurrentCulture), x.LateMinutes.ToString(CultureInfo.CurrentCulture), x.LateDeduction.ToString("N2", CultureInfo.CurrentCulture), x.ProratedSalary.ToString("N2", CultureInfo.CurrentCulture), x.Deductions.ToString("N2", CultureInfo.CurrentCulture), x.Additions.ToString("N2", CultureInfo.CurrentCulture), x.InsuranceFunds.ToString("N2", CultureInfo.CurrentCulture), x.AdvanceDeduction.ToString("N2", CultureInfo.CurrentCulture), x.AmountPaid.ToString("N2", CultureInfo.CurrentCulture), x.IsPaid ? "تم الصرف" : x.IsCalculated ? "جاهز للصرف" : "غير محسوب"]).ToList();
+        rows.Add(["الإجمالي", "", "", "", "", _records.Sum(x => x.LateDeduction).ToString("N2", CultureInfo.CurrentCulture), _records.Sum(x => x.ProratedSalary).ToString("N2", CultureInfo.CurrentCulture), _records.Sum(x => x.Deductions).ToString("N2", CultureInfo.CurrentCulture), _records.Sum(x => x.Additions).ToString("N2", CultureInfo.CurrentCulture), _records.Sum(x => x.InsuranceFunds).ToString("N2", CultureInfo.CurrentCulture), _records.Sum(x => x.AdvanceDeduction).ToString("N2", CultureInfo.CurrentCulture), _records.Sum(x => x.AmountPaid).ToString("N2", CultureInfo.CurrentCulture), ""]);
+        using var dialog = new SaveFileDialog { Title = "تصدير رواتب Excel", Filter = "ملف Excel (*.xlsx)|*.xlsx", DefaultExt = "xlsx", AddExtension = true, FileName = $"رواتب_{DateTime.Now:yyyyMMdd_HHmm}.xlsx", OverwritePrompt = true };
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+        var result = await _excel.ExportAsync(new ExcelExportData("الرواتب", headers, rows, "تقرير الرواتب", description), dialog.FileName);
+        ResultPresenter.Present(this, "تصدير الرواتب", result);
     }
 
     private async Task GenerateForAllEmployeesAsync()

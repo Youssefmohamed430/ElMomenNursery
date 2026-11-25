@@ -58,9 +58,12 @@ internal sealed class ChildAttendancePage : UserControl
         _manual.Visible = session.HasPermission("Attendance.Record"); _correct.Visible = session.HasPermission("Attendance.Edit");
         _history.Visible = session.HasPermission("Attendance.View");
         var export = FilterTheme.CreateSecondaryButton("تصدير Excel");
+        var exportSheet = FilterTheme.CreateSecondaryButton("كشف حضور فصل");
         export.AutoSize = true;
         export.Height = FilterTheme.ToolbarHeight;
         export.Visible = session.HasPermission("Attendance.Export");
+        exportSheet.AutoSize = true; exportSheet.Height = FilterTheme.ToolbarHeight; exportSheet.Visible = session.HasPermission("Attendance.Export");
+        exportSheet.Click += (_, _) => { using var form = new ChildAttendanceSheetForm(_scopes, _excelExportService); form.ShowDialog(FindForm()); };
         export.Click += async (_, _) => await GridExcelExport.SaveAsync((IWin32Window?)FindForm() ?? this, _grid,
             _excelExportService, "تصدير حضور الأطفال", "حضور الأطفال");
         export.Name = "attendance.export";
@@ -72,7 +75,7 @@ internal sealed class ChildAttendancePage : UserControl
         filters.AddField("attendance.search", "بحث", _search, columnSpan: 3);
 
         var toolbar = new ActionToolbar { Name = "attendance.actions" };
-        toolbar.Add(_refresh, _history, _manual, _present, _absent, _checkout, _correct, _markAll, export);
+        toolbar.Add(_refresh, _history, _manual, _present, _absent, _checkout, _correct, _markAll, exportSheet, export);
 
         _grid.Dock = DockStyle.None;
         _summary.Dock = DockStyle.None;

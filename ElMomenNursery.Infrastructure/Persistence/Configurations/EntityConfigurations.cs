@@ -51,6 +51,7 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         b.Property(x => x.MaritalStatus).HasConversion<string>().HasMaxLength(32).IsRequired();
         b.Property(x => x.Phone).IsRequired();
         b.Property(x => x.JobDesignation).IsRequired();
+        b.Property(x => x.ShiftStartTime).HasMaxLength(5).HasDefaultValue("07:30").IsRequired();
         b.Property(x => x.Salary).HasPrecision(18, 2);
         b.HasIndex(x => x.NationalIdNumber).IsUnique().HasFilter("\"IsDeleted\" = 0").HasDatabaseName("UX_Employees_NationalIdNumber");
         b.HasIndex(x => x.FullName).HasDatabaseName("IX_Employees_FullName");
@@ -209,6 +210,7 @@ internal sealed class InventoryCategoryConfiguration : IEntityTypeConfiguration<
         b.HasKey(x => x.Id);
         b.Property(x => x.Name).IsRequired();
         b.HasIndex(x => x.Name).IsUnique().HasFilter("\"IsDeleted\" = 0").HasDatabaseName("UX_InventoryCategories_Name");
+        b.HasOne(x => x.ParentCategory).WithMany(x => x.Children).HasForeignKey(x => x.ParentCategoryId).OnDelete(DeleteBehavior.Restrict);
         b.HasMany(x => x.Items).WithOne(x => x.Category).HasForeignKey(x => x.CategoryId).IsRequired().OnDelete(DeleteBehavior.Restrict);
     }
 }

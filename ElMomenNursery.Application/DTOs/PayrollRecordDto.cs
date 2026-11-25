@@ -21,4 +21,7 @@ public class PayrollRecordDto
     public string? Notes { get; set; }
     public decimal InsuranceFunds { get; set; }
     public decimal AdvanceDeduction { get; set; }
+    public int LateMinutes { get; set; }
+    public decimal LateDeduction { get; set; }
+    public decimal ProratedSalary { get; set; }
 }

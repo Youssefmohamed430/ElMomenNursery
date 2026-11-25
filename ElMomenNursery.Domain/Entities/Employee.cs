@@ -18,6 +18,7 @@ public sealed class Employee : ISoftDeletable
     public string? AlternatePhone { get; set; }
     public required string JobDesignation { get; set; }
     public DateOnly HireDate { get; set; }
+    public string ShiftStartTime { get; set; } = "07:30";
     public decimal Salary { get; set; }
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? UpdatedAt { get; set; }

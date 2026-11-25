@@ -1,31 +1,36 @@
+using System.Globalization;
+
 namespace ElMomenNursery.Application.Services;
 
 public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRollRecordService> logger,
     IPermissionService permissions, IFinanceService financeService, ISessionManager? sessions = null) : IPayRollRecordService
 {
     private const int DefaultPaidDaysPerMonth = 22;
+    private static readonly TimeOnly DefaultEmployeeStartTime = new(7, 30);
 
     public async Task<Result<PayrollRecordDto>> CalculateFinalSalary(Guid payrollRecordId)
     {
         if (!permissions.HasPermission("Payroll.Manage")) return PayrollRecordErrors.PermissionDenied;
-        var record = await unitOfWork.Repository<PayrollRecord>().FirstOrDefaultAsync(x => x.Id == payrollRecordId,
-            asNoTracking: false, includeProperties: [nameof(PayrollRecord.Employee)]);
+        var record = await unitOfWork.Repository<PayrollRecord>().Query(asNoTracking: false).IgnoreQueryFilters()
+            .Include(x => x.Employee).SingleOrDefaultAsync(x => x.Id == payrollRecordId && !x.IsDeleted);
         if (record is null) return PayrollRecordErrors.NotFound;
         if (record.IsPaid) return PayrollRecordErrors.AlreadyPaid;
 
         try
         {
             var paidDaysPerMonth = await GetPaidDaysPerMonthAsync();
+            var activeStart = record.Employee.HireDate > record.PeriodStart ? record.Employee.HireDate : record.PeriodStart;
+            var activeEnd = EmploymentEnd(record.Employee) is DateOnly ended && ended < record.PeriodEnd ? ended : record.PeriodEnd;
             var attendanceRows = await unitOfWork.Repository<EmployeeAttendance>().ListAsync(x =>
-                x.EmployeeId == record.EmployeeId && x.AttendanceDate >= record.PeriodStart &&
-                x.AttendanceDate <= record.PeriodEnd);
+                x.EmployeeId == record.EmployeeId && x.AttendanceDate >= activeStart && x.AttendanceDate <= activeEnd);
             if (attendanceRows.Count == 0)
                 logger.LogWarning("Payroll calculated without attendance records; payrollRecordId={PayrollRecordId}; employeeId={EmployeeId}; periodStart={PeriodStart}; periodEnd={PeriodEnd}",
                     record.Id, record.EmployeeId, record.PeriodStart, record.PeriodEnd);
-            var absenceDays = attendanceRows.Where(x => x.Status == AttendanceStatus.Absent).Select(x => x.AttendanceDate).Distinct().Count();
+            var summary = CalculateAttendanceAndProration(record.Employee, record.PeriodStart, record.PeriodEnd, attendanceRows, paidDaysPerMonth);
+            var absenceDays = summary.AbsenceDays;
+            record.LateMinutes = summary.LateMinutes; record.LateDeduction = summary.LateDeduction; record.ProratedSalary = summary.ProratedSalary;
             var dailySalary = record.AgreedSalary / paidDaysPerMonth;
-            var payableDays = Math.Max(0, paidDaysPerMonth - absenceDays);
-            var salaryBeforeAdvances = Math.Max(0m, decimal.Round(dailySalary * payableDays + record.Additions - record.Deductions - record.InsuranceFunds, 2, MidpointRounding.AwayFromZero));
+            var salaryBeforeAdvances = Math.Max(0m, decimal.Round(summary.ProratedSalary - summary.AbsenceDays * dailySalary - summary.LateDeduction + record.Additions - record.Deductions - record.InsuranceFunds, 2, MidpointRounding.AwayFromZero));
             var advances = await unitOfWork.Repository<EmployeeAdvance>().ListAsync(x => x.EmployeeId == record.EmployeeId &&
                 x.AdvanceDate <= record.PeriodEnd && x.RemainingAmount > 0);
             var outstandingAdvances = advances.Sum(x => x.RemainingAmount);
@@ -38,7 +43,7 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
                 EntityType = nameof(PayrollRecord),
                 EntityId = record.Id.ToString("D"),
                 UserAccountId = sessions?.CurrentUser?.UserId,
-                ChangeSummary = $"period={record.PeriodStart:yyyy-MM-dd}..{record.PeriodEnd:yyyy-MM-dd};absenceDays={absenceDays};advanceDeduction={record.AdvanceDeduction};amountPaid={record.AmountPaid}"
+                ChangeSummary = $"period={record.PeriodStart:yyyy-MM-dd}..{record.PeriodEnd:yyyy-MM-dd};absenceDays={absenceDays};lateMinutes={record.LateMinutes};lateDeduction={record.LateDeduction};proratedSalary={record.ProratedSalary};advanceDeduction={record.AdvanceDeduction};amountPaid={record.AmountPaid}"
             });
             await unitOfWork.SaveChangesAsync();
             logger.LogInformation("Payroll record calculated; operation={Operation}; recordId={RecordId}; periodStart={PeriodStart}; periodEnd={PeriodEnd}; absenceDays={AbsenceDays}; advanceDeduction={AdvanceDeduction}; amountPaid={AmountPaid}",
@@ -46,6 +51,7 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
             var dto = ToDto(record, record.Employee.FullName, paidDaysPerMonth);
             dto.DailySalary = decimal.Round(dailySalary, 2, MidpointRounding.AwayFromZero);
             dto.AbsenceDays = absenceDays;
+            dto.LateMinutes = record.LateMinutes; dto.LateDeduction = record.LateDeduction; dto.ProratedSalary = record.ProratedSalary;
             return Result.Success(dto, PayrollRecordErrors.CalculatedFinalSalary.Description);
         }
         catch (Exception ex)
@@ -140,6 +146,7 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
         record.Additions = dto.Additions; record.Deductions = dto.Deductions; record.InsuranceFunds = dto.InsuranceFunds;
         record.AmountPaid = 0; record.PaymentDate = dto.PaymentDate; record.Notes = Clean(dto.Notes);
         record.AdvanceDeduction = 0;
+        record.LateMinutes = 0; record.LateDeduction = 0; record.ProratedSalary = 0;
         record.IsCalculated = false;
         await unitOfWork.Repository<AuditLog>().AddAsync(new AuditLog
         {
@@ -261,26 +268,21 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
     private async Task<Result<IReadOnlyList<PayrollRecordDto>>> GetRecordsAsync(System.Linq.Expressions.Expression<Func<PayrollRecord, bool>> predicate, bool includeDeleted = false)
     {
         if (!permissions.HasPermission("Payroll.Manage")) return PayrollRecordErrors.PermissionDenied;
-        var query = unitOfWork.Repository<PayrollRecord>().Query();
-        if (includeDeleted) query = query.IgnoreQueryFilters();
+        var query = unitOfWork.Repository<PayrollRecord>().Query().IgnoreQueryFilters();
         var items = await query.Where(predicate).Include(x => x.Employee).ToListAsync();
         var employeeIds = items.Select(x => x.EmployeeId).Distinct().ToArray();
         var earliestPeriodStart = items.Count == 0 ? default : items.Min(record => record.PeriodStart);
         var latestPeriodEnd = items.Count == 0 ? default : items.Max(record => record.PeriodEnd);
         var attendanceRows = employeeIds.Length == 0 ? [] : await unitOfWork.Repository<EmployeeAttendance>().Query()
-            .Where(x => employeeIds.Contains(x.EmployeeId)
-                && x.AttendanceDate >= earliestPeriodStart
-                && x.AttendanceDate <= latestPeriodEnd
-                && x.Status == AttendanceStatus.Absent)
-            .Select(x => new { x.EmployeeId, x.AttendanceDate }).ToListAsync();
+            .Where(x => employeeIds.Contains(x.EmployeeId) && x.AttendanceDate >= earliestPeriodStart && x.AttendanceDate <= latestPeriodEnd).ToListAsync();
         var paidDaysPerMonth = await GetPaidDaysPerMonthAsync();
         var result = new List<PayrollRecordDto>(items.Count);
         foreach (var item in items)
         {
             var dto = ToDto(item, item.Employee.FullName, paidDaysPerMonth);
-            dto.AbsenceDays = attendanceRows.Where(x => x.EmployeeId == item.EmployeeId
-                && x.AttendanceDate >= item.PeriodStart && x.AttendanceDate <= item.PeriodEnd)
-                .Select(x => x.AttendanceDate).Distinct().Count();
+            var attendance = attendanceRows.Where(x => x.EmployeeId == item.EmployeeId && x.AttendanceDate >= item.PeriodStart && x.AttendanceDate <= item.PeriodEnd).ToList();
+            var summary = CalculateAttendanceAndProration(item.Employee, item.PeriodStart, item.PeriodEnd, attendance, paidDaysPerMonth);
+            dto.AbsenceDays = summary.AbsenceDays; dto.LateMinutes = summary.LateMinutes; dto.LateDeduction = summary.LateDeduction; dto.ProratedSalary = item.ProratedSalary;
             result.Add(dto);
         }
         return Result.Success<IReadOnlyList<PayrollRecordDto>>(result);
@@ -291,7 +293,44 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
       DailySalary = decimal.Round(x.AgreedSalary / paidDaysPerMonth, 2, MidpointRounding.AwayFromZero),
       AgreedSalary = x.AgreedSalary, Additions = x.Additions, Deductions = x.Deductions, AmountPaid = x.AmountPaid,
       PaymentDate = x.PaymentDate, IsPaid = x.IsPaid, IsCalculated = x.IsCalculated, Notes = x.Notes,
-      InsuranceFunds = x.InsuranceFunds, AdvanceDeduction = x.AdvanceDeduction };
+      InsuranceFunds = x.InsuranceFunds, AdvanceDeduction = x.AdvanceDeduction, LateMinutes = x.LateMinutes,
+      LateDeduction = x.LateDeduction, ProratedSalary = x.ProratedSalary };
+    private sealed record AttendancePayrollSummary(int AbsenceDays, int LateMinutes, decimal LateDeduction, decimal ProratedSalary);
+
+    private static AttendancePayrollSummary CalculateAttendanceAndProration(Employee employee, DateOnly periodStart, DateOnly periodEnd,
+        IReadOnlyCollection<EmployeeAttendance> attendance, int paidDaysPerMonth)
+    {
+        var start = employee.HireDate > periodStart ? employee.HireDate : periodStart;
+        var employmentEnd = EmploymentEnd(employee);
+        var end = employmentEnd is DateOnly lastDay && lastDay < periodEnd ? lastDay : periodEnd;
+        if (end < start) return new AttendancePayrollSummary(0, 0, 0m, 0m);
+        var periodDays = periodEnd.DayNumber - periodStart.DayNumber + 1;
+        var employedDays = end.DayNumber - start.DayNumber + 1;
+        var prorated = periodDays <= 0 ? 0m : decimal.Round(employee.Salary * employedDays / periodDays, 2, MidpointRounding.AwayFromZero);
+        var byDate = attendance.GroupBy(x => x.AttendanceDate).ToDictionary(x => x.Key, x => x.OrderByDescending(row => row.UpdatedAt ?? row.CreatedAt).First());
+        var scheduledStart = TimeOnly.TryParse(employee.ShiftStartTime, CultureInfo.InvariantCulture, out var parsedStart) ? parsedStart : DefaultEmployeeStartTime;
+        var absences = 0;
+        var lateMinutes = 0;
+        var through = end < DateOnly.FromDateTime(DateTime.Today) ? end : DateOnly.FromDateTime(DateTime.Today);
+        for (var date = start; date <= through; date = date.AddDays(1))
+        {
+            if (date.DayOfWeek == DayOfWeek.Friday) continue;
+            if (!byDate.TryGetValue(date, out var row) || row.Status == AttendanceStatus.Absent) { absences++; continue; }
+            if (row.Status is AttendanceStatus.Present or AttendanceStatus.Late && row.CheckInTime is DateTimeOffset checkIn)
+            {
+                var actual = checkIn.ToLocalTime().TimeOfDay;
+                var minutes = (actual - scheduledStart.ToTimeSpan()).TotalMinutes;
+                if (minutes > 0) lateMinutes += (int)Math.Ceiling(minutes);
+            }
+        }
+        var hourly = employee.Salary / (paidDaysPerMonth * 4.5m);
+        var deduction = decimal.Round(lateMinutes * hourly / 60m, 2, MidpointRounding.AwayFromZero);
+        return new AttendancePayrollSummary(absences, lateMinutes, deduction, prorated);
+    }
+
+    private static DateOnly? EmploymentEnd(Employee employee) => employee.IsDeleted && employee.DeletedAt is DateTimeOffset deleted
+        ? DateOnly.FromDateTime(deleted.ToLocalTime().DateTime) : null;
+
     private async Task<int> GetPaidDaysPerMonthAsync(CancellationToken cancellationToken = default)
     {
         var setting = await unitOfWork.Repository<AppSetting>().FirstOrDefaultAsync(

@@ -73,6 +73,20 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
         return Result.Success(result);
     }
 
+    public async Task<Result<IReadOnlyList<AttendanceChildOptionDto>>> GetChildrenForAttendanceSheetAsync(Guid classroomId, DateOnly start, DateOnly end, CancellationToken cancellationToken = default)
+    {
+        var permissionError = PermissionGuard.Check(permissions, "Attendance.View", AttendanceErrors.PermissionDenied);
+        if (permissionError is not null) return permissionError;
+        if (classroomId == Guid.Empty || start == default || end < start) return AttendanceErrors.InvalidDate;
+        if (!await unitOfWork.Repository<Classroom>().AnyAsync(x => x.Id == classroomId, cancellationToken)) return ClassroomErrors.NotFound;
+        var childIds = await unitOfWork.Repository<ChildClassEnrollment>().Query()
+            .Where(x => x.ClassroomId == classroomId && x.StartDate <= end && (x.EndDate == null || x.EndDate >= start))
+            .Select(x => x.ChildId).Distinct().ToListAsync(cancellationToken);
+        var children = childIds.Count == 0 ? [] : await unitOfWork.Repository<Child>().ListAsync(x => childIds.Contains(x.Id), cancellationToken: cancellationToken);
+        return Result.Success<IReadOnlyList<AttendanceChildOptionDto>>(children.OrderBy(x => x.FullName)
+            .Select(x => new AttendanceChildOptionDto(x.Id, x.FullName)).ToArray());
+    }
+
     public async Task<Result<IReadOnlyList<ClassroomFilterOptionDto>>> GetClassroomsForFilterAsync(CancellationToken cancellationToken = default)
     {
         var permissionError = PermissionGuard.Check(permissions, "Attendance.View", AttendanceErrors.PermissionDenied);

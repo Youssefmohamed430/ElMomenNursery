@@ -16,5 +16,6 @@ public class EmployeeDto
     public string? AlternatePhone { get; set; }
     public required string JobDesignation { get; set; }
     public required DateOnly HireDate { get; set; }
+    public string ShiftStartTime { get; set; } = "07:30";
     public required decimal Salary { get; set; }
 }

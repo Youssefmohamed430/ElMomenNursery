@@ -23,6 +23,30 @@ public sealed class InvoiceService(IUnitOfWork uow, ILogger<InvoiceService> logg
         return Result.Success<IReadOnlyList<InventoryItemDto>>(rows.Select(x => new InventoryItemDto { Id=x.Id, Name=x.Name, CategoryId=x.CategoryId, CategoryName=x.Category.Name, UnitPrice=x.UnitPrice, Quantity=x.Quantity, IsActive=x.IsActive, CategoryIsActive=x.Category.IsActive }).ToArray());
     }
 
+    public async Task<Result<IReadOnlyList<InventoryCategoryLookupDto>>> GetInvoiceCategoriesAsync(CancellationToken ct = default)
+    {
+        if (!Allowed("Payments.View")) return InventoryErrors.PermissionDenied;
+        var rows = await uow.Repository<InventoryCategory>().Query().Where(x => x.IsActive).OrderBy(x => x.Name).ToListAsync(ct);
+        return Result.Success<IReadOnlyList<InventoryCategoryLookupDto>>(rows.Select(x => new InventoryCategoryLookupDto(x.Id, x.Name, x.IsActive, x.ParentCategoryId)).ToArray());
+    }
+
+    public async Task<Result<IReadOnlyList<InventoryItemDto>>> BrowseAvailableItemsAsync(Guid? categoryId, string? searchText, CancellationToken ct = default)
+    {
+        if (!Allowed("Payments.View")) return InventoryErrors.PermissionDenied;
+        var query = uow.Repository<InventoryItem>().Query().Include(x => x.Category).Where(x => x.IsActive && x.Category.IsActive);
+        if (categoryId is Guid selectedCategory) query = query.Where(x => x.CategoryId == selectedCategory);
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            var term = searchText.Trim();
+            if (Guid.TryParse(term, out var itemId)) query = query.Where(x => x.Name.Contains(term) || x.Id == itemId);
+            else query = query.Where(x => x.Name.Contains(term));
+        }
+        var rows = await query.OrderBy(x => x.Name).ToListAsync(ct);
+        return Result.Success<IReadOnlyList<InventoryItemDto>>(rows.Select(x => new InventoryItemDto
+        { Id = x.Id, Name = x.Name, CategoryId = x.CategoryId, CategoryName = x.Category.Name, UnitPrice = x.UnitPrice,
+          Quantity = x.Quantity, IsActive = x.IsActive, CategoryIsActive = x.Category.IsActive }).ToArray());
+    }
+
     public async Task<Result<InvoiceReceiptDto>> CreateInvoiceAsync(CreateInvoiceDto dto, CancellationToken ct = default)
     {
         if (!Allowed("Payments.Create")) return CommonErrors.PermissionDenied;

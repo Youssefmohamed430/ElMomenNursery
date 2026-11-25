@@ -230,7 +230,7 @@ public sealed class InventoryPage : UserControl
                 if (IsDisposed || grid.IsDisposed || version != _categoryLoadVersion) return;
                 if (result.IsFailure) { ResultPresenter.Present(this, "الفئات", result); return; }
                 rows = result.Value.ToList(); grid.Rows.Clear();
-                foreach (var row in rows) { var idx = grid.Rows.Add(row.Name, row.Description ?? string.Empty, row.ItemsCount, row.IsActive ? "نشط" : "موقوف"); grid.Rows[idx].Tag = row.Id; }
+                foreach (var row in rows) { var idx = grid.Rows.Add(row.DisplayName, row.Description ?? string.Empty, row.ItemsCount, row.IsActive ? "نشط" : "موقوف"); grid.Rows[idx].Tag = row.Id; }
                 count.Text = $"عدد الفئات: {rows.Count}";
             }
             catch (Exception ex) { await UiGuard.RunAsync(this, "Inventory.LoadCategories", () => Task.FromException(ex), "تعذر تحميل الفئات. أعد المحاولة."); }
