@@ -5,6 +5,10 @@
 Installer/stage/
 Installer/*-publish/
 Installer/payload.zip
+# Keep local logs, installer project, and generated release package out of Git
+/Logs/
+/Installer/
+/حزمة تثبيت نظام إدارة حضانة المؤمن/
 # Local release packages and installer binaries
 /*.zip
 /*.exe
