@@ -30,6 +30,16 @@ internal static class GridExcelExport
             return;
         }
 
+        var chosenIndexes = ExportColumnPicker.Pick(owner, visibleColumns.Select(column => column.HeaderText).ToArray());
+        if (chosenIndexes is null) return;
+        visibleColumns = chosenIndexes.Select(index => visibleColumns[index]).ToArray();
+        rows = grid.Rows.Cast<DataGridViewRow>()
+            .Where(row => row.Visible && !row.IsNewRow)
+            .Select(row => (IReadOnlyList<string?>)visibleColumns
+                .Select(column => Convert.ToString(row.Cells[column.Index].FormattedValue, CultureInfo.CurrentCulture))
+                .ToArray())
+            .ToArray();
+
         using var dialog = new SaveFileDialog
         {
             Title = reportTitle,

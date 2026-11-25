@@ -43,6 +43,7 @@ internal sealed class ChildAttendancePage : UserControl
     private readonly Button _refresh = MakeButton("تحديث");
     private readonly Button _history = MakeButton("سجل طفل لفترة");
     private List<ChildDailyAttendanceDto> _rows = [];
+    private readonly HashSet<Guid> _checkedChildren = [];
     private int _loadVersion;
 
     public ChildAttendancePage(IServiceScopeFactory scopes, UserSession session, IExcelExportService excelExportService)
@@ -109,6 +110,8 @@ internal sealed class ChildAttendancePage : UserControl
             form.ShowDialog(FindForm());
         };
         _grid.SelectionChanged += (_, _) => UpdateActions(); _grid.CellDoubleClick += async (_, _) => await OpenEditorAsync(correction: Selected()?.IsMarked == true);
+        _grid.CellValueChanged += (_, e) => { if (e.RowIndex >= 0 && _grid.Rows[e.RowIndex].Tag is ChildDailyAttendanceDto r) { if (Convert.ToBoolean(_grid.Rows[e.RowIndex].Cells[0].Value)) _checkedChildren.Add(r.ChildId); else _checkedChildren.Remove(r.ChildId); UpdateActions(); } };
+        _grid.CurrentCellDirtyStateChanged += (_, _) => { if (_grid.IsCurrentCellDirty) _grid.CommitEdit(DataGridViewDataErrorContexts.Commit); };
         _grid.KeyDown += async (_, e) => { if (e.KeyCode == Keys.F5) { e.Handled = true; await LoadAsync(); } };
         Load += async (_, _) => { await LoadClassroomsAsync(); await LoadAsync(); };
     }
@@ -155,7 +158,7 @@ internal sealed class ChildAttendancePage : UserControl
         _grid.Rows.Clear();
         foreach (var row in visible)
         {
-            var index = _grid.Rows.Add(row.ChildName, row.ClassroomNames, row.Status is null ? "لم يسجل" : AttendanceLabels.Status(row.Status.Value),
+            var index = _grid.Rows.Add(_checkedChildren.Contains(row.ChildId), row.ChildName, row.ClassroomNames, row.Status is null ? "لم يسجل" : AttendanceLabels.Status(row.Status.Value),
                 Time(row.CheckIn), Time(row.CheckOut), row.EntryMethod is null ? "—" : AttendanceLabels.Method(row.EntryMethod.Value), row.Notes ?? "");
             _grid.Rows[index].Tag = row;
         }
@@ -166,21 +169,27 @@ internal sealed class ChildAttendancePage : UserControl
 
     private async Task RecordAsync(AttendanceStatus status)
     {
-        var row = Selected(); if (row is null || row.IsMarked) return;
-        if (status is AttendanceStatus.Present or AttendanceStatus.Late && row.Date < DateOnly.FromDateTime(DateTime.Today))
+        var targets = _checkedChildren.Count > 0 ? _rows.Where(x => _checkedChildren.Contains(x.ChildId) && !x.IsMarked).ToArray()
+            : Selected() is { IsMarked: false } selected ? [selected] : [];
+        if (targets.Length == 0) return;
+        var date = targets[0].Date;
+        DateTimeOffset? checkIn = status == AttendanceStatus.Present ? DateTimeOffset.Now : null;
+        if (date < DateOnly.FromDateTime(DateTime.Today) && status == AttendanceStatus.Present)
         {
-            await OpenEditorAsync(correction: false);
-            return;
+            using var picker = new Form { Text = "وقت الحضور", Width = 300, Height = 140, StartPosition = FormStartPosition.CenterParent, RightToLeft = RightToLeft.Yes, RightToLeftLayout = true };
+            var time = new DateTimePicker { Format = DateTimePickerFormat.Time, ShowUpDown = true, Value = DateTime.Today.AddHours(8), Dock = DockStyle.Top };
+            var ok = new Button { Text = "موافق", DialogResult = DialogResult.OK, Dock = DockStyle.Bottom };
+            picker.Controls.Add(time); picker.Controls.Add(ok); picker.AcceptButton = ok;
+            if (picker.ShowDialog(FindForm()) != DialogResult.OK) return;
+            checkIn = new DateTimeOffset(date.ToDateTime(TimeOnly.FromDateTime(time.Value)), DateTimeOffset.Now.Offset);
         }
-        var now = DateTimeOffset.Now;
         await UiGuard.RunAsync(this, "Attendance.RecordChild", async () =>
         {
             await using var scope = _scopes.CreateAsyncScope();
             var service = scope.ServiceProvider.GetRequiredService<IChildAttendanceService>();
-            var result = await service.MarkManualAttendanceAsync(new CreateChildAttendanceDto(row.ChildId, row.Date, status,
-                status is AttendanceStatus.Present or AttendanceStatus.Late ? now : null));
+            var result = await service.MarkBulkAsync(date, targets.Select(x => x.ChildId).ToArray(), status, checkIn);
             if (result.IsFailure) { ShowError(result.Error.Description); return; }
-            if (!string.IsNullOrWhiteSpace(result.Value.Alert)) ShowError(result.Value.Alert);
+            ShowError(result.Message ?? $"تم تسجيل {result.Value} طفلًا.");
             await LoadAsync();
         }, "تعذر تسجيل الحضور.");
     }
@@ -258,7 +267,7 @@ internal sealed class ChildAttendancePage : UserControl
         button.MinimumSize = new Size(0, FilterTheme.ToolbarHeight);
         return button;
     }
-    private static DataGridView MakeGrid() => new() { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, RightToLeft = RightToLeft.Yes, BackgroundColor = Color.White, RowHeadersVisible = false, Columns = { new DataGridViewTextBoxColumn { HeaderText = "الطفل" }, new DataGridViewTextBoxColumn { HeaderText = "الفصل" }, new DataGridViewTextBoxColumn { HeaderText = "الحالة" }, new DataGridViewTextBoxColumn { HeaderText = "وقت الحضور" }, new DataGridViewTextBoxColumn { HeaderText = "وقت الانصراف" }, new DataGridViewTextBoxColumn { HeaderText = "طريقة التسجيل" }, new DataGridViewTextBoxColumn { HeaderText = "ملاحظات" } } };
+    private static DataGridView MakeGrid() => new() { Dock = DockStyle.Fill, ReadOnly = false, AllowUserToAddRows = false, AllowUserToDeleteRows = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = true, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, RightToLeft = RightToLeft.Yes, BackgroundColor = Color.White, RowHeadersVisible = false, Columns = { new DataGridViewCheckBoxColumn { HeaderText = "تحديد", Width = 55, ReadOnly = false }, new DataGridViewTextBoxColumn { HeaderText = "الطفل", ReadOnly = true }, new DataGridViewTextBoxColumn { HeaderText = "الفصل", ReadOnly = true }, new DataGridViewTextBoxColumn { HeaderText = "الحالة", ReadOnly = true }, new DataGridViewTextBoxColumn { HeaderText = "وقت الحضور", ReadOnly = true }, new DataGridViewTextBoxColumn { HeaderText = "وقت الانصراف", ReadOnly = true }, new DataGridViewTextBoxColumn { HeaderText = "طريقة التسجيل", ReadOnly = true }, new DataGridViewTextBoxColumn { HeaderText = "ملاحظات", ReadOnly = true } } };
 }
 
 internal sealed class EmployeeAttendancePage : UserControl

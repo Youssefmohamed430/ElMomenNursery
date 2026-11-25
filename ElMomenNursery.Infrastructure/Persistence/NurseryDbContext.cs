@@ -41,6 +41,7 @@ public sealed class NurseryDbContext(DbContextOptions<NurseryDbContext> options)
     public DbSet<AttendanceDevice> AttendanceDevices => Set<AttendanceDevice>();
     public DbSet<DeviceAttendanceEvent> DeviceAttendanceEvents => Set<DeviceAttendanceEvent>();
     public DbSet<ManualIncome> ManualIncomes => Set<ManualIncome>();
+    public DbSet<LookupItem> LookupItems => Set<LookupItem>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {

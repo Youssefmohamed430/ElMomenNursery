@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using ElMomenNursery.Domain.Enums;
 
 namespace ElMomenNursery.Application.DTOs;
 
@@ -15,4 +16,5 @@ public class CreateSubscriptionDto
     public string? Notes { get; set; }
     public InitialPaymentDto? InitialPayment { get; set; }
     public bool ConfirmOverlappingPeriod { get; set; }
+    public SubscriptionStatus? StatusOverride { get; set; }
 }

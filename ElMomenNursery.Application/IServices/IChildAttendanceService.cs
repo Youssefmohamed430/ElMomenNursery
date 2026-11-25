@@ -13,4 +13,5 @@ public interface IChildAttendanceService
     Task<Result<ChildAttendanceDto>> UpdateChildAttendanceAsync(Guid id, UpdateChildAttendanceDto dto, CancellationToken cancellationToken = default);
     Task<Result<ChildAttendanceDto>> RecordCheckOutAsync(Guid childId, DateOnly date, DateTimeOffset checkOut, CancellationToken cancellationToken = default);
     Task<Result<int>> MarkAllPresentAsync(DateOnly date, Guid? classroomId, CancellationToken cancellationToken = default);
+    Task<Result<int>> MarkBulkAsync(DateOnly date, IReadOnlyCollection<Guid> childIds, AttendanceStatus status, DateTimeOffset? checkIn, CancellationToken cancellationToken = default);
 }

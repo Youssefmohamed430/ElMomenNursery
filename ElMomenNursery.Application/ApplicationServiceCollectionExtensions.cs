@@ -19,6 +19,8 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<IInvoiceService, InvoiceService>();
         services.AddScoped<IFinanceService, FinanceService>();
         services.AddScoped<IPayRollRecordService, PayRollRecordService>();
+        services.AddScoped<ILookupService, LookupService>();
+        services.AddScoped<ISubscriptionPlanService, SubscriptionPlanService>();
         return services;
     }
 }

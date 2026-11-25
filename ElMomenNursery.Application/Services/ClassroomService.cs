@@ -157,6 +157,45 @@ public sealed class ClassroomService(IUnitOfWork unitOfWork, IPermissionService 
         return Result.Success<Guid?>(enrollment?.ClassroomId);
     }
 
+    public async Task<Result<IReadOnlyList<Guid>>> GetChildClassroomsAsync(Guid childId, CancellationToken cancellationToken = default)
+    {
+        if (!Allowed()) return ClassroomErrors.PermissionDenied;
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var ids = await unitOfWork.Repository<ChildClassEnrollment>().Query()
+            .Where(x => x.ChildId == childId && x.StartDate <= today && (x.EndDate == null || x.EndDate >= today))
+            .OrderBy(x => x.StartDate).Select(x => x.ClassroomId).ToListAsync(cancellationToken);
+        return Result.Success<IReadOnlyList<Guid>>(ids);
+    }
+
+    public async Task<Result> SetChildClassroomsAsync(Guid childId, IReadOnlyCollection<Guid> classroomIds, DateOnly startDate, CancellationToken cancellationToken = default)
+    {
+        if (!Allowed()) return ClassroomErrors.PermissionDenied;
+        var selected = classroomIds.Where(x => x != Guid.Empty).Distinct().ToArray();
+        if (selected.Length > 2) return new Error("Classes.TooManyForChild", "يمكن إسناد الطفل إلى فصلين كحد أقصى.");
+        if (startDate == default) return ClassroomErrors.InvalidData;
+        try
+        {
+            var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(x => x.Id == childId, asNoTracking: false, cancellationToken: cancellationToken);
+            if (child is null) return ChildErrors.NotFound;
+            var rooms = await unitOfWork.Repository<Classroom>().ListAsync(x => selected.Contains(x.Id), asNoTracking: false, cancellationToken: cancellationToken);
+            if (rooms.Count != selected.Length) return ClassroomErrors.NotFound;
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            var enrollments = unitOfWork.Repository<ChildClassEnrollment>();
+            var current = await enrollments.Query(asNoTracking: false).Where(x => x.ChildId == childId && x.StartDate <= today && (x.EndDate == null || x.EndDate >= today)).ToListAsync(cancellationToken);
+            foreach (var row in current.Where(x => !selected.Contains(x.ClassroomId))) row.EndDate = today < row.StartDate ? row.StartDate : today;
+            foreach (var room in rooms.Where(r => current.All(x => x.ClassroomId != r.Id)))
+            {
+                var sameDay = await enrollments.FirstOrDefaultAsync(x => x.ChildId == childId && x.ClassroomId == room.Id && x.StartDate == startDate, asNoTracking: false, cancellationToken: cancellationToken);
+                if (sameDay is not null) sameDay.EndDate = null;
+                else await enrollments.AddAsync(new ChildClassEnrollment { ChildId = child.Id, Child = child, ClassroomId = room.Id, Classroom = room, StartDate = startDate }, cancellationToken);
+            }
+            await AuditAsync("Classroom.ChildAssignmentUpdated", childId, cancellationToken);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return Result.Success("تم تحديث فصول الطفل.");
+        }
+        catch (Exception ex) { logger.LogError(ex, "Child classroom assignments update failed; childId={ChildId}", childId); return ex is DbUpdateException ? PersistenceErrorMapper.FromException(ex) : ClassroomErrors.PersistenceFailure; }
+    }
+
     public async Task<Result> AssignChildAsync(Guid childId, Guid? classroomId, DateOnly startDate, CancellationToken cancellationToken = default)
     {
         if (!Allowed()) return ClassroomErrors.PermissionDenied;

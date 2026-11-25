@@ -1,4 +1,5 @@
 namespace ElMomenNursery.Application.DTOs;
+using ElMomenNursery.Domain.Enums;
 
 public class UpdateSubscriptionDto
 {
@@ -8,4 +9,5 @@ public class UpdateSubscriptionDto
     public decimal AmountDue { get; init; }
     public string? Notes { get; init; }
     public required string Reason { get; init; }
+    public SubscriptionStatus? StatusOverride { get; init; }
 }

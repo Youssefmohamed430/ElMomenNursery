@@ -219,6 +219,45 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
         }
     }
 
+    public async Task<Result<int>> MarkBulkAsync(DateOnly date, IReadOnlyCollection<Guid> childIds, AttendanceStatus status,
+        DateTimeOffset? checkIn, CancellationToken cancellationToken = default)
+    {
+        var permissionError = PermissionGuard.Check(permissions, "Attendance.Record", AttendanceErrors.PermissionDenied);
+        if (permissionError is not null) return permissionError;
+        if (date == default || date > DateOnly.FromDateTime(DateTime.Today)) return AttendanceErrors.InvalidDate;
+        if (childIds.Count == 0 || status is not (AttendanceStatus.Present or AttendanceStatus.Absent)) return AttendanceErrors.InvalidDate;
+        if (status == AttendanceStatus.Present && checkIn is null) return AttendanceErrors.InvalidDate;
+        var ids = childIds.Distinct().ToArray();
+        var children = await unitOfWork.Repository<Child>().ListAsync(x => ids.Contains(x.Id) && x.EnrollmentDate <= date, asNoTracking: false, cancellationToken: cancellationToken);
+        var existingRows = await unitOfWork.Repository<ChildAttendance>().ListAsync(x => ids.Contains(x.ChildId) && x.AttendanceDate == date, cancellationToken: cancellationToken);
+        var existing = existingRows.Select(x => x.ChildId).ToHashSet();
+        var pending = children.Where(x => !existing.Contains(x.Id)).ToArray();
+        await unitOfWork.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            foreach (var child in pending)
+            {
+                var item = new ChildAttendance { ChildId = child.Id, Child = child, AttendanceDate = date, Status = status,
+                    CheckInTime = status == AttendanceStatus.Present ? checkIn : null, EntryMethod = AttendanceEntryMethod.Manual,
+                    RecordedByUserId = sessions.CurrentUser?.UserId };
+                await unitOfWork.Repository<ChildAttendance>().AddAsync(item, cancellationToken);
+                await AddAuditAsync(item, "ChildAttendance.Created", "—", Values(item), null, cancellationToken);
+            }
+            await unitOfWork.CommitTransactionAsync(cancellationToken);
+            var alerts = new List<string>();
+            if (status == AttendanceStatus.Present)
+                foreach (var child in pending)
+                    if (await GetSubscriptionAndAbsenceAlertAsync(child.Id, date, cancellationToken) is { Length: > 0 } alert && !alerts.Contains(alert)) alerts.Add(alert);
+            return Result.Success(pending.Length, alerts.Count == 0 ? $"تم تسجيل {pending.Length} طفلًا." : $"تم تسجيل {pending.Length} طفلًا.\n{string.Join("\n", alerts)}");
+        }
+        catch (DbUpdateException ex)
+        {
+            await unitOfWork.RollbackTransactionAsync(CancellationToken.None);
+            return IsDuplicate(ex) ? AttendanceErrors.AlreadyRecorded : PersistenceErrorMapper.FromException(ex);
+        }
+        catch { await unitOfWork.RollbackTransactionAsync(CancellationToken.None); throw; }
+    }
+
     private async Task AddAuditAsync(ChildAttendance item, string action, string before, string after, string? reason, CancellationToken ct)
     {
         var actor = sessions.CurrentUser?.FullName ?? "مستخدم غير معروف";

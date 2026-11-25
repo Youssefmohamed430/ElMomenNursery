@@ -86,6 +86,7 @@ internal static class Program
                 try
                 {
                     AuthSeed.InitializeAsync(db).GetAwaiter().GetResult();
+                    LookupSeed.InitializeAsync(db).GetAwaiter().GetResult();
                     Log.Information("Authentication seed completed; durationMs={DurationMs}", seedTimer.ElapsedMilliseconds);
                 }
                 catch (Exception exception)

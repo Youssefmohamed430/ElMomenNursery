@@ -16,6 +16,29 @@ public sealed class LocalAccountManagementService(NurseryDbContext db, ISessionM
 {
     private static readonly PasswordHasher<UserAccount> Hasher = new();
 
+    public async Task<Result<RoleSummary>> CreateRoleAsync(string name, string? description, CancellationToken cancellationToken = default)
+    {
+        if (!permissions.HasPermission("Roles.Manage")) return AccountErrors.PermissionDenied;
+        name = (name ?? string.Empty).Trim();
+        if (name.Length is < 2 or > 80) return AccountErrors.InvalidRequest;
+        if (await db.Roles.AnyAsync(x => x.Name == name, cancellationToken)) return new Error("Roles.Duplicate", "اسم الدور مستخدم بالفعل.");
+        var role = new Role { Name = name, Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(), IsSystemRole = false };
+        db.Roles.Add(role); db.AuditLogs.Add(new AuditLog { Action = "Role.Created", EntityType = nameof(Role), EntityId = role.Id.ToString("D"), UserAccountId = sessions.CurrentUser?.UserId, ChangeSummary = role.Name });
+        await db.SaveChangesAsync(cancellationToken);
+        return Result.Success(new RoleSummary(role.Id, role.Name, Array.Empty<string>()), "تم إنشاء الدور.");
+    }
+
+    public async Task<Result> DeleteRoleAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        if (!permissions.HasPermission("Roles.Manage")) return AccountErrors.PermissionDenied;
+        var role = await db.Roles.Include(x => x.UserRoles).SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (role is null) return AccountErrors.NotFound;
+        if (role.IsSystemRole) return new Error("Roles.SystemRole", "لا يمكن حذف دور نظامي.");
+        if (role.UserRoles.Count > 0 || await db.UserAccounts.AnyAsync(x => x.RoleId == id, cancellationToken)) return new Error("Roles.InUse", "لا يمكن حذف دور مرتبط بحسابات مستخدمين.");
+        db.AuditLogs.Add(new AuditLog { Action = "Role.Deleted", EntityType = nameof(Role), EntityId = id.ToString("D"), UserAccountId = sessions.CurrentUser?.UserId, ChangeSummary = role.Name });
+        db.Roles.Remove(role); await db.SaveChangesAsync(cancellationToken); return Result.Success("تم حذف الدور.");
+    }
+
     public async Task<Result<IReadOnlyList<AccountSummary>>> GetAccountsAsync(CancellationToken cancellationToken = default)
     {
         var permissionError = PermissionGuard.Check(permissions, "Users.View", AccountErrors.PermissionDenied);

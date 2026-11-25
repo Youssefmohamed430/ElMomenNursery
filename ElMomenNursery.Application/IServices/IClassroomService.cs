@@ -13,4 +13,6 @@ public interface IClassroomService
     Task<Result> AssignChildrenAsync(Guid classroomId, IReadOnlyCollection<Guid> childIds, CancellationToken cancellationToken = default);
     Task<Result<Guid?>> GetChildClassroomAsync(Guid childId, CancellationToken cancellationToken = default);
     Task<Result> AssignChildAsync(Guid childId, Guid? classroomId, DateOnly startDate, CancellationToken cancellationToken = default);
+    Task<Result<IReadOnlyList<Guid>>> GetChildClassroomsAsync(Guid childId, CancellationToken cancellationToken = default);
+    Task<Result> SetChildClassroomsAsync(Guid childId, IReadOnlyCollection<Guid> classroomIds, DateOnly startDate, CancellationToken cancellationToken = default);
 }

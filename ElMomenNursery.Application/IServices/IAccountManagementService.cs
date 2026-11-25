@@ -14,4 +14,6 @@ public interface IAccountManagementService
     Task<Result> ResetPasswordAsync(Guid userId, string newPassword, CancellationToken cancellationToken = default);
     Task<Result> SetUserRolesAsync(Guid userId, IReadOnlyCollection<Guid> roleIds, CancellationToken cancellationToken = default);
     Task<Result> SetRolePermissionsAsync(Guid roleId, IReadOnlyCollection<string> permissionCodes, CancellationToken cancellationToken = default);
+    Task<Result<RoleSummary>> CreateRoleAsync(string name, string? description, CancellationToken cancellationToken = default);
+    Task<Result> DeleteRoleAsync(Guid id, CancellationToken cancellationToken = default);
 }

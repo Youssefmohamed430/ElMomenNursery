@@ -1,0 +1,22 @@
+using ElMomenNursery.Application.DTOs;
+using ElMomenNursery.Application.IServices;
+using ElMomenNursery.Domain.Abstractions;
+using ElMomenNursery.Domain.Entities;
+namespace ElMomenNursery.Application.Services;
+public sealed class SubscriptionPlanService(IUnitOfWork uow, IPermissionService permissions, ISessionManager sessions) : ISubscriptionPlanService
+{
+    public async Task<Result<IReadOnlyList<SubscriptionPlanDto>>> GetAsync(CancellationToken ct = default)
+    { if (!permissions.HasPermission("Subscriptions.View")) return new Error("Subscriptions.PermissionDenied", "لا تملك صلاحية عرض الخطط."); var rows = await uow.Repository<SubscriptionPlan>().ListAsync(cancellationToken: ct); return Result.Success<IReadOnlyList<SubscriptionPlanDto>>(rows.OrderBy(x => x.Name).Select(Map).ToArray()); }
+    public async Task<Result<SubscriptionPlanDto>> CreateAsync(SaveSubscriptionPlanDto dto, CancellationToken ct = default)
+    { if (!Allowed()) return Denied(); if (!Valid(dto)) return Invalid(); if (await uow.Repository<SubscriptionPlan>().AnyAsync(x => x.Name == dto.Name.Trim(), ct)) return Duplicate(); var item = new SubscriptionPlan { Name = dto.Name.Trim(), DefaultFee = dto.DefaultFee, Description = string.IsNullOrWhiteSpace(dto.Description) ? null : dto.Description.Trim() }; await uow.Repository<SubscriptionPlan>().AddAsync(item, ct); await Audit("SubscriptionPlan.Created", item, ct); await uow.SaveChangesAsync(ct); return Result.Success(Map(item), "تمت إضافة الخطة."); }
+    public async Task<Result<SubscriptionPlanDto>> UpdateAsync(Guid id, SaveSubscriptionPlanDto dto, CancellationToken ct = default)
+    { if (!Allowed()) return Denied(); if (!Valid(dto)) return Invalid(); var item = await uow.Repository<SubscriptionPlan>().FirstOrDefaultAsync(x => x.Id == id, asNoTracking: false, cancellationToken: ct); if (item is null) return Missing(); if (await uow.Repository<SubscriptionPlan>().AnyAsync(x => x.Id != id && x.Name == dto.Name.Trim(), ct)) return Duplicate(); item.Name = dto.Name.Trim(); item.DefaultFee = dto.DefaultFee; item.Description = dto.Description?.Trim(); await Audit("SubscriptionPlan.Updated", item, ct); await uow.SaveChangesAsync(ct); return Result.Success(Map(item), "تم تحديث الخطة."); }
+    public async Task<Result> SetActiveAsync(Guid id, bool active, CancellationToken ct = default)
+    { if (!Allowed()) return Denied(); var item = await uow.Repository<SubscriptionPlan>().FirstOrDefaultAsync(x => x.Id == id, asNoTracking: false, cancellationToken: ct); if (item is null) return Missing(); item.IsActive = active; await Audit("SubscriptionPlan.StateChanged", item, ct); await uow.SaveChangesAsync(ct); return Result.Success("تم تحديث حالة الخطة."); }
+    public async Task<Result> DeleteAsync(Guid id, CancellationToken ct = default)
+    { if (!Allowed()) return Denied(); if (await uow.Repository<Subscription>().AnyAsync(x => x.SubscriptionPlanId == id, ct)) return new Error("Subscriptions.PlanInUse", "الخطة مستخدمة في اشتراكات سابقة. أوقفها بدلًا من حذفها."); var item = await uow.Repository<SubscriptionPlan>().FirstOrDefaultAsync(x => x.Id == id, asNoTracking: false, cancellationToken: ct); if (item is null) return Missing(); uow.Repository<SubscriptionPlan>().Remove(item); await Audit("SubscriptionPlan.Deleted", item, ct); await uow.SaveChangesAsync(ct); return Result.Success("تم حذف الخطة."); }
+    private bool Allowed() => permissions.HasPermission("Subscriptions.Manage"); private static bool Valid(SaveSubscriptionPlanDto d) => !string.IsNullOrWhiteSpace(d.Name) && d.Name.Length <= 120 && d.DefaultFee >= 0;
+    private static SubscriptionPlanDto Map(SubscriptionPlan x) => new(x.Id, x.Name, x.DefaultFee, x.Description, x.IsActive);
+    private static Error Denied() => new("Subscriptions.PermissionDenied", "لا تملك صلاحية إدارة الخطط."); private static Error Invalid() => new("Subscriptions.InvalidPlan", "اسم الخطة مطلوب والرسوم يجب ألا تكون سالبة."); private static Error Missing() => new("Subscriptions.PlanNotFound", "الخطة غير موجودة."); private static Error Duplicate() => new("Subscriptions.DuplicatePlan", "اسم الخطة مستخدم بالفعل.");
+    private async Task Audit(string action, SubscriptionPlan x, CancellationToken ct) => await uow.Repository<AuditLog>().AddAsync(new AuditLog { Action = action, EntityType = nameof(SubscriptionPlan), EntityId = x.Id.ToString("D"), UserAccountId = sessions.CurrentUser?.UserId, ChangeSummary = $"{x.Name}; fee={x.DefaultFee}" }, ct);
+}

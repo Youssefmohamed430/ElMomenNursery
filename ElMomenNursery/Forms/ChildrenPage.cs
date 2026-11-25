@@ -43,18 +43,24 @@ internal sealed class ChildrenPage : UserControl
         var detailsButton = CreateActionButton("عرض الملف");
         var exportButton = CreateActionButton("تصدير القائمة");
         var schoolAgeButton = CreateActionButton("أطفال سن المدرسة");
+        var deletedButton = CreateActionButton("عرض المحذوفين");
+        var restoreButton = CreateActionButton("استعادة طفل");
         addButton.Visible = _session.HasPermission("Students.Create");
         editButton.Visible = _session.HasPermission("Students.Edit");
         deleteButton.Visible = _session.HasPermission("Students.Delete");
         detailsButton.Visible = _session.HasPermission("Students.View");
         exportButton.Visible = _session.HasPermission("Students.Export");
         schoolAgeButton.Visible = _session.HasPermission("Students.View");
+        deletedButton.Visible = _session.HasPermission("Students.Restore");
+        restoreButton.Visible = false;
         addButton.Name = "actions.add";
         editButton.Name = "actions.edit";
         deleteButton.Name = "actions.delete";
         detailsButton.Name = "actions.details";
         exportButton.Name = "actions.export";
         schoolAgeButton.Name = "actions.school-age";
+        deletedButton.Name = "actions.deleted";
+        restoreButton.Name = "actions.restore";
         addButton.Width = 150;
         editButton.Width = 140;
         deleteButton.Width = 126;
@@ -114,7 +120,7 @@ internal sealed class ChildrenPage : UserControl
         resetLayoutButton.Name = "layout.reset";
         resetLayoutButton.Width = 150;
         resetLayoutButton.Visible = false;
-        actions.Controls.AddRange([addButton, editButton, deleteButton, detailsButton, exportButton, schoolAgeButton, customizeButton, resetLayoutButton]);
+        actions.Controls.AddRange([addButton, editButton, deleteButton, detailsButton, exportButton, schoolAgeButton, deletedButton, restoreButton, customizeButton, resetLayoutButton]);
 
         var grid = CreateGrid([
             "المعرف", "اسم الطفل", "العنوان", "تاريخ الالتحاق", "تاريخ الميلاد", "النوع", "الفترة",
@@ -132,6 +138,8 @@ internal sealed class ChildrenPage : UserControl
         RegisterDraggable(addButton);
         RegisterDraggable(editButton);
         RegisterDraggable(deleteButton);
+        RegisterDraggable(deletedButton);
+        RegisterDraggable(restoreButton);
         RegisterDraggable(detailsButton);
         RegisterDraggable(exportButton);
         RegisterDraggable(grid);
@@ -148,6 +156,7 @@ internal sealed class ChildrenPage : UserControl
                 && bounds[3] >= FilterTheme.FieldHeight
                 && bounds[1] + bounds[3] <= MaxFilterFieldBottom);
         var loadInProgress = false;
+        var showingDeleted = false;
         var defaultGridTop = MinGridTop;
         AttachDraggableControls();
 
@@ -243,6 +252,26 @@ internal sealed class ChildrenPage : UserControl
                     MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
             }
         }, "Delete child");
+        deletedButton.Click += (_, _) => RunSafeEvent(async () =>
+        {
+            showingDeleted = !showingDeleted;
+            deletedButton.Text = showingDeleted ? "عرض الأطفال" : "عرض المحذوفين";
+            restoreButton.Visible = showingDeleted && _session.HasPermission("Students.Restore");
+            addButton.Visible = editButton.Visible = deleteButton.Visible = !showingDeleted && _session.HasPermission("Students.Create") && _session.HasPermission("Students.Edit") && _session.HasPermission("Students.Delete");
+            // Preserve each action's own permission while switching modes.
+            addButton.Visible = !showingDeleted && _session.HasPermission("Students.Create");
+            editButton.Visible = !showingDeleted && _session.HasPermission("Students.Edit");
+            deleteButton.Visible = !showingDeleted && _session.HasPermission("Students.Delete");
+            filterPanel.Enabled = !showingDeleted;
+            await LoadChildrenAsync();
+        }, "Toggle deleted children");
+        restoreButton.Click += (_, _) => RunSafeEvent(async () =>
+        {
+            if (grid.SelectedRows.Count == 0 || grid.SelectedRows[0].Tag is not Guid id) { AppDialog.ShowInformation(this, "استعادة طفل", "اختر طفلًا من المحذوفات أولًا."); return; }
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var result = await scope.ServiceProvider.GetRequiredService<IChildService>().RestoreChildAsync(id);
+            if (ResultPresenter.Present(this, "استعادة طفل", result)) await LoadChildrenAsync();
+        }, "Restore child");
         detailsButton.Click += (_, _) => RunSafeEvent(async () =>
         {
             if (isCustomizing) return;
@@ -418,7 +447,10 @@ internal sealed class ChildrenPage : UserControl
                 };
                 Result<IReadOnlyList<ChildDto>> childrenResult;
                 await using (var scope = _scopeFactory.CreateAsyncScope())
-                    childrenResult = await scope.ServiceProvider.GetRequiredService<IChildService>().GetChildrenAsync(filter);
+                {
+                    var service = scope.ServiceProvider.GetRequiredService<IChildService>();
+                    childrenResult = showingDeleted ? await service.GetDeletedChildrenAsync() : await service.GetChildrenAsync(filter);
+                }
                 if (page.IsDisposed || grid.IsDisposed || resultCount.IsDisposed)
                 {
                     _log.Debug("Child load cancelled: page disposed");
@@ -516,7 +548,7 @@ internal sealed class ChildrenPage : UserControl
         void ArrangeDefaultActions()
         {
             var right = actions.ClientSize.Width - 8;
-            foreach (var button in new[] { addButton, editButton, deleteButton, detailsButton, exportButton, schoolAgeButton })
+            foreach (var button in new[] { addButton, editButton, deleteButton, detailsButton, exportButton, schoolAgeButton, deletedButton, restoreButton })
             {
                 right -= button.Width;
                 button.SetBounds(right, 1, button.Width, 42);

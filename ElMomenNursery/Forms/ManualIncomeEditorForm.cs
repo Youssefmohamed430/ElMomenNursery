@@ -39,6 +39,7 @@ public sealed class ManualIncomeEditorForm : ResponsiveForm
 
         _source.Items.AddRange(["تبرع", "منحة", "دعم خارجي", "نشاط ترفيهي إضافي", "رحلة", "إيراد متنوع", "أخرى"]);
         _source.SelectedIndex = 0;
+        Shown += async (_, _) => await LookupOptions.LoadAsync(_scopes, _source, "IncomeSource", ["تبرع", "منحة", "دعم خارجي", "نشاط ترفيهي إضافي", "رحلة", "إيراد متنوع", "أخرى"]);
         _date.Value = DateTime.Today;
 
         var fields = new TableLayoutPanel

@@ -111,8 +111,9 @@ public sealed class SubscriptionService : ISubscriptionService
             plan = await unitOfWork.Repository<SubscriptionPlan>().FirstOrDefaultAsync(x => x.Id == planId, cancellationToken: ct);
             if (plan is null) return SubscriptionErrors.PlanNotFound;
         }
-        var amount = dto.AmountDue ?? plan?.DefaultFee ?? 0m;
+        var amount = dto.StatusOverride == SubscriptionStatus.Waived ? 0m : dto.AmountDue ?? plan?.DefaultFee ?? 0m;
         if (amount < 0) return SubscriptionErrors.InvalidAmount;
+        if (dto.StatusOverride is SubscriptionStatus.Cancelled or SubscriptionStatus.Waived && dto.InitialPayment is not null) return SubscriptionErrors.PaymentNotAllowedForStatus;
 
         if (dto.InitialPayment is not null && (dto.InitialPayment.Amount <= 0 || dto.InitialPayment.Amount > amount))
             return dto.InitialPayment.Amount <= 0 ? SubscriptionErrors.InvalidAmount : SubscriptionErrors.OverpaymentNotAllowed;
@@ -124,7 +125,7 @@ public sealed class SubscriptionService : ISubscriptionService
         var initialPaid = dto.InitialPayment?.Amount ?? 0;
 
         var sub = new Subscription { ChildId = child.Id, Child = child, SubscriptionPlanId = plan?.Id, SubscriptionPlan = plan,
-            PeriodStart = dto.PeriodStart, PeriodEnd = dto.PeriodEnd, AmountDue = amount, Notes = Clean(dto.Notes), Status = ComputeStatus(amount, initialPaid) };
+            PeriodStart = dto.PeriodStart, PeriodEnd = dto.PeriodEnd, AmountDue = amount, Notes = Clean(dto.Notes), Status = dto.StatusOverride is SubscriptionStatus.Cancelled or SubscriptionStatus.Waived ? dto.StatusOverride.Value : ComputeStatus(amount, initialPaid) };
 
         var before = "—";
         Payment? initialPayment = null;
@@ -134,7 +135,7 @@ public sealed class SubscriptionService : ISubscriptionService
             await unitOfWork.Repository<Subscription>().AddAsync(sub, ct);
             if (dto.InitialPayment is not null)
             {
-                initialPayment = await CreatePayment(sub, dto.InitialPayment.Amount, dto.InitialPayment.PaymentMethod, dto.InitialPayment.Reference, null, ct);
+                initialPayment = await CreatePayment(sub, dto.InitialPayment.Amount, dto.InitialPayment.PaymentMethod, dto.InitialPayment.Reference, dto.InitialPayment.Notes, ct);
                 await Audit("Payment.Recorded", initialPayment.Id, "مدفوع سابقًا: 0", SubscriptionValues(sub, dto.InitialPayment.Amount), null, ct, nameof(Payment));
             }
             await Audit("Subscription.Created", sub.Id, before, SubscriptionValues(sub, dto.InitialPayment?.Amount ?? 0), null, ct);
@@ -163,14 +164,18 @@ public sealed class SubscriptionService : ISubscriptionService
         if (string.IsNullOrWhiteSpace(dto.Reason)) return SubscriptionErrors.ReasonRequired;
         if (dto.PeriodStart == default || dto.PeriodEnd < dto.PeriodStart || dto.AmountDue < 0) return dto.AmountDue < 0 ? SubscriptionErrors.InvalidAmount : SubscriptionErrors.InvalidPeriod;
         var item = await GetTrackedSubscription(id, true, ct); if (item is null) return SubscriptionErrors.NotFound;
-        var paid = await PaidAsync(id, ct); if (dto.AmountDue < paid) return SubscriptionErrors.AmountBelowPaid;
+        var paid = await PaidAsync(id, ct);
+        var requestedAmount = dto.StatusOverride == SubscriptionStatus.Waived ? 0m : dto.AmountDue;
+        if (requestedAmount < paid) return SubscriptionErrors.AmountBelowPaid;
         SubscriptionPlan? updatedPlan = null;
         if (dto.SubscriptionPlanId is Guid planId)
         { updatedPlan = await unitOfWork.Repository<SubscriptionPlan>().FirstOrDefaultAsync(x => x.Id == planId, asNoTracking: false, cancellationToken: ct); if (updatedPlan is null) return SubscriptionErrors.PlanNotFound; }
+        if (dto.StatusOverride is SubscriptionStatus.Cancelled or SubscriptionStatus.Waived && string.IsNullOrWhiteSpace(dto.Reason)) return SubscriptionErrors.ReasonRequired;
         var before = SubscriptionValues(item, paid);
         item.SubscriptionPlanId = dto.SubscriptionPlanId; item.SubscriptionPlan = updatedPlan; item.PeriodStart = dto.PeriodStart; item.PeriodEnd = dto.PeriodEnd;
-        item.AmountDue = dto.AmountDue; item.Notes = Clean(dto.Notes);
-        if (item.Status is not (SubscriptionStatus.Cancelled or SubscriptionStatus.Waived)) item.Status = ComputeStatus(dto.AmountDue, paid);
+        item.AmountDue = requestedAmount; item.Notes = Clean(dto.Notes);
+        if (dto.StatusOverride is SubscriptionStatus.Cancelled or SubscriptionStatus.Waived) item.Status = dto.StatusOverride.Value;
+        else if (item.Status is not (SubscriptionStatus.Cancelled or SubscriptionStatus.Waived)) item.Status = ComputeStatus(requestedAmount, paid);
         await Audit("Subscription.Updated", id, before, SubscriptionValues(item, paid), dto.Reason, ct);
         var saveError = await SaveChangesErrorAsync(ct);
         if (saveError is not null) return saveError;

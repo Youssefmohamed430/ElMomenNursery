@@ -22,7 +22,7 @@ public sealed class EmployeeEditorForm : ResponsiveForm
     private readonly TextBox _phone = CreateTextBox(50);
     private readonly TextBox _alternatePhone = CreateTextBox(50);
     private readonly TextBox _address = CreateTextBox(250, multiline: true);
-    private readonly TextBox _jobDesignation = CreateTextBox(100);
+    private readonly ComboBox _jobDesignation = new() { DropDownStyle = ComboBoxStyle.DropDown, MaxLength = 100, RightToLeft = RightToLeft.Yes };
     private readonly DateTimePicker _hireDate = CreateDatePicker();
     private readonly TextBox _salary = CreateTextBox(30);
     private readonly CheckBox _hasExperience = new() { Text = "لديه خبرة", AutoSize = true, RightToLeft = RightToLeft.Yes };
@@ -93,6 +93,7 @@ public sealed class EmployeeEditorForm : ResponsiveForm
         CancelButton = cancelButton;
 
         if (employee is not null) Populate(employee);
+        Shown += async (_, _) => await LookupOptions.LoadAsync(_scopes, _jobDesignation, "JobDesignation", ["معلمة", "مساعدة معلمة", "مشرفة", "محاسب", "إدارية", "عامل خدمات"]);
     }
 
     private void Populate(EmployeeDto employee)

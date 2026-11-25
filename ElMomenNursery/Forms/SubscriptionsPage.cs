@@ -24,6 +24,7 @@ public sealed class SubscriptionsPage : UserControl
     private readonly CheckBox _balance = new() { Text = "عليه متبقي فقط", AutoSize = true };
     private readonly Label _summary = new() { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight };
     private readonly Button _add = Button("إضافة اشتراك");
+    private readonly Button _plans = Button("خطط الاشتراك");
     private readonly Button _invoice = Button("فاتورة بيع من المخزن");
     private readonly Button _invoiceHistory = Button("سجل الفواتير");
     private readonly Button _edit = Button("تعديل");
@@ -52,6 +53,7 @@ public sealed class SubscriptionsPage : UserControl
             new DataGridViewTextBoxColumn { HeaderText = "المدفوع" }, new DataGridViewTextBoxColumn { HeaderText = "المتبقي" }, new DataGridViewTextBoxColumn { HeaderText = "الحالة" },
             new DataGridViewTextBoxColumn { HeaderText = "ملاحظات" }, new DataGridViewTextBoxColumn { HeaderText = "تاريخ الإضافة" }, new DataGridViewTextBoxColumn { Visible = false }]);
         _add.Visible = session.HasPermission("Subscriptions.Manage"); _edit.Visible = _cancel.Visible = _delete.Visible = session.HasPermission("Subscriptions.Manage");
+        _plans.Visible = session.HasPermission("Subscriptions.Manage");
         _pay.Visible = session.HasPermission("Payments.Create"); _fine.Visible = session.HasPermission("Payments.Create") && session.HasPermission("Finance.ManageIncome"); _receipt.Visible = session.HasPermission("Payments.View"); _export.Visible = session.HasPermission("Subscriptions.Export");
         var apply = Button("تطبيق"); var clear = Button("مسح الفلاتر"); var refresh = Button("تحديث");
         _invoice.Visible = session.HasPermission("Payments.Create");
@@ -65,7 +67,7 @@ public sealed class SubscriptionsPage : UserControl
         filter.AddField("subscriptions.balance", "الرصيد", _balance);
         filter.AddActions(apply, clear);
         var toolbar = new ActionToolbar { Name = "subscriptions.actions" };
-        toolbar.Add(refresh, _add, _invoice, _invoiceHistory, _edit, _pay, _fine, _cancel, _delete, _receipt, _export);
+        toolbar.Add(refresh, _add, _plans, _invoice, _invoiceHistory, _edit, _pay, _fine, _cancel, _delete, _receipt, _export);
         _grid.Dock = DockStyle.None; _summary.Dock = DockStyle.None;
         Controls.Add(_grid); Controls.Add(_summary); Controls.Add(toolbar); Controls.Add(filter);
         Resize += (_, _) => LayoutContent(); LayoutContent();
@@ -81,6 +83,7 @@ public sealed class SubscriptionsPage : UserControl
         refresh.Click += (_, _) => _ = UiGuard.RunAsync(this, "Subscriptions.Load", LoadAsync);
         clear.Click += (_, _) => { _search.Clear(); _status.SelectedIndex = 0; _plan.SelectedIndex = 0; _classroom.SelectedIndex = 0; _from.Checked = _to.Checked = false; _balance.Checked = false; _ = UiGuard.RunAsync(this, "Subscriptions.Load", LoadAsync); };
         _add.Click += (_, _) => _ = UiGuard.RunAsync(this, "Subscriptions.Add", () => EditAsync(null));
+        _plans.Click += (_, _) => { using var form = new SubscriptionPlansForm(_scopes); form.ShowDialog(FindForm()); _ = UiGuard.RunAsync(this, "Subscriptions.LoadPlans", LoadPlansAsync); };
         _edit.Click += (_, _) => { if (Selected() is { } row) _ = UiGuard.RunAsync(this, "Subscriptions.Edit", () => EditAsync(row)); };
         _invoice.Click += (_, _) => _ = UiGuard.RunAsync(this, "Subscriptions.Invoice", async () => { using var form = new CashierInvoiceForm(_scopes); if (form.ShowDialog(FindForm()) == DialogResult.OK) await LoadAsync(); });
         _invoiceHistory.Click += (_, _) => { using var form = new InvoiceHistoryForm(_scopes); form.ShowDialog(FindForm()); };
@@ -203,7 +206,7 @@ public sealed class SubscriptionsPage : UserControl
     private async Task RecordPaymentAsync()
     {
         if (Selected() is not { } row) return;
-        using var form = new PaymentEditorForm(row.RemainingAmount);
+        using var form = new PaymentEditorForm(row.RemainingAmount, _scopes);
         if (form.ShowDialog(FindForm()) != DialogResult.OK || form.Values is null) return;
         await UiGuard.RunAsync(this, "Subscriptions.RecordPayment", async () =>
         {
@@ -284,6 +287,7 @@ internal sealed class SubscriptionEditorForm : ResponsiveForm
     private readonly IServiceScopeFactory _scopes; private readonly UserSession _session; private readonly SubscriptionDto? _item;
     private readonly ComboBox _child = new() { DropDownStyle = ComboBoxStyle.DropDown, AutoCompleteMode = AutoCompleteMode.SuggestAppend, AutoCompleteSource = AutoCompleteSource.ListItems, Width = 300 };
     private readonly ComboBox _plan = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 300 };
+    private readonly ComboBox _statusOverride = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 300 };
     private readonly DateTimePicker _start = new() { Format = DateTimePickerFormat.Short, Width = 300 };
     private readonly DateTimePicker _end = new() { Format = DateTimePickerFormat.Short, Width = 300 };
     private readonly NumericUpDown _due = new() { Maximum = 10000000, DecimalPlaces = 2, ThousandsSeparator = true, Width = 300 };
@@ -298,9 +302,12 @@ internal sealed class SubscriptionEditorForm : ResponsiveForm
     {
         _scopes = scopes; _session = session; _item = item; Text = item is null ? "إضافة اشتراك" : "تعديل اشتراك"; Width = 470; Height = 610; StartPosition = FormStartPosition.CenterParent; RightToLeft = RightToLeft.Yes; RightToLeftLayout = true; FormBorderStyle = FormBorderStyle.FixedDialog; MaximizeBox = false;
         _method.Items.AddRange(["نقدًا", "تحويل بنكي", "أخرى"]); _method.SelectedIndex = 0; _start.Value = DateTime.Today; _end.Value = DateTime.Today.AddMonths(1);
+        Shown += async (_, _) => await LookupOptions.LoadAsync(_scopes, _method, "PaymentMethod", ["نقدًا", "تحويل بنكي", "أخرى"]);
+        _statusOverride.Items.AddRange(["تلقائي (حسب المدفوع)", "مستحق", "مدفوع جزئيًا", "مدفوع", "ملغي", "معفى"]); _statusOverride.SelectedIndex = 0;
+        _statusOverride.SelectedIndexChanged += (_, _) => { if (_statusOverride.SelectedIndex == 5 && _item is null) { _due.Value = 0; _initial.Value = 0; } _initial.Enabled = _item is null && _statusOverride.SelectedIndex != 5; };
         _child.TextUpdate += async (_, _) => { if (!_loadingChildren && _item is null) await SearchChildrenAsync(_child.Text); };
         _child.Enabled = item is null;
-        var fields = new List<(string, Control)> { ("الطفل", _child), ("الخطة (اختيارية)", _plan), ("من", _start), ("إلى", _end), ("المستحق", _due) };
+        var fields = new List<(string, Control)> { ("الطفل", _child), ("الخطة (اختيارية)", _plan), ("من", _start), ("إلى", _end), ("المستحق", _due), ("حالة الاشتراك", _statusOverride) };
         if (session.HasPermission("Payments.Create")) fields.AddRange([("المدفوع الآن", _initial), ("طريقة الدفع", _method), ("المرجع", _reference)]);
         fields.Add(("ملاحظات", _notes));
         var panel = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(16), ColumnCount = 2, RowCount = fields.Count + 1, AutoScroll = true }; panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110)); panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -330,6 +337,9 @@ internal sealed class SubscriptionEditorForm : ResponsiveForm
             _start.Value = _item.PeriodStart.ToDateTime(TimeOnly.MinValue);
             _end.Value = _item.PeriodEnd.ToDateTime(TimeOnly.MinValue);
             _due.Value = _item.AmountDue;
+            _statusOverride.Items.Clear(); _statusOverride.Items.AddRange(["تلقائي (حسب المدفوع)", "ملغي", "معفى"]);
+            _statusOverride.SelectedIndex = _item.Status switch { SubscriptionStatus.Cancelled => 1, SubscriptionStatus.Waived => 2, _ => 0 };
+            _statusOverride.Enabled = true;
             _notes.Text = _item.Notes ?? string.Empty;
             for (var i = 0; i < _plan.Items.Count; i++)
                 if (_plan.Items[i] is SubscriptionPlanOptionDto p && p.Id == _item.SubscriptionPlanId) _plan.SelectedIndex = i;
@@ -381,8 +391,8 @@ internal sealed class SubscriptionEditorForm : ResponsiveForm
                     while (true)
                     {
                         var result = await svc.CreateSubscriptionAsync(new CreateSubscriptionDto { ChildId = child.Id, SubscriptionPlanId = (_plan.SelectedItem as SubscriptionPlanOptionDto)?.Id,
-                            PeriodStart = DateOnly.FromDateTime(_start.Value), PeriodEnd = DateOnly.FromDateTime(_end.Value), AmountDue = _due.Value, Notes = _notes.Text,
-                            InitialPayment = _initial.Value > 0 ? new InitialPaymentDto(_initial.Value, MethodValue(), _reference.Text) : null, ConfirmOverlappingPeriod = overlapConfirmed });
+                            PeriodStart = DateOnly.FromDateTime(_start.Value), PeriodEnd = DateOnly.FromDateTime(_end.Value), AmountDue = _due.Value, Notes = _notes.Text, StatusOverride = SelectedStatusOverride(),
+                            InitialPayment = _initial.Value > 0 ? new InitialPaymentDto(_initial.Value, MethodValue(), _reference.Text, PaymentMethodNote()) : null, ConfirmOverlappingPeriod = overlapConfirmed });
                         if (result.IsFailure && result.Error.Code == "Subscriptions.OverlappingPeriod" && !overlapConfirmed)
                         {
                             if (AppDialog.Confirm(this, "فترة متقاطعة", "توجد فترة اشتراك متقاطعة لهذا الطفل. هل تريد المتابعة؟")) { overlapConfirmed = true; continue; }
@@ -397,7 +407,7 @@ internal sealed class SubscriptionEditorForm : ResponsiveForm
                 }
                 var reason = PromptReason();
                 if (string.IsNullOrWhiteSpace(reason)) { ShowError("سبب التعديل مطلوب."); return; }
-                var updated = await svc.UpdateSubscriptionAsync(_item.Id, new UpdateSubscriptionDto { SubscriptionPlanId = (_plan.SelectedItem as SubscriptionPlanOptionDto)?.Id, PeriodStart = DateOnly.FromDateTime(_start.Value), PeriodEnd = DateOnly.FromDateTime(_end.Value), AmountDue = _due.Value, Notes = _notes.Text, Reason = reason });
+                var updated = await svc.UpdateSubscriptionAsync(_item.Id, new UpdateSubscriptionDto { SubscriptionPlanId = (_plan.SelectedItem as SubscriptionPlanOptionDto)?.Id, PeriodStart = DateOnly.FromDateTime(_start.Value), PeriodEnd = DateOnly.FromDateTime(_end.Value), AmountDue = _due.Value, Notes = _notes.Text, Reason = reason, StatusOverride = SelectedStatusOverride() });
                 if (!ResultPresenter.Present(this, "الاشتراكات والمدفوعات", updated)) return;
                 DialogResult = DialogResult.OK;
                 Close();
@@ -405,7 +415,9 @@ internal sealed class SubscriptionEditorForm : ResponsiveForm
         }
         finally { if (!IsDisposed) _saveButton.Enabled = true; }
     }
-    private PaymentMethod MethodValue() => _method.SelectedIndex switch { 0 => PaymentMethod.Cash, 1 => PaymentMethod.BankTransfer, _ => PaymentMethod.Other };
+    private PaymentMethod MethodValue() => _method.Text == "نقدًا" ? PaymentMethod.Cash : _method.Text == "تحويل بنكي" ? PaymentMethod.BankTransfer : PaymentMethod.Other;
+    private string? PaymentMethodNote() => MethodValue() == PaymentMethod.Other && _method.Text != "أخرى" ? $"طريقة الدفع: {_method.Text}" : null;
+    private SubscriptionStatus? SelectedStatusOverride() => _statusOverride.Text switch { "ملغي" => SubscriptionStatus.Cancelled, "معفى" => SubscriptionStatus.Waived, _ => null };
     private string? PromptReason() { using var prompt = new ResponsiveForm { Text = "سبب التعديل", Width = 380, Height = 145, StartPosition = FormStartPosition.CenterParent, RightToLeft = RightToLeft.Yes }; var box = new TextBox { Left = 15, Top = 15, Width = 330 }; var ok = new Button { Text = "موافق", DialogResult = DialogResult.OK, Left = 255, Top = 55 }; prompt.Controls.AddRange([box, ok]); prompt.AcceptButton = ok; return prompt.ShowDialog(this) == DialogResult.OK ? box.Text : null; }
     private void ShowError(string message) => AppDialog.ShowInformation(this, "الاشتراكات والمدفوعات", message);
     private sealed record PlanOption(Guid? Id, string Name) { public override string ToString() => Name; }
@@ -417,13 +429,13 @@ internal sealed class PaymentEditorForm : ResponsiveForm
     private readonly ComboBox _method = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 240 };
     private readonly TextBox _reference = new() { Width = 240 }; private readonly TextBox _notes = new() { Width = 240 };
     public RecordPaymentDto? Values { get; private set; }
-    public PaymentEditorForm(decimal max)
+    public PaymentEditorForm(decimal max, IServiceScopeFactory? scopes = null)
     {
-        Text = "تسجيل دفعة"; Width = 380; Height = 330; StartPosition = FormStartPosition.CenterParent; RightToLeft = RightToLeft.Yes; RightToLeftLayout = true; _amount.Maximum = Math.Max(0.01m, max); _amount.Value = _amount.Maximum; _method.Items.AddRange(["نقدًا", "تحويل بنكي", "أخرى"]); _method.SelectedIndex = 0;
+        Text = "تسجيل دفعة"; Width = 380; Height = 330; StartPosition = FormStartPosition.CenterParent; RightToLeft = RightToLeft.Yes; RightToLeftLayout = true; _amount.Maximum = Math.Max(0.01m, max); _amount.Value = _amount.Maximum; _method.Items.AddRange(["نقدًا", "تحويل بنكي", "أخرى"]); _method.SelectedIndex = 0; Shown += async (_, _) => await LookupOptions.LoadAsync(scopes, _method, "PaymentMethod", ["نقدًا", "تحويل بنكي", "أخرى"]);
         var labels = new[] { "المبلغ", "طريقة الدفع", "المرجع", "ملاحظات" }; var fields = new Control[] { _amount, _method, _reference, _notes };
         var grid = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(16), ColumnCount = 2, RowCount = 5 }; grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 100)); grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         for (var i = 0; i < fields.Length; i++) { grid.Controls.Add(new Label { Text = labels[i], Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight }, 0, i); grid.Controls.Add(fields[i], 1, i); }
-        var ok = new Button { Text = "حفظ", Width = 90 }; ok.Click += (_, _) => { if (_amount.Value <= 0) { AppDialog.ShowInformation(this, Text, "يجب أن يكون مبلغ الدفعة أكبر من صفر."); _amount.Focus(); return; } if (_amount.Value > max) { AppDialog.ShowInformation(this, Text, "المبلغ أكبر من المتبقي."); _amount.Focus(); return; } Values = new RecordPaymentDto(_amount.Value, _method.SelectedIndex switch { 0 => PaymentMethod.Cash, 1 => PaymentMethod.BankTransfer, _ => PaymentMethod.Other }, _reference.Text, _notes.Text); DialogResult = DialogResult.OK; Close(); };
+        var ok = new Button { Text = "حفظ", Width = 90 }; ok.Click += (_, _) => { if (_amount.Value <= 0) { AppDialog.ShowInformation(this, Text, "يجب أن يكون مبلغ الدفعة أكبر من صفر."); _amount.Focus(); return; } if (_amount.Value > max) { AppDialog.ShowInformation(this, Text, "المبلغ أكبر من المتبقي."); _amount.Focus(); return; } var method = _method.Text == "نقدًا" ? PaymentMethod.Cash : _method.Text == "تحويل بنكي" ? PaymentMethod.BankTransfer : PaymentMethod.Other; var note = method == PaymentMethod.Other && _method.Text != "أخرى" ? $"طريقة الدفع: {_method.Text}\n{_notes.Text}" : _notes.Text; Values = new RecordPaymentDto(_amount.Value, method, _reference.Text, note); DialogResult = DialogResult.OK; Close(); };
         var cancel = new Button { Text = "إلغاء", DialogResult = DialogResult.Cancel, Width = 90 }; grid.Controls.Add(ok, 0, 4); grid.Controls.Add(cancel, 1, 4); Controls.Add(grid); AcceptButton = ok; CancelButton = cancel;
     }
 }

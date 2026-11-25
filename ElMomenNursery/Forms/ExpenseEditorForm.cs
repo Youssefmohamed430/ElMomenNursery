@@ -39,6 +39,7 @@ public sealed class ExpenseEditorForm : ResponsiveForm
 
         _category.Items.AddRange(["كهرباء", "مياه", "إيجار", "نظافة", "صيانة", "مستلزمات", "نقل", "ضيافة", "أخرى"]);
         _category.SelectedIndex = 0;
+        Shown += async (_, _) => await LookupOptions.LoadAsync(_scopes, _category, "ExpenseCategory", ["كهرباء", "مياه", "إيجار", "نظافة", "صيانة", "مستلزمات", "نقل", "ضيافة", "أخرى"]);
         _date.Value = DateTime.Today;
 
         var fields = new TableLayoutPanel

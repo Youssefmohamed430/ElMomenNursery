@@ -24,6 +24,7 @@ public sealed class ChildEditorForm : ResponsiveForm
     private readonly ComboBox _gender = CreateGenderPicker();
     private readonly ComboBox _shift = CreateShiftPicker();
     private readonly ComboBox _classroom = new() { DropDownStyle = ComboBoxStyle.DropDownList, Height = 34 };
+    private readonly ComboBox _classroom2 = new() { DropDownStyle = ComboBoxStyle.DropDownList, Height = 34 };
     private readonly TextBox _fatherName = CreateTextBox(100);
     private readonly TextBox _fatherOccupation = CreateTextBox(100);
     private readonly TextBox _fatherPhone = CreateTextBox(50);
@@ -45,6 +46,7 @@ public sealed class ChildEditorForm : ResponsiveForm
         _child = child;
         _canManageClasses = canManageClasses;
         _classroom.Enabled = canManageClasses;
+        _classroom2.Enabled = canManageClasses;
         Text = child is null ? "إضافة طفل" : "تعديل بيانات الطفل";
         StartPosition = FormStartPosition.CenterParent;
         MinimumSize = new Size(820, 640);
@@ -73,7 +75,8 @@ public sealed class ChildEditorForm : ResponsiveForm
             AddPair(table, "اسم الطفل *", _fullName, "النوع *", _gender);
             AddPair(table, "تاريخ الميلاد *", _dateOfBirth, "تاريخ الالتحاق *", _enrollmentDate);
             AddSingle(table, "الفترة *", _shift);
-            AddSingle(table, "الفصل (اختياري)", _classroom);
+            AddSingle(table, "الفصل الأول (اختياري)", _classroom);
+            AddSingle(table, "الفصل الثاني (اختياري)", _classroom2);
             AddSingle(table, "العنوان *", _address);
         }));
         sections.Controls.Add(CreateSection("بيانات الأب", table =>
@@ -288,16 +291,21 @@ public sealed class ChildEditorForm : ResponsiveForm
             var service = scope.ServiceProvider.GetRequiredService<IClassroomService>();
             _classroom.Items.Clear();
             _classroom.Items.Add(new ClassroomOption(null, "بدون فصل"));
+            _classroom2.Items.Clear();
+            _classroom2.Items.Add(new ClassroomOption(null, "بدون فصل"));
             var rooms = await service.GetClassroomsAsync();
             if (rooms.IsFailure) { ShowValidationError(rooms.Error.Description); return; }
-            foreach (var room in rooms.Value) _classroom.Items.Add(new ClassroomOption(room.Id, room.Name));
+            foreach (var room in rooms.Value) { _classroom.Items.Add(new ClassroomOption(room.Id, room.Name)); _classroom2.Items.Add(new ClassroomOption(room.Id, room.Name)); }
             _classroom.SelectedIndex = 0;
+            _classroom2.SelectedIndex = 0;
             if (_child is not null)
             {
-                var current = await service.GetChildClassroomAsync(_child.Id);
+                var current = await service.GetChildClassroomsAsync(_child.Id);
                 if (current.IsFailure) { ShowValidationError(current.Error.Description); return; }
                 for (var index = 0; index < _classroom.Items.Count; index++)
-                    if (_classroom.Items[index] is ClassroomOption option && option.Id == current.Value) _classroom.SelectedIndex = index;
+                    if (_classroom.Items[index] is ClassroomOption option && current.Value.Count > 0 && option.Id == current.Value[0]) _classroom.SelectedIndex = index;
+                if (current.Value.Count > 1) for (var index = 0; index < _classroom2.Items.Count; index++)
+                    if (_classroom2.Items[index] is ClassroomOption option && option.Id == current.Value[1]) _classroom2.SelectedIndex = index;
             }
         }
         catch (Exception exception) { _log.Warning(exception, "Unable to load classroom choices for child form"); }
@@ -306,11 +314,12 @@ public sealed class ChildEditorForm : ResponsiveForm
     private async Task<bool> SaveClassroomAssignmentAsync(Guid childId, DateOnly startDate)
     {
         if (!_canManageClasses) return true;
-        var requestedId = (_classroom.SelectedItem as ClassroomOption)?.Id;
+        var requestedIds = new[] { (_classroom.SelectedItem as ClassroomOption)?.Id, (_classroom2.SelectedItem as ClassroomOption)?.Id }.Where(x => x.HasValue).Select(x => x!.Value).ToArray();
+        if (requestedIds.Distinct().Count() != requestedIds.Length) { ShowValidationError("اختر فصلين مختلفين."); return false; }
         await using var scope = _scopes.CreateAsyncScope();
         var effectiveStartDate = _child is null ? startDate : DateOnly.FromDateTime(DateTime.Today);
         var result = await scope.ServiceProvider.GetRequiredService<IClassroomService>()
-            .AssignChildAsync(childId, requestedId, effectiveStartDate);
+            .SetChildClassroomsAsync(childId, requestedIds, effectiveStartDate);
         if (result.IsFailure) { ShowValidationError(result.Error.Description); return false; }
         return true;
     }

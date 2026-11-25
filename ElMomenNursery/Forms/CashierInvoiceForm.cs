@@ -54,6 +54,7 @@ internal sealed class CashierInvoiceForm : ResponsiveForm
 
         _method.Items.AddRange(["نقدًا", "تحويل بنكي", "أخرى"]);
         _method.SelectedIndex = 0;
+        Shown += async (_, _) => await LookupOptions.LoadAsync(_scopes, _method, "PaymentMethod", ["نقدًا", "تحويل بنكي", "أخرى"]);
         ConfigureGrid();
 
         var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(16), ColumnCount = 1, RowCount = 5, BackColor = BrandPalette.AppBackground };
@@ -272,8 +273,8 @@ internal sealed class CashierInvoiceForm : ResponsiveForm
             await using var scope = _scopes.CreateAsyncScope();
             var dto = new CreateInvoiceDto(_customer.Text.Trim(), null,
                 _cart.Select(x => new CreateInvoiceLineDto(x.ItemId, x.Name, x.Price, x.Quantity)).ToArray(),
-                _method.SelectedIndex switch { 0 => PaymentMethod.Cash, 1 => PaymentMethod.BankTransfer, _ => PaymentMethod.Other },
-                _reference.Text, null);
+                _method.Text == "نقدًا" ? PaymentMethod.Cash : _method.Text == "تحويل بنكي" ? PaymentMethod.BankTransfer : PaymentMethod.Other,
+                _reference.Text, _method.Text is not ("نقدًا" or "تحويل بنكي" or "أخرى") ? $"طريقة الدفع: {_method.Text}" : null);
             var result = await scope.ServiceProvider.GetRequiredService<IInvoiceService>().CreateInvoiceAsync(dto);
             if (!ResultPresenter.Present(this, Text, result)) return;
             try

@@ -5,6 +5,17 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace ElMomenNursery.Infrastructure.Persistence.Configurations;
 
+internal sealed class LookupItemConfiguration : IEntityTypeConfiguration<LookupItem>
+{
+    public void Configure(EntityTypeBuilder<LookupItem> b)
+    {
+        b.ToTable("LookupItems"); b.HasKey(x => x.Id);
+        b.Property(x => x.Category).HasMaxLength(64).IsRequired();
+        b.Property(x => x.Name).HasMaxLength(120).IsRequired();
+        b.HasIndex(x => new { x.Category, x.Name }).IsUnique().HasFilter("\"IsDeleted\" = 0").HasDatabaseName("UX_LookupItems_Category_Name");
+    }
+}
+
 internal sealed class ChildConfiguration : IEntityTypeConfiguration<Child>
 {
     public void Configure(EntityTypeBuilder<Child> b)

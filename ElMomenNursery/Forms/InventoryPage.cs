@@ -67,6 +67,7 @@ public sealed class InventoryPage : UserControl
         filters.AddActions(apply, clear);
         var actions = new ActionToolbar { Name = "inventory.items.actions" };
         actions.Add(add, edit, toggle, delete, deleted, restore, export);
+        actions.ArrangeItems(Math.Max(240, root.ClientSize.Width - root.Padding.Horizontal));
         count.Dock = DockStyle.None; count.Height = 30; grid.Dock = DockStyle.None;
         root.Controls.Add(grid); root.Controls.Add(count); root.Controls.Add(actions); root.Controls.Add(filters);
         void LayoutItems()
@@ -204,13 +205,13 @@ public sealed class InventoryPage : UserControl
             actions.SetBounds(0, filters.Bottom + 8, width, actions.ArrangeItems(width)); count.SetBounds(0, actions.Bottom, width, 28);
             grid.SetBounds(0, count.Bottom, width, Math.Max(120, root.ClientSize.Height - count.Bottom));
         }
-        root.Resize += (_, _) => LayoutCategories(); LayoutCategories();
+        root.Resize += (_, _) => LayoutCategories(); root.VisibleChanged += (_, _) => { if (root.Visible) LayoutCategories(); }; LayoutCategories();
         apply.Click += async (_, _) => await Load(); clear.Click += async (_, _) => { search.Clear(); status.SelectedIndex = 0; await Load(); };
         search.KeyDown += async (_, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; await Load(); } };
         add.Click += async (_, _) => { using var form = new InventoryCategoryEditorForm(_scopes); if (form.ShowDialog(this) == DialogResult.OK) await Load(); };
         edit.Click += async (_, _) => await Edit(); grid.CellDoubleClick += async (_, _) => await Edit();
         toggle.Click += async (_, _) => await Toggle(); delete.Click += async (_, _) => await Delete();
-        deleted.Click += async (_, _) => { showingDeleted = !showingDeleted; _categoryLoadVersion++; deleted.Text = showingDeleted ? "عرض الفئات" : "عرض المحذوفات"; restore.Visible = showingDeleted && _session?.HasPermission("Inventory.Restore") == true; add.Visible = edit.Visible = toggle.Visible = delete.Visible = !showingDeleted && canManage; export.Visible = !showingDeleted && _session?.HasPermission("Inventory.Export") == true; filters.Enabled = !showingDeleted; await Load(); };
+        deleted.Click += async (_, _) => { showingDeleted = !showingDeleted; _categoryLoadVersion++; deleted.Text = showingDeleted ? "عرض الفئات" : "عرض المحذوفات"; restore.Visible = showingDeleted && _session?.HasPermission("Inventory.Restore") == true; add.Visible = edit.Visible = toggle.Visible = delete.Visible = !showingDeleted && canManage; export.Visible = !showingDeleted && _session?.HasPermission("Inventory.Export") == true; filters.Enabled = !showingDeleted; LayoutCategories(); await Load(); };
         restore.Click += async (_, _) => await Restore();
         export.Click += async (_, _) => await GridExcelExport.SaveAsync(this, grid, _excel!, "تصدير الفئات", "الفئات");
         if (_scopes is not null) _ = UiGuard.RunAsync(this, "Inventory.LoadCategories", Load);

@@ -12,6 +12,7 @@ internal sealed class UserManagementForm : UserControl
     private static readonly ILogger _log = Log.ForContext<UserManagementForm>();
     private readonly IServiceScopeFactory _scopes;
     private readonly IExcelExportService _excelExportService;
+    private readonly UserSession _session;
     private readonly DataGridView _grid = new() { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false,
         AllowUserToDeleteRows = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false,
         AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, RowHeadersVisible = false };
@@ -19,7 +20,7 @@ internal sealed class UserManagementForm : UserControl
 
     public UserManagementForm(IServiceScopeFactory scopes, UserSession session, IExcelExportService excelExportService)
     {
-        _scopes = scopes; _excelExportService = excelExportService;
+        _scopes = scopes; _excelExportService = excelExportService; _session = session;
         Dock = DockStyle.Fill; BackColor = BrandPalette.AppBackground; RightToLeft = RightToLeft.Yes; Padding = new Padding(24);
         _grid.Columns.Add("Username", "اسم المستخدم"); _grid.Columns.Add("FullName", "الاسم");
         _grid.Columns.Add("Roles", "الأدوار"); _grid.Columns.Add("Active", "الحالة");
@@ -30,6 +31,13 @@ internal sealed class UserManagementForm : UserControl
         var assignments = Button("تعيين أدوار");
         var resetPassword = Button("إعادة كلمة المرور");
         var export = Button("تصدير Excel");
+        var lookups = Button("إدارة القوائم");
+        lookups.Visible = session.HasPermission("Lookups.Manage");
+        lookups.Click += (_, _) => { using var form = new LookupsManagementForm(_scopes); form.ShowDialog(FindForm()); };
+        var addRole = Button("إضافة دور"); var deleteRole = Button("حذف دور");
+        addRole.Visible = deleteRole.Visible = session.HasPermission("Roles.Manage");
+        addRole.Click += (_, _) => RunSafeEvent(CreateRoleAsync, "Create role");
+        deleteRole.Click += (_, _) => RunSafeEvent(DeleteRoleAsync, "Delete role");
         export.Visible = session.HasPermission("Users.Export");
         add.Visible = toggle.Visible = assignments.Visible = resetPassword.Visible = session.HasPermission("Users.Manage");
         roles.Visible = session.HasPermission("Permissions.Manage");
@@ -40,7 +48,7 @@ internal sealed class UserManagementForm : UserControl
         resetPassword.Click += (_, _) => RunSafeEvent(() => ResetPasswordAsync(), "Reset account password");
         export.Click += async (_, _) => await GridExcelExport.SaveAsync((IWin32Window?)FindForm() ?? this, _grid,
             _excelExportService, "تصدير الحسابات", "الحسابات");
-        toolbar.Controls.AddRange([add, toggle, assignments, resetPassword, roles, export, _status]);
+        toolbar.Controls.AddRange([add, toggle, assignments, resetPassword, roles, addRole, deleteRole, lookups, export, _status]);
         Controls.Add(_grid); Controls.Add(toolbar);
         Load += (_, _) => RunSafeEvent(() => ReloadAsync(), "Load user accounts");
     }
@@ -61,6 +69,24 @@ internal sealed class UserManagementForm : UserControl
         }
         catch (UnauthorizedAccessException exception) { _log.Warning(exception, "Access denied while loading user accounts"); _status.Text = "ليست لديك صلاحية عرض الحسابات."; }
         catch (Exception exception) { _log.Error(exception, "Failed to load user accounts"); _status.Text = "تعذر تحميل الحسابات."; }
+    }
+
+    private async Task CreateRoleAsync()
+    {
+        var name = new TextBox { Left = 130, Top = 20, Width = 230 }; var description = new TextBox { Left = 130, Top = 65, Width = 230 };
+        using var d = new ResponsiveForm { Text = "إضافة دور", Width = 410, Height = 190, StartPosition = FormStartPosition.CenterParent, RightToLeft = RightToLeft.Yes, RightToLeftLayout = true };
+        var ok = new Button { Text = "إنشاء", DialogResult = DialogResult.OK, Left = 270, Top = 110 }; d.Controls.AddRange([LabelAt("اسم الدور", 18), name, LabelAt("الوصف", 63), description, ok]);
+        if (d.ShowDialog(this) != DialogResult.OK) return;
+        var result = await WithServiceAsync(s => s.CreateRoleAsync(name.Text, description.Text)); if (result.IsFailure) AppDialog.ShowInformation(this, "الأدوار", result.Error.Description); else _status.Text = result.Message;
+    }
+
+    private async Task DeleteRoleAsync()
+    {
+        var result = await WithServiceAsync(s => s.GetRolesAsync()); if (result.IsFailure) { AppDialog.ShowInformation(this, "الأدوار", result.Error.Description); return; }
+        using var d = new ResponsiveForm { Text = "حذف دور", Width = 410, Height = 150, StartPosition = FormStartPosition.CenterParent, RightToLeft = RightToLeft.Yes, RightToLeftLayout = true };
+        var choices = new ComboBox { Left = 25, Top = 20, Width = 340, DropDownStyle = ComboBoxStyle.DropDownList, DataSource = result.Value.Select(x => new RoleOption(x)).ToList() }; var ok = new Button { Text = "حذف", DialogResult = DialogResult.OK, Left = 270, Top = 65 }; d.Controls.AddRange([choices, ok]);
+        if (d.ShowDialog(this) != DialogResult.OK || choices.SelectedItem is not RoleOption choice) return;
+        var deleted = await WithServiceAsync(s => s.DeleteRoleAsync(choice.Role.Id)); if (deleted.IsFailure) AppDialog.ShowInformation(this, "الأدوار", deleted.Error.Description); else _status.Text = deleted.Message;
     }
 
     private async Task AddAccountAsync()
@@ -211,7 +237,7 @@ internal sealed class UserManagementForm : UserControl
             "EmployeeAttendance" => "حضور الموظفين", "Employees" => "الموظفين", "Payments" => "المدفوعات",
             "Expenses" => "المصروفات", "Inventory" => "المخزن", "Subscriptions" => "الاشتراكات",
             "Users" => "المستخدمين", "Roles" => "الأدوار", "Permissions" => "الصلاحيات",
-            "Settings" => "الإعدادات", "Finance" => "الماليات", "Payroll" => "الرواتب", _ => parts[0]
+            "Settings" => "الإعدادات", "Finance" => "الماليات", "Payroll" => "الرواتب", "Lookups" => "القوائم", _ => parts[0]
         };
         var action = parts[1] switch
         {

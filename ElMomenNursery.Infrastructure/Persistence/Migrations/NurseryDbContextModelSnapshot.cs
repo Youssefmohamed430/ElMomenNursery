@@ -1024,6 +1024,50 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.LookupItem", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("DeletedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DeletedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsSystem")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Category", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("UX_LookupItems_Category_Name")
+                        .HasFilter("\"IsDeleted\" = 0");
+
+                    b.ToTable("LookupItems", (string)null);
+                });
+
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.ManualIncome", b =>
                 {
                     b.Property<string>("Id")

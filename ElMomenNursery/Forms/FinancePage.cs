@@ -78,7 +78,7 @@ public sealed class FinancePage : UserControl
 
         WireEvents();
 
-        Load += async (_, _) => await LoadDataAsync();
+        Load += async (_, _) => { await LoadFinanceFilterOptionsAsync(); await LoadDataAsync(); };
     }
 
     private Control BuildLayout()
@@ -498,7 +498,7 @@ public sealed class FinancePage : UserControl
             }
 
             var selectedType = _typeFilter.SelectedItem?.ToString();
-            bool Matches(FinanceTransactionDto row) => selectedType is null or "كل الأنواع" || row.TypeLabel == selectedType;
+            bool Matches(FinanceTransactionDto row) => selectedType is null or "كل الأنواع" || row.TypeLabel == selectedType || row.Category == selectedType;
             if (incomeRes.IsSuccess)
             {
                 _incomeRows = incomeRes.Value.Where(Matches).ToList();
@@ -512,6 +512,22 @@ public sealed class FinancePage : UserControl
             }
             if (summaryRes.IsSuccess) RenderFilteredSummary(summaryRes.Value);
         }, "تعذر تحميل البيانات المالية.");
+    }
+
+    private async Task LoadFinanceFilterOptionsAsync()
+    {
+        if (_scopes is null) return;
+        try
+        {
+            await using var scope = _scopes.CreateAsyncScope(); var lookup = scope.ServiceProvider.GetRequiredService<ILookupService>();
+            var expenses = await lookup.GetAsync("ExpenseCategory"); var incomes = await lookup.GetAsync("IncomeSource");
+            var selected = _typeFilter.SelectedItem?.ToString();
+            var names = new[] { "كل الأنواع", "دفعة اشتراك", "مبيعات مخزن", "إيراد يدوي", "راتب", "مصروف خارجي" }
+                .Concat(expenses.IsSuccess ? expenses.Value.Select(x => x.Name) : [])
+                .Concat(incomes.IsSuccess ? incomes.Value.Select(x => x.Name) : []).Distinct().ToArray();
+            _typeFilter.Items.Clear(); _typeFilter.Items.AddRange(names.Cast<object>().ToArray()); _typeFilter.SelectedItem = names.Contains(selected) ? selected : "كل الأنواع";
+        }
+        catch { }
     }
 
     private void RenderFilteredSummary(FinanceSummaryDto original)
@@ -541,9 +557,14 @@ public sealed class FinancePage : UserControl
         var dateRange = $"من {(_fromPicker.Checked ? _fromPicker.Value.ToString("dd/MM/yyyy") : "البداية")} إلى {(_toPicker.Checked ? _toPicker.Value.ToString("dd/MM/yyyy") : "النهاية")}";
         var filterText = $"الفترة: {dateRange}؛ النوع: {_typeFilter.SelectedItem ?? "كل الأنواع"}";
         var reportTitle = $"التقرير المالي للمقبوضات والمصروفات - {filterText}";
+        var headers = new[] { "الحركة", "التاريخ", "النوع", "الفئة/الطرف", "البيان", "المبلغ", "المرجع", "بواسطة" };
+        var owner = (IWin32Window?)FindForm() ?? this;
+        var selected = ExportColumnPicker.Pick(owner, headers);
+        if (selected is null) return;
+        rows = rows.Select(row => (IReadOnlyList<string?>)selected.Select(i => row[i]).ToArray()).ToList();
         using var dialog = new SaveFileDialog { Title = reportTitle, Filter = "ملف Excel (*.xlsx)|*.xlsx", DefaultExt = "xlsx", AddExtension = true, FileName = $"تقرير_مالي_{_typeFilter.SelectedItem}_{DateTime.Now:yyyyMMdd_HHmm}.xlsx", OverwritePrompt = true };
-        if (dialog.ShowDialog((IWin32Window?)FindForm() ?? this) != DialogResult.OK) return;
-        var data = new ExcelExportData("التقرير المالي", ["الحركة", "التاريخ", "النوع", "الفئة / الطرف", "البيان", "المبلغ", "المرجع", "بواسطة"], rows, reportTitle, filterText);
+        if (dialog.ShowDialog(owner) != DialogResult.OK) return;
+        var data = new ExcelExportData("التقرير المالي", selected.Select(i => headers[i]).ToArray(), rows, reportTitle, filterText);
         var result = await _excel.ExportAsync(data, dialog.FileName);
         ResultPresenter.Present((IWin32Window?)FindForm() ?? this, "تصدير التقرير المالي", result);
     }
