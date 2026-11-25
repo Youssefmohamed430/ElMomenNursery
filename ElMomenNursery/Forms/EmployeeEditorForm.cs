@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace ElMomenNursery.Forms;
 
-public sealed class EmployeeEditorForm : Form
+public sealed class EmployeeEditorForm : ResponsiveForm
 {
     private static readonly ILogger _log = Log.ForContext<EmployeeEditorForm>();
     private readonly IServiceScopeFactory _scopes;

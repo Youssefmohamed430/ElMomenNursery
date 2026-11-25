@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace ElMomenNursery.Forms;
 
-internal sealed class EmployeeAdvancesForm : Form
+internal sealed class EmployeeAdvancesForm : ResponsiveForm
 {
     private readonly IServiceScopeFactory _scopes;
     private readonly ComboBox _employee = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 250 };

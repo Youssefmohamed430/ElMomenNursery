@@ -4,7 +4,7 @@ using System.Diagnostics;
 
 namespace ElMomenNursery.Forms;
 
-internal sealed class ChildProfileForm : Form
+internal sealed class ChildProfileForm : ResponsiveForm
 {
     public ChildProfileForm(ChildDto child, IReadOnlyList<ChildAttachmentDto> attachments, IReadOnlyList<SubscriptionDto> subscriptions)
     {

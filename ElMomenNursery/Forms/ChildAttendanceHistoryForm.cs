@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace ElMomenNursery.Forms;
 
-internal sealed class ChildAttendanceHistoryForm : Form
+internal sealed class ChildAttendanceHistoryForm : ResponsiveForm
 {
     private readonly IServiceScopeFactory _scopes;
     private readonly IExcelExportService _excelExportService;

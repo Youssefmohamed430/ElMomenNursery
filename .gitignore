@@ -2,6 +2,14 @@
 .vs/
 **/bin/
 **/obj/
+Installer/stage/
+Installer/*-publish/
+Installer/payload.zip
+# Local release packages and installer binaries
+/*.zip
+/*.exe
+**/Setup.exe
+**/Update.exe
 *.user
 *.suo
 

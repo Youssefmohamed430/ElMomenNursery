@@ -8,7 +8,7 @@ namespace ElMomenNursery.Forms;
 internal sealed record AttendanceEditorValues(AttendanceStatus Status, DateTimeOffset? CheckIn, DateTimeOffset? CheckOut,
     string? Notes, string? Reason);
 
-internal sealed class AttendanceEditorForm : Form
+internal sealed class AttendanceEditorForm : ResponsiveForm
 {
     private readonly DateOnly _date;
     private readonly bool _correction;

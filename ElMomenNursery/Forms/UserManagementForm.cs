@@ -1,4 +1,4 @@
-﻿using ElMomenNursery.Application.IServices;
+using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Infrastructure.Security;
 using ElMomenNursery.Controls;
 using ElMomenNursery.Styling;
@@ -69,7 +69,7 @@ internal sealed class UserManagementForm : UserControl
         {
             var roles = await WithServiceAsync(service => service.GetRolesAsync());
             if (roles.IsFailure) { _status.Text = roles.Error.Description; return; }
-            using var dialog = new Form { Text = "إضافة حساب", Size = new Size(430, 400), StartPosition = FormStartPosition.CenterParent,
+            using var dialog = new ResponsiveForm { Text = "إضافة حساب", Size = new Size(430, 400), StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog, MinimizeBox = false, MaximizeBox = false, RightToLeft = RightToLeft.Yes, RightToLeftLayout = true };
             var name = Input("الاسم الكامل", 25); var username = Input("اسم المستخدم", 75); var password = Input("كلمة المرور (12 حرفًا على الأقل)", 125);
             password.UseSystemPasswordChar = true;
@@ -108,7 +108,7 @@ internal sealed class UserManagementForm : UserControl
     private async Task ResetPasswordAsync()
     {
         if (_grid.SelectedRows.Count == 0) { _status.Text = "اختر حسابًا أولًا."; return; }
-        using var dialog = new Form { Text = "إعادة تعيين كلمة المرور", Size = new Size(420, 210), StartPosition = FormStartPosition.CenterParent,
+        using var dialog = new ResponsiveForm { Text = "إعادة تعيين كلمة المرور", Size = new Size(420, 210), StartPosition = FormStartPosition.CenterParent,
             FormBorderStyle = FormBorderStyle.FixedDialog, RightToLeft = RightToLeft.Yes, RightToLeftLayout = true };
         var password = new TextBox { Left = 160, Top = 35, Width = 220, UseSystemPasswordChar = true };
         var label = new Label { Left = 20, Top = 35, Width = 130, Text = "كلمة مرور جديدة", TextAlign = ContentAlignment.MiddleRight };
@@ -133,7 +133,7 @@ internal sealed class UserManagementForm : UserControl
         {
             var roles = await WithServiceAsync(service => service.GetRolesAsync());
             if (roles.IsFailure) { _status.Text = roles.Error.Description; return; }
-            using var dialog = new Form { Text = "صلاحيات الأدوار", Size = new Size(460, 560), StartPosition = FormStartPosition.CenterParent,
+            using var dialog = new ResponsiveForm { Text = "صلاحيات الأدوار", Size = new Size(460, 560), StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog, RightToLeft = RightToLeft.Yes, RightToLeftLayout = true };
             var select = new ComboBox { Left = 25, Top = 20, Width = 390, DropDownStyle = ComboBoxStyle.DropDownList, DataSource = roles.Value.Select(x => new RoleOption(x)).ToList() };
             var permissions = AuthSeed.PermissionCodes.Select(code => new CheckBox { Text = PermissionNameArabic(code), AutoSize = true, Tag = code, RightToLeft = RightToLeft.Yes }).ToList();
@@ -167,7 +167,7 @@ internal sealed class UserManagementForm : UserControl
             var existingNames = row.Tag as string[] ?? [];
             var roles = await WithServiceAsync(service => service.GetRolesAsync());
             if (roles.IsFailure) { _status.Text = roles.Error.Description; return; }
-            using var dialog = new Form { Text = "تعيين أدوار للحساب", Size = new Size(390, 430), StartPosition = FormStartPosition.CenterParent,
+            using var dialog = new ResponsiveForm { Text = "تعيين أدوار للحساب", Size = new Size(390, 430), StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog, RightToLeft = RightToLeft.Yes, RightToLeftLayout = true };
             var list = new CheckedListBox { Left = 25, Top = 20, Width = 320, Height = 300, CheckOnClick = true, RightToLeft = RightToLeft.Yes };
             foreach (var role in roles.Value) { var i = list.Items.Add(new RoleOption(role)); if (existingNames.Contains(role.Name, StringComparer.Ordinal)) list.SetItemChecked(i, true); }

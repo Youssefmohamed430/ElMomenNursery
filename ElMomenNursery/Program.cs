@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using Serilog.Context;
 using System.Diagnostics;
+using System.Globalization;
 using Microsoft.Data.Sqlite;
 using System.Reflection;
 
@@ -22,12 +23,16 @@ internal static class Program
     {
         try
         {
-            var configuration = new ConfigurationBuilder()
+            var baseConfiguration = new ConfigurationBuilder()
                 .SetBasePath(AppContext.BaseDirectory)
                 .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
                 .AddJsonFile("appsettings.Development.json", optional: true, reloadOnChange: false)
                 .Build();
-            ConfigureLogging(configuration);
+            ConfigureLogging(baseConfiguration);
+            var configuration = new ConfigurationBuilder()
+                .AddConfiguration(baseConfiguration)
+                .AddInMemoryCollection(ResolveDatabaseProfile())
+                .Build();
             Log.ForContext("AppVersion", Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown")
                 .Information("Application starting");
 
@@ -36,7 +41,7 @@ internal static class Program
             System.Windows.Forms.Application.ThreadException += (_, eventArgs) =>
             {
                 Log.Error(eventArgs.Exception, "Unhandled Windows Forms exception");
-                ShowUnexpectedError();
+                ShowUnexpectedError(WriteEmergencyStartupLog(eventArgs.Exception));
             };
             AppDomain.CurrentDomain.UnhandledException += (_, eventArgs) =>
             {
@@ -95,7 +100,7 @@ internal static class Program
             while (true)
             {
                 using (var loginScope = serviceProvider.CreateScope())
-                using (var login = new LoginForm(loginScope.ServiceProvider.GetRequiredService<IAuthService>()))
+                using (var login = new LoginForm(loginScope.ServiceProvider.GetRequiredService<IAuthService>(), IsMockupDatabaseSelected()))
                     if (login.ShowDialog() != DialogResult.OK) break;
 
                 if (session.CurrentUser is null) break;
@@ -128,8 +133,9 @@ internal static class Program
         }
         catch (Exception exception)
         {
+            var emergencyLogPath = WriteEmergencyStartupLog(exception);
             Log.Fatal(exception, "Application terminated during startup or execution");
-            ShowUnexpectedError();
+            ShowUnexpectedError(emergencyLogPath);
         }
         finally
         {
@@ -137,12 +143,109 @@ internal static class Program
         }
     }
 
+    private static Dictionary<string, string?> ResolveDatabaseProfile()
+    {
+        var dataRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AlMoumenNursery");
+        var isMockup = IsMockupDatabaseSelected();
+        var databasePath = isMockup
+            ? Path.Combine(dataRoot, "Mockup", "nursery.db")
+            : Path.Combine(dataRoot, "nursery.db");
+        if (isMockup)
+            EnsureMockupDatabase(databasePath, Path.Combine(AppContext.BaseDirectory, "Mockup", "nursery-mockup.db"));
+
+        return new Dictionary<string, string?>
+        {
+            ["LocalData:DirectoryPath"] = Path.GetDirectoryName(databasePath),
+            ["ConnectionStrings:Nursery"] = $"Data Source={databasePath};Foreign Keys=True;Default Timeout=30"
+        };
+    }
+
+    private static void EnsureMockupDatabase(string databasePath, string bundledTemplate)
+    {
+        if (!File.Exists(bundledTemplate))
+        {
+            Log.Warning("Bundled mockup database template is missing; path={TemplatePath}", bundledTemplate);
+            return;
+        }
+
+        Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
+        if (!File.Exists(databasePath))
+        {
+            File.Copy(bundledTemplate, databasePath);
+            Log.Information("Created mockup database from bundled sample data; path={DatabasePath}", databasePath);
+            return;
+        }
+
+        if (!IsMockupDatabaseEmpty(databasePath)) return;
+
+        var backupPath = $"{databasePath}.empty-backup-{DateTime.Now:yyyyMMdd-HHmmss}";
+        File.Copy(databasePath, backupPath, overwrite: false);
+        foreach (var suffix in new[] { "-wal", "-shm" })
+        {
+            var sidecar = databasePath + suffix;
+            if (File.Exists(sidecar)) File.Copy(sidecar, backupPath + suffix, overwrite: false);
+        }
+
+        var replacementPath = databasePath + ".seed.tmp";
+        File.Copy(bundledTemplate, replacementPath, overwrite: true);
+        File.Move(replacementPath, databasePath, overwrite: true);
+        foreach (var suffix in new[] { "-wal", "-shm" })
+        {
+            var sidecar = databasePath + suffix;
+            if (File.Exists(sidecar)) File.Delete(sidecar);
+        }
+
+        Log.Information("Replaced empty mockup database with bundled sample data; path={DatabasePath}; backupPath={BackupPath}",
+            databasePath, backupPath);
+    }
+
+    private static bool IsMockupDatabaseEmpty(string databasePath)
+    {
+        try
+        {
+            var builder = new SqliteConnectionStringBuilder { DataSource = databasePath, Mode = SqliteOpenMode.ReadOnly };
+            using var connection = new SqliteConnection(builder.ToString());
+            connection.Open();
+            var businessTables = new[]
+            {
+                "Children", "Employees", "Classrooms", "Subscriptions", "Payments", "Expenses",
+                "InventoryItems", "Invoices", "ManualIncomes", "PayrollRecords", "ChildAttendances"
+            };
+            foreach (var table in businessTables)
+            {
+                using var command = connection.CreateCommand();
+                command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = $table";
+                command.Parameters.AddWithValue("$table", table);
+                if (Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture) == 0) continue;
+
+                command.Parameters.Clear();
+                command.CommandText = $"SELECT COUNT(*) FROM [{table}]";
+                if (Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture) > 0) return false;
+            }
+
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Log.Warning(exception, "Could not read mockup database; treating it as empty for recovery; path={DatabasePath}", databasePath);
+            return true;
+        }
+    }
+
+    private static bool IsMockupDatabaseSelected()
+    {
+        var modeFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AlMoumenNursery", "database-mode.txt");
+        return string.Equals(File.Exists(modeFile) ? File.ReadAllText(modeFile).Trim() : "Production", "Mockup", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static void ConfigureLogging(IConfiguration configuration)
     {
         var configuredPath = configuration["Serilog:File:Path"] ?? "Logs/log-.txt";
+        var localDataRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AlMoumenNursery");
+        var logRoot = FindProjectRoot() ?? localDataRoot;
         var logPath = Path.IsPathRooted(configuredPath)
             ? configuredPath
-            : Path.Combine(FindProjectRoot() ?? AppContext.BaseDirectory, configuredPath);
+            : Path.Combine(logRoot, configuredPath);
         logPath = Path.GetFullPath(logPath);
         try
         {
@@ -232,10 +335,34 @@ internal static class Program
         return null;
     }
 
-    private static void ShowUnexpectedError()
+    private static string WriteEmergencyStartupLog(Exception exception)
+    {
+        var localLogPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "AlMoumenNursery", "Logs", $"startup-error-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(localLogPath)!);
+            File.WriteAllText(localLogPath,
+                $"وقت الخطأ: {DateTimeOffset.Now:O}{Environment.NewLine}مسار التطبيق: {AppContext.BaseDirectory}{Environment.NewLine}{exception}",
+                System.Text.Encoding.UTF8);
+            return localLogPath;
+        }
+        catch
+        {
+            var tempLogPath = Path.Combine(Path.GetTempPath(), $"AlMoumenNursery-startup-error-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
+            try
+            {
+                File.WriteAllText(tempLogPath, $"وقت الخطأ: {DateTimeOffset.Now:O}{Environment.NewLine}{exception}", System.Text.Encoding.UTF8);
+                return tempLogPath;
+            }
+            catch { return localLogPath; }
+        }
+    }
+
+    private static void ShowUnexpectedError(string logPath)
     {
         MessageBox.Show(
-            "حدث خطأ غير متوقع. أعد تشغيل التطبيق، وإذا استمرت المشكلة أرسل ملفات السجل للدعم الفني.",
+            $"حدث خطأ غير متوقع. أعد تشغيل التطبيق، وإذا استمرت المشكلة أرسل ملف السجل الموجود هنا:\n{logPath}",
             "تعذر تشغيل التطبيق",
             MessageBoxButtons.OK,
             MessageBoxIcon.Error,

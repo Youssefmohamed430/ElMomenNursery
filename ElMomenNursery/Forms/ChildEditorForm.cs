@@ -10,7 +10,7 @@ using System.Text.RegularExpressions;
 
 namespace ElMomenNursery.Forms;
 
-public sealed class ChildEditorForm : Form
+public sealed class ChildEditorForm : ResponsiveForm
 {
     private static readonly ILogger _log = Log.ForContext<ChildEditorForm>();
     private readonly IServiceScopeFactory _scopes;

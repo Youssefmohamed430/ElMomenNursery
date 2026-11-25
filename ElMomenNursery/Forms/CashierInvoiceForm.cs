@@ -9,7 +9,7 @@ using Serilog;
 
 namespace ElMomenNursery.Forms;
 
-internal sealed class CashierInvoiceForm : Form
+internal sealed class CashierInvoiceForm : ResponsiveForm
 {
     private sealed record CartLine(Guid LineId, Guid? ItemId, string Name, decimal Price, int Quantity)
     {

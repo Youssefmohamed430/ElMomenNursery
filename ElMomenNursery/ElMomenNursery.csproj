@@ -8,12 +8,15 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>نظام إدارة حضانة المؤمن</AssemblyName>
+    <Product>نظام إدارة حضانة المؤمن</Product>
+    <ApplicationIcon>Resources\Branding\AlMoumenNursery.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <None Update="Resources\Branding\AlMoumenNurseryLogo.jpeg" CopyToOutputDirectory="PreserveNewest" />
     <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
-    <None Update="appsettings.Development.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="appsettings.Development.json" CopyToOutputDirectory="PreserveNewest" Condition="'$(Configuration)' == 'Debug'" />
   </ItemGroup>
 
   <ItemGroup>

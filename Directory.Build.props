@@ -8,6 +8,7 @@
 
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'ElMomenNursery'">
     <TargetFramework>net9.0-windows</TargetFramework>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(MSBuildProjectName)' != 'ElMomenNursery'">

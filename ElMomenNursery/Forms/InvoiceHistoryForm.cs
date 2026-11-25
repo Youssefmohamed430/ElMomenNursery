@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace ElMomenNursery.Forms;
 
-internal sealed class InvoiceHistoryForm : Form
+internal sealed class InvoiceHistoryForm : ResponsiveForm
 {
     private readonly IServiceScopeFactory _scopes;
     private readonly DataGridView _grid = new() { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false,

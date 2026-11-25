@@ -24,13 +24,13 @@ public sealed class FinancePage : UserControl
     private readonly Button _quickLastMonth = MainForm.CreateActionButton("الشهر السابق");
     private readonly Button _quickAll = MainForm.CreateActionButton("الكل");
 
-    private readonly Label _incomeKpiValue = new() { Font = new Font("Segoe UI", 16F, FontStyle.Bold), ForeColor = BrandPalette.PrimaryGreen, AutoSize = true };
+    private readonly Label _incomeKpiValue = new() { Font = new Font("Segoe UI", 21F, FontStyle.Bold), ForeColor = BrandPalette.PrimaryGreen, AutoSize = true };
     private readonly Label _incomeKpiSub = new() { Font = new Font("Segoe UI", 8.5F), ForeColor = BrandPalette.MutedText, AutoSize = true };
 
-    private readonly Label _expenseKpiValue = new() { Font = new Font("Segoe UI", 16F, FontStyle.Bold), ForeColor = BrandPalette.DangerText, AutoSize = true };
+    private readonly Label _expenseKpiValue = new() { Font = new Font("Segoe UI", 21F, FontStyle.Bold), ForeColor = BrandPalette.DangerText, AutoSize = true };
     private readonly Label _expenseKpiSub = new() { Font = new Font("Segoe UI", 8.5F), ForeColor = BrandPalette.MutedText, AutoSize = true };
 
-    private readonly Label _netKpiValue = new() { Font = new Font("Segoe UI", 16F, FontStyle.Bold), ForeColor = BrandPalette.PrimaryGreen, AutoSize = true };
+    private readonly Label _netKpiValue = new() { Font = new Font("Segoe UI", 21F, FontStyle.Bold), ForeColor = BrandPalette.PrimaryGreen, AutoSize = true };
     private readonly Label _netKpiSub = new() { Font = new Font("Segoe UI", 8.5F), ForeColor = BrandPalette.MutedText, AutoSize = true };
     private Panel? _netKpiCard;
 
@@ -156,11 +156,18 @@ public sealed class FinancePage : UserControl
         topFlow.Controls.Add(kpiPanel);
         topSection.Controls.Add(topFlow);
 
-        var bodyPanel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 10, 0, 0) };
+        var bodyPanel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 10, 0, 0), MinimumSize = new Size(0, 270) };
         bodyPanel.Controls.Add(tabControl);
 
         mainContainer.Controls.Add(bodyPanel);
         mainContainer.Controls.Add(topSection);
+        void UpdateScrollableHeight()
+        {
+            mainContainer.AutoScrollMinSize = new Size(0, topSection.Height + bodyPanel.MinimumSize.Height + mainContainer.Padding.Vertical + 10);
+        }
+        topSection.SizeChanged += (_, _) => UpdateScrollableHeight();
+        mainContainer.Resize += (_, _) => UpdateScrollableHeight();
+        UpdateScrollableHeight();
 
         return mainContainer;
     }
@@ -189,7 +196,7 @@ public sealed class FinancePage : UserControl
     {
         var table = new TableLayoutPanel
         {
-            Height = 110,
+            Height = 120,
             ColumnCount = 3,
             RowCount = 1,
             Dock = DockStyle.Top,
@@ -235,7 +242,7 @@ public sealed class FinancePage : UserControl
         };
 
         valLabel.Dock = DockStyle.Top;
-        valLabel.Height = 36;
+        valLabel.Height = 44;
         valLabel.Text = "0.00 ج.م";
 
         subLabel.Dock = DockStyle.Bottom;

@@ -10,7 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace ElMomenNursery.Forms;
 
-public sealed class InventoryItemEditorForm : Form
+public sealed class InventoryItemEditorForm : ResponsiveForm
 {
     private static readonly ILogger Log = Serilog.Log.ForContext<InventoryItemEditorForm>();
     private readonly IServiceScopeFactory? _scopes;

@@ -10,7 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace ElMomenNursery.Forms;
 
-public sealed class MainForm : Form
+public sealed class MainForm : ResponsiveForm
 {
     private static readonly ILogger _log = Log.ForContext<MainForm>();
     private const int SidebarWidth = 258;
@@ -31,8 +31,9 @@ public sealed class MainForm : Form
         _scopeFactory = scopeFactory;
         Text = "نظام إدارة حضانة المؤمن";
         StartPosition = FormStartPosition.CenterScreen;
-        MinimumSize = new Size(1024, 700);
+        MinimumSize = new Size(800, 560);
         Size = new Size(1440, 900);
+        WindowState = FormWindowState.Maximized;
         BackColor = BrandPalette.AppBackground;
         ForeColor = BrandPalette.Text;
         Font = new Font("Segoe UI", 10F, FontStyle.Regular, GraphicsUnit.Point);
@@ -57,7 +58,7 @@ public sealed class MainForm : Form
 
     private void ApplyRootLayout(Control mainArea, Control sidebar)
     {
-        var sidebarWidth = Math.Min(SidebarWidth, ClientSize.Width / 3);
+        var sidebarWidth = Math.Min(ClientSize.Width < 1100 ? 205 : SidebarWidth, ClientSize.Width / 3);
         var mainWidth = ClientSize.Width - sidebarWidth;
 
         mainArea.SetBounds(0, 0, mainWidth, ClientSize.Height);
@@ -164,6 +165,17 @@ public sealed class MainForm : Form
         }, "Logout");
         account.Controls.Add(who); account.Controls.Add(logout);
         header.Controls.Add(account);
+        header.Resize += (_, _) =>
+        {
+            var compact = header.ClientSize.Width < 760;
+            account.Width = compact ? 245 : 320;
+            who.Width = compact ? 125 : 175;
+            logout.Width = compact ? 105 : 120;
+            logo.Width = logo.Height = compact ? 54 : 70;
+            brandText.Width = Math.Max(145, header.ClientSize.Width - account.Width - logo.Width - header.Padding.Horizontal - 42);
+            brandSubtitle.Visible = !compact;
+            brandName.Font = new Font("Segoe UI", compact ? 12F : 16F, FontStyle.Bold, GraphicsUnit.Point);
+        };
 
         var divider = new Panel { Dock = DockStyle.Bottom, Height = 3, BackColor = BrandPalette.LogoGreen };
         header.Controls.Add(divider);
@@ -225,6 +237,11 @@ public sealed class MainForm : Form
             _navigationButtons.Add(section, button);
             menu.Controls.Add(button);
         }
+        menu.SizeChanged += (_, _) =>
+        {
+            foreach (Control button in menu.Controls)
+                button.Width = Math.Max(150, menu.ClientSize.Width - menu.Padding.Horizontal - 4);
+        };
 
         var footer = new Label
         {
@@ -282,7 +299,10 @@ public sealed class MainForm : Form
                 "إدارة المستخدمين" => new UserManagementForm(_scopeFactory, _session, _excelExportService),
                 _ => BuildSectionPage(section)
             };
+            if (page is ScrollableControl scrollablePage)
+                scrollablePage.AutoScroll = true;
             _pageHost.Controls.Add(page);
+            ResponsiveLayout.ApplyToTree(page);
             _pageHost.ResumeLayout(performLayout: true);
         }
         catch (Exception exception)
@@ -351,12 +371,33 @@ public sealed class MainForm : Form
             "طريقة الاستخدام",
             "يمكنك الوصول إلى الأقسام من القائمة الجانبية أو من الاختصارات هنا.",
             MessageTone.Information);
+        var profilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AlMoumenNursery", "database-mode.txt");
+        var isMockup = File.Exists(profilePath) && File.ReadAllText(profilePath, System.Text.Encoding.UTF8).Trim().Equals("Mockup", StringComparison.OrdinalIgnoreCase);
+        var changeDatabase = CreateActionButton(isMockup
+            ? "القاعدة الحالية: تجريبية | التبديل للفعلية"
+            : "القاعدة الحالية: فعلية | التبديل للتجريبية");
+        changeDatabase.Width = 330;
+        changeDatabase.Height = 42;
+        var canSwitchDatabase = _session.Roles.Any(role => role is "Admin" or "Manager");
+        changeDatabase.Enabled = canSwitchDatabase;
+        changeDatabase.Click += (_, _) =>
+        {
+            var targetMode = isMockup ? "Production" : "Mockup";
+            var targetLabel = isMockup ? "الفعلية" : "التجريبية";
+            if (MessageBox.Show(this, $"سيتم إغلاق البرنامج وفتحه على قاعدة البيانات {targetLabel}. هل تريد المتابعة؟", "تغيير قاعدة البيانات",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2,
+                    MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign) != DialogResult.Yes) return;
+            Directory.CreateDirectory(Path.GetDirectoryName(profilePath)!);
+            File.WriteAllText(profilePath, targetMode, System.Text.Encoding.UTF8);
+            System.Windows.Forms.Application.Restart();
+        };
 
         page.Controls.Add(title);
         page.Controls.Add(subtitle);
         page.Controls.Add(quickActionsTitle);
         page.Controls.Add(shortcuts);
         page.Controls.Add(guidance);
+        page.Controls.Add(changeDatabase);
 
         void LayoutHomePage()
         {
@@ -366,6 +407,7 @@ public sealed class MainForm : Form
             quickActionsTitle.SetBounds(34, 126, contentWidth, 34);
             shortcuts.SetBounds(26, 166, Math.Max(300, page.ClientSize.Width - 52), 300);
             guidance.SetBounds(34, 480, contentWidth, 76);
+            changeDatabase.SetBounds(34, 570, 330, 42);
         }
 
         page.Resize += (_, _) => LayoutHomePage();
@@ -486,6 +528,7 @@ public sealed class MainForm : Form
             AllowUserToResizeRows = false,
             RowHeadersVisible = false,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+            ScrollBars = ScrollBars.Both,
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
             MultiSelect = false,
             EnableHeadersVisualStyles = false,
@@ -511,7 +554,11 @@ public sealed class MainForm : Form
         };
         foreach (var column in columns)
         {
-            grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = column, SortMode = DataGridViewColumnSortMode.Automatic });
+            var minimumWidth = column.Contains("بيان") || column.Contains("ملاحظ") || column.Contains("مصدر") || column.Contains("موظف") || column.Contains("طفل") ? 125
+                : column.Contains("تاريخ") || column == "من" || column == "إلى" || column.Contains("فترة") ? 96
+                : column.Contains("مبلغ") || column.Contains("رصيد") || column.Contains("راتب") || column.Contains("إجمال") || column.Contains("مدفوع") || column.Contains("مستحق") ? 100
+                : 84;
+            grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = column, MinimumWidth = minimumWidth, SortMode = DataGridViewColumnSortMode.Automatic });
         }
         return grid;
     }

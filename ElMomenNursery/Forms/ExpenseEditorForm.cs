@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace ElMomenNursery.Forms;
 
-public sealed class ExpenseEditorForm : Form
+public sealed class ExpenseEditorForm : ResponsiveForm
 {
     private readonly IServiceScopeFactory? _scopes;
     private readonly FinanceTransactionDto? _transaction;

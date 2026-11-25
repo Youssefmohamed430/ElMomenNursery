@@ -55,7 +55,7 @@ internal sealed class ClassesPage : UserControl
 
     private sealed record ClassroomRow(Guid Id, string Name, Guid? TeacherId);
 
-    private sealed class ClassroomEditor : Form
+    private sealed class ClassroomEditor : ResponsiveForm
     {
         private readonly IServiceScopeFactory _scopes;
         private readonly Guid? _id;
@@ -87,7 +87,7 @@ internal sealed class ClassesPage : UserControl
         private sealed record TeacherOption(Guid? Id, string Name) { public override string ToString() => Name; }
     }
 
-    private sealed class ClassroomChildrenDialog : Form
+    private sealed class ClassroomChildrenDialog : ResponsiveForm
     {
         private readonly IServiceScopeFactory _scopes; private readonly Guid _classroomId; private readonly CheckedListBox _children = new() { Dock = DockStyle.Fill, CheckOnClick = true };
         public ClassroomChildrenDialog(IServiceScopeFactory scopes, Guid classroomId, string classroomName)

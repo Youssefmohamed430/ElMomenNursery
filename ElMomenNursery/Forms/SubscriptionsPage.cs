@@ -257,13 +257,13 @@ public sealed class SubscriptionsPage : UserControl
     private static Button Button(string text) => new() { Text = text, AutoSize = true, Height = 36, UseVisualStyleBackColor = true };
     private static string? Prompt(string title)
     {
-        using var form = new Form { Text = title, Width = 430, Height = 170, StartPosition = FormStartPosition.CenterParent, RightToLeft = RightToLeft.Yes, RightToLeftLayout = true, FormBorderStyle = FormBorderStyle.FixedDialog, MinimizeBox = false, MaximizeBox = false };
+        using var form = new ResponsiveForm { Text = title, Width = 430, Height = 170, StartPosition = FormStartPosition.CenterParent, RightToLeft = RightToLeft.Yes, RightToLeftLayout = true, FormBorderStyle = FormBorderStyle.FixedDialog, MinimizeBox = false, MaximizeBox = false };
         var box = new TextBox { Left = 18, Top = 20, Width = 375, RightToLeft = RightToLeft.Yes }; var ok = Button("موافق"); ok.DialogResult = DialogResult.OK; ok.SetBounds(286, 65, 105, 34); var cancel = Button("إلغاء"); cancel.DialogResult = DialogResult.Cancel; cancel.SetBounds(174,65,105,34);
         form.Controls.AddRange([box, ok, cancel]); form.AcceptButton = ok; form.CancelButton = cancel; return form.ShowDialog() == DialogResult.OK ? box.Text : null;
     }
     private PaymentReceiptDto? SelectReceipt(IReadOnlyList<PaymentReceiptDto> receipts)
     {
-        using var dialog = new Form { Text = "اختيار إيصال", Width = 460, Height = 190, StartPosition = FormStartPosition.CenterParent, RightToLeft = RightToLeft.Yes, RightToLeftLayout = true, FormBorderStyle = FormBorderStyle.FixedDialog, MinimizeBox = false, MaximizeBox = false };
+        using var dialog = new ResponsiveForm { Text = "اختيار إيصال", Width = 460, Height = 190, StartPosition = FormStartPosition.CenterParent, RightToLeft = RightToLeft.Yes, RightToLeftLayout = true, FormBorderStyle = FormBorderStyle.FixedDialog, MinimizeBox = false, MaximizeBox = false };
         var list = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Left = 24, Top = 24, Width = 395 };
         foreach (var receipt in receipts) list.Items.Add(new ReceiptChoice(receipt));
         list.SelectedIndex = 0;
@@ -279,7 +279,7 @@ public sealed class SubscriptionsPage : UserControl
     private sealed record PlanChoice(Guid? Id, string Name) { public override string ToString() => Name; }
 }
 
-internal sealed class SubscriptionEditorForm : Form
+internal sealed class SubscriptionEditorForm : ResponsiveForm
 {
     private readonly IServiceScopeFactory _scopes; private readonly UserSession _session; private readonly SubscriptionDto? _item;
     private readonly ComboBox _child = new() { DropDownStyle = ComboBoxStyle.DropDown, AutoCompleteMode = AutoCompleteMode.SuggestAppend, AutoCompleteSource = AutoCompleteSource.ListItems, Width = 300 };
@@ -406,12 +406,12 @@ internal sealed class SubscriptionEditorForm : Form
         finally { if (!IsDisposed) _saveButton.Enabled = true; }
     }
     private PaymentMethod MethodValue() => _method.SelectedIndex switch { 0 => PaymentMethod.Cash, 1 => PaymentMethod.BankTransfer, _ => PaymentMethod.Other };
-    private string? PromptReason() { using var prompt = new Form { Text = "سبب التعديل", Width = 380, Height = 145, StartPosition = FormStartPosition.CenterParent, RightToLeft = RightToLeft.Yes }; var box = new TextBox { Left = 15, Top = 15, Width = 330 }; var ok = new Button { Text = "موافق", DialogResult = DialogResult.OK, Left = 255, Top = 55 }; prompt.Controls.AddRange([box, ok]); prompt.AcceptButton = ok; return prompt.ShowDialog(this) == DialogResult.OK ? box.Text : null; }
+    private string? PromptReason() { using var prompt = new ResponsiveForm { Text = "سبب التعديل", Width = 380, Height = 145, StartPosition = FormStartPosition.CenterParent, RightToLeft = RightToLeft.Yes }; var box = new TextBox { Left = 15, Top = 15, Width = 330 }; var ok = new Button { Text = "موافق", DialogResult = DialogResult.OK, Left = 255, Top = 55 }; prompt.Controls.AddRange([box, ok]); prompt.AcceptButton = ok; return prompt.ShowDialog(this) == DialogResult.OK ? box.Text : null; }
     private void ShowError(string message) => AppDialog.ShowInformation(this, "الاشتراكات والمدفوعات", message);
     private sealed record PlanOption(Guid? Id, string Name) { public override string ToString() => Name; }
 }
 
-internal sealed class PaymentEditorForm : Form
+internal sealed class PaymentEditorForm : ResponsiveForm
 {
     private readonly NumericUpDown _amount = new() { DecimalPlaces = 2, ThousandsSeparator = true, Minimum = 0.01m, Width = 240 };
     private readonly ComboBox _method = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 240 };
@@ -429,7 +429,7 @@ internal sealed class PaymentEditorForm : Form
 }
 
 
-internal sealed class AbsenceFineForm : Form
+internal sealed class AbsenceFineForm : ResponsiveForm
 {
     private readonly IServiceScopeFactory _scopes;
     private readonly ComboBox _child = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };

@@ -1,4 +1,5 @@
 using ElMomenNursery.Styling;
+using ElMomenNursery.Forms;
 
 namespace ElMomenNursery.Controls;
 
@@ -16,7 +17,7 @@ public static class AppDialog
         return dialog.ShowDialog(owner) == DialogResult.OK;
     }
 
-    private sealed class MessageDialog : Form
+    private sealed class MessageDialog : ResponsiveForm
     {
         public MessageDialog(string title, string message, bool isConfirmation)
         {
