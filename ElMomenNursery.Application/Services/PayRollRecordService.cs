@@ -342,7 +342,7 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
 
     public async Task<Result<EmployeeAdvanceDto>> CreateEmployeeAdvanceAsync(CreateEmployeeAdvanceDto dto, CancellationToken cancellationToken = default)
     {
-        if (!permissions.HasPermission("Payroll.Manage")) return PayrollRecordErrors.PermissionDenied;
+        if (!permissions.HasPermission("Employees.Advances")) return PayrollRecordErrors.PermissionDenied;
         if (dto is null || dto.EmployeeId == Guid.Empty || dto.Amount <= 0 || decimal.Round(dto.Amount, 2) <= 0 || dto.AdvanceDate == default)
             return PayrollRecordErrors.InvalidAdvance;
         var employee = await unitOfWork.Repository<Employee>().FirstOrDefaultAsync(x => x.Id == dto.EmployeeId,
@@ -388,7 +388,7 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
 
     public async Task<Result<IReadOnlyList<EmployeeAdvanceDto>>> GetEmployeeAdvancesAsync(Guid? employeeId = null, CancellationToken cancellationToken = default)
     {
-        if (!permissions.HasPermission("Payroll.Manage")) return PayrollRecordErrors.PermissionDenied;
+        if (!permissions.HasPermission("Employees.Advances")) return PayrollRecordErrors.PermissionDenied;
         var advances = await unitOfWork.Repository<EmployeeAdvance>().ListAsync(
             includeProperties: [nameof(EmployeeAdvance.Employee)], cancellationToken: cancellationToken);
         return Result.Success<IReadOnlyList<EmployeeAdvanceDto>>(advances

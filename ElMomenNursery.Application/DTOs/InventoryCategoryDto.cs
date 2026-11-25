@@ -7,6 +7,4 @@ public sealed class InventoryCategoryDto
     public string? Description { get; init; }
     public bool IsActive { get; init; }
     public int ItemsCount { get; init; }
-    public Guid? ParentCategoryId { get; init; }
-    public string DisplayName { get; init; } = string.Empty;
 }

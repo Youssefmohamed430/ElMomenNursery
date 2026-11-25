@@ -10,7 +10,7 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
 
         if (query.Date == default || query.Date > DateOnly.FromDateTime(DateTime.Today)) return AttendanceErrors.InvalidDate;
 
-        var children = await unitOfWork.Repository<Child>().ListAsync(x => x.EnrollmentDate <= query.Date, cancellationToken: cancellationToken);
+        var children = await unitOfWork.Repository<Child>().ListAsync(x => x.IsRegistrationComplete && x.EnrollmentDate <= query.Date, cancellationToken: cancellationToken);
 
         var childIds = children.Select(x => x.Id).ToArray();
 
@@ -66,7 +66,7 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
         var permissionError = PermissionGuard.Check(permissions, "Attendance.View", AttendanceErrors.PermissionDenied);
         if (permissionError is not null) return permissionError;
 
-        var children = await unitOfWork.Repository<Child>().ListAsync(cancellationToken: cancellationToken);
+        var children = await unitOfWork.Repository<Child>().ListAsync(x => x.IsRegistrationComplete, cancellationToken: cancellationToken);
         IReadOnlyList<AttendanceChildOptionDto> result = children.OrderBy(x => x.FullName)
             .Select(x => new AttendanceChildOptionDto(x.Id, x.FullName)).ToArray();
 
@@ -82,7 +82,7 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
         var childIds = await unitOfWork.Repository<ChildClassEnrollment>().Query()
             .Where(x => x.ClassroomId == classroomId && x.StartDate <= end && (x.EndDate == null || x.EndDate >= start))
             .Select(x => x.ChildId).Distinct().ToListAsync(cancellationToken);
-        var children = childIds.Count == 0 ? [] : await unitOfWork.Repository<Child>().ListAsync(x => childIds.Contains(x.Id), cancellationToken: cancellationToken);
+        var children = childIds.Count == 0 ? [] : await unitOfWork.Repository<Child>().ListAsync(x => childIds.Contains(x.Id) && x.IsRegistrationComplete, cancellationToken: cancellationToken);
         return Result.Success<IReadOnlyList<AttendanceChildOptionDto>>(children.OrderBy(x => x.FullName)
             .Select(x => new AttendanceChildOptionDto(x.Id, x.FullName)).ToArray());
     }
@@ -107,7 +107,7 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
         if (error is not null) return error;
 
         var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(x => x.Id == dto.ChildId, asNoTracking: false, new string[] { "Subscriptions" }, cancellationToken: cancellationToken);
-        if (child is null || child.EnrollmentDate > dto.Date) return AttendanceErrors.PersonNotFound;
+        if (child is null || !child.IsRegistrationComplete || child.EnrollmentDate > dto.Date) return AttendanceErrors.PersonNotFound;
 
         if (await unitOfWork.Repository<ChildAttendance>().AnyAsync(x => x.ChildId == dto.ChildId && x.AttendanceDate == dto.Date, cancellationToken)) return AttendanceErrors.AlreadyRecorded;
 
@@ -189,7 +189,7 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
 
         if (date == default || date > DateOnly.FromDateTime(DateTime.Today)) return AttendanceErrors.InvalidDate;
 
-        var children = await unitOfWork.Repository<Child>().ListAsync(x => x.EnrollmentDate <= date, asNoTracking: false, cancellationToken: cancellationToken);
+        var children = await unitOfWork.Repository<Child>().ListAsync(x => x.IsRegistrationComplete && x.EnrollmentDate <= date, asNoTracking: false, cancellationToken: cancellationToken);
         var ids = children.Select(x => x.Id).ToArray();
 
         if (classroomId.HasValue)
@@ -242,7 +242,7 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
         if (childIds.Count == 0 || status is not (AttendanceStatus.Present or AttendanceStatus.Absent)) return AttendanceErrors.InvalidDate;
         if (status == AttendanceStatus.Present && checkIn is null) return AttendanceErrors.InvalidDate;
         var ids = childIds.Distinct().ToArray();
-        var children = await unitOfWork.Repository<Child>().ListAsync(x => ids.Contains(x.Id) && x.EnrollmentDate <= date, asNoTracking: false, cancellationToken: cancellationToken);
+        var children = await unitOfWork.Repository<Child>().ListAsync(x => ids.Contains(x.Id) && x.IsRegistrationComplete && x.EnrollmentDate <= date, asNoTracking: false, cancellationToken: cancellationToken);
         var existingRows = await unitOfWork.Repository<ChildAttendance>().ListAsync(x => ids.Contains(x.ChildId) && x.AttendanceDate == date, cancellationToken: cancellationToken);
         var existing = existingRows.Select(x => x.ChildId).ToHashSet();
         var pending = children.Where(x => !existing.Contains(x.Id)).ToArray();

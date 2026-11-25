@@ -15,7 +15,7 @@ public static class AuthSeed
         "Subscriptions.View", "Subscriptions.Manage", "Users.View", "Users.Manage", "Roles.Manage", "Permissions.Manage", "Settings.View", "Settings.Manage",
         "Students.Export", "Employees.Export", "Classes.Export", "Attendance.Export", "EmployeeAttendance.Export", "Users.Export", "Subscriptions.Export",
         "Students.Restore", "Employees.Restore",
-        "Finance.View", "Finance.ManageExpenses", "Finance.ManageIncome", "Finance.Export", "Payroll.Manage", "Lookups.View", "Lookups.Manage"
+        "Finance.View", "Finance.ManageExpenses", "Finance.ManageIncome", "Finance.Export", "Payroll.Manage", "Employees.Advances", "Lookups.View", "Lookups.Manage"
     ];
 
     public static async Task InitializeAsync(NurseryDbContext db, CancellationToken ct = default)
@@ -190,6 +190,10 @@ public static class AuthSeed
             if (!await db.RolePermissions.AnyAsync(x => x.RoleId == roleId && x.PermissionId == payrollPermissionId, ct))
                 db.RolePermissions.Add(new RolePermission { RoleId = roleId, PermissionId = payrollPermissionId });
         }
+        var advancePermissionId = await db.Permissions.Where(x => x.Code == "Employees.Advances").Select(x => x.Id).SingleAsync(ct);
+        var managerRoleId = await db.Roles.Where(x => x.Name == "Manager").Select(x => x.Id).SingleAsync(ct);
+        if (!await db.RolePermissions.AnyAsync(x => x.RoleId == managerRoleId && x.PermissionId == advancePermissionId, ct))
+            db.RolePermissions.Add(new RolePermission { RoleId = managerRoleId, PermissionId = advancePermissionId });
         await db.SaveChangesAsync(ct);
     }
 }

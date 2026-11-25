@@ -27,7 +27,14 @@ public sealed class InvoiceService(IUnitOfWork uow, ILogger<InvoiceService> logg
     {
         if (!Allowed("Payments.View")) return InventoryErrors.PermissionDenied;
         var rows = await uow.Repository<InventoryCategory>().Query().Where(x => x.IsActive).OrderBy(x => x.Name).ToListAsync(ct);
-        return Result.Success<IReadOnlyList<InventoryCategoryLookupDto>>(rows.Select(x => new InventoryCategoryLookupDto(x.Id, x.Name, x.IsActive, x.ParentCategoryId)).ToArray());
+        return Result.Success<IReadOnlyList<InventoryCategoryLookupDto>>(rows.Select(x => new InventoryCategoryLookupDto(x.Id, x.Name, x.IsActive)).ToArray());
+    }
+
+    public async Task<Result<IReadOnlyList<ChildLookupDto>>> GetInvoiceChildrenAsync(CancellationToken ct = default)
+    {
+        if (!Allowed("Payments.Create")) return InventoryErrors.PermissionDenied;
+        var rows = await uow.Repository<Child>().Query().OrderBy(x => x.FullName).ToListAsync(ct);
+        return Result.Success<IReadOnlyList<ChildLookupDto>>(rows.Select(x => new ChildLookupDto(x.Id, x.FullName)).ToArray());
     }
 
     public async Task<Result<IReadOnlyList<InventoryItemDto>>> BrowseAvailableItemsAsync(Guid? categoryId, string? searchText, CancellationToken ct = default)

@@ -17,14 +17,12 @@ public sealed class SubscriptionsPage : UserControl
     private readonly DataGridView _grid = new() { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, RightToLeft = RightToLeft.Yes, RowHeadersVisible = false };
     private readonly TextBox _search = new() { Width = 170, PlaceholderText = "بحث باسم الطفل", RightToLeft = RightToLeft.Yes };
     private readonly ComboBox _status = new() { Width = 130, DropDownStyle = ComboBoxStyle.DropDownList };
-    private readonly ComboBox _plan = new() { Width = 150, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly ComboBox _classroom = new() { Width = 150, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly DateTimePicker _from = new() { Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy", ShowCheckBox = true, Width = 135 };
     private readonly DateTimePicker _to = new() { Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy", ShowCheckBox = true, Width = 135 };
     private readonly CheckBox _balance = new() { Text = "عليه متبقي فقط", AutoSize = true };
     private readonly Label _summary = new() { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight };
     private readonly Button _add = Button("إضافة اشتراك");
-    private readonly Button _plans = Button("خطط الاشتراك");
     private readonly Button _invoice = Button("فاتورة بيع من المخزن");
     private readonly Button _invoiceHistory = Button("سجل الفواتير");
     private readonly Button _edit = Button("تعديل");
@@ -41,19 +39,16 @@ public sealed class SubscriptionsPage : UserControl
     {
         _scopes = scopes; _session = session; _excel = excel; Dock = DockStyle.Fill; Padding = new Padding(10); RightToLeft = RightToLeft.Yes; BackColor = BrandPalette.AppBackground;
         _status.Items.AddRange(["الكل", "مستحق", "مدفوع جزئيًا", "مدفوع", "ملغي", "معفى"]); _status.SelectedIndex = 0;
-        _plan.Items.Add(new PlanChoice(null, "كل الخطط")); _plan.SelectedIndex = 0;
         _classroom.Items.Add(new ClassroomFilterOptionDto(Guid.Empty, "كل الفصول")); _classroom.SelectedIndex = 0;
         var currentMonth = DateTime.Today;
         _from.Value = new DateTime(currentMonth.Year, currentMonth.Month, 1);
         _to.Value = new DateTime(currentMonth.Year, currentMonth.Month, DateTime.DaysInMonth(currentMonth.Year, currentMonth.Month));
         _from.Checked = true;
         _to.Checked = true;
-        _grid.Columns.AddRange([new DataGridViewTextBoxColumn { HeaderText = "الطفل" }, new DataGridViewTextBoxColumn { HeaderText = "الخطة" },
-            new DataGridViewTextBoxColumn { HeaderText = "من" }, new DataGridViewTextBoxColumn { HeaderText = "إلى" }, new DataGridViewTextBoxColumn { HeaderText = "المستحق" },
+        _grid.Columns.AddRange([new DataGridViewTextBoxColumn { HeaderText = "الطفل" }, new DataGridViewTextBoxColumn { HeaderText = "من" }, new DataGridViewTextBoxColumn { HeaderText = "إلى" }, new DataGridViewTextBoxColumn { HeaderText = "المستحق" },
             new DataGridViewTextBoxColumn { HeaderText = "المدفوع" }, new DataGridViewTextBoxColumn { HeaderText = "المتبقي" }, new DataGridViewTextBoxColumn { HeaderText = "الحالة" },
             new DataGridViewTextBoxColumn { HeaderText = "ملاحظات" }, new DataGridViewTextBoxColumn { HeaderText = "تاريخ الإضافة" }, new DataGridViewTextBoxColumn { Visible = false }]);
         _add.Visible = session.HasPermission("Subscriptions.Manage"); _edit.Visible = _cancel.Visible = _delete.Visible = session.HasPermission("Subscriptions.Manage");
-        _plans.Visible = session.HasPermission("Subscriptions.Manage");
         _pay.Visible = session.HasPermission("Payments.Create"); _fine.Visible = session.HasPermission("Payments.Create") && session.HasPermission("Finance.ManageIncome"); _receipt.Visible = session.HasPermission("Payments.View"); _export.Visible = session.HasPermission("Subscriptions.Export");
         var apply = Button("تطبيق"); var clear = Button("مسح الفلاتر"); var refresh = Button("تحديث");
         _invoice.Visible = session.HasPermission("Payments.Create");
@@ -61,13 +56,12 @@ public sealed class SubscriptionsPage : UserControl
         var filter = new FilterCard { Name = "subscriptions.filters" };
         filter.AddField("subscriptions.search", "اسم الطفل", _search, 2);
         filter.AddField("subscriptions.status", "حالة الاشتراك", _status);
-        filter.AddField("subscriptions.plan", "الخطة", _plan);
         filter.AddField("subscriptions.classroom", "الفصل", _classroom);
         filter.AddGroup("subscriptions.period", "فترة الاشتراك", 2, _from, _to);
         filter.AddField("subscriptions.balance", "الرصيد", _balance);
         filter.AddActions(apply, clear);
         var toolbar = new ActionToolbar { Name = "subscriptions.actions" };
-        toolbar.Add(refresh, _add, _plans, _invoice, _invoiceHistory, _edit, _pay, _fine, _cancel, _delete, _receipt, _export);
+        toolbar.Add(refresh, _add, _invoice, _invoiceHistory, _edit, _pay, _fine, _cancel, _delete, _receipt, _export);
         _grid.Dock = DockStyle.None; _summary.Dock = DockStyle.None;
         Controls.Add(_grid); Controls.Add(_summary); Controls.Add(toolbar); Controls.Add(filter);
         Resize += (_, _) => LayoutContent(); LayoutContent();
@@ -81,9 +75,7 @@ public sealed class SubscriptionsPage : UserControl
         }
         apply.Click += (_, _) => _ = UiGuard.RunAsync(this, "Subscriptions.Load", LoadAsync);
         refresh.Click += (_, _) => _ = UiGuard.RunAsync(this, "Subscriptions.Load", LoadAsync);
-        clear.Click += (_, _) => { _search.Clear(); _status.SelectedIndex = 0; _plan.SelectedIndex = 0; _classroom.SelectedIndex = 0; _from.Checked = _to.Checked = false; _balance.Checked = false; _ = UiGuard.RunAsync(this, "Subscriptions.Load", LoadAsync); };
         _add.Click += (_, _) => _ = UiGuard.RunAsync(this, "Subscriptions.Add", () => EditAsync(null));
-        _plans.Click += (_, _) => { using var form = new SubscriptionPlansForm(_scopes); form.ShowDialog(FindForm()); _ = UiGuard.RunAsync(this, "Subscriptions.LoadPlans", LoadPlansAsync); };
         _edit.Click += (_, _) => { if (Selected() is { } row) _ = UiGuard.RunAsync(this, "Subscriptions.Edit", () => EditAsync(row)); };
         _invoice.Click += (_, _) => _ = UiGuard.RunAsync(this, "Subscriptions.Invoice", async () => { using var form = new CashierInvoiceForm(_scopes); if (form.ShowDialog(FindForm()) == DialogResult.OK) await LoadAsync(); });
         _invoiceHistory.Click += (_, _) => { using var form = new InvoiceHistoryForm(_scopes); form.ShowDialog(FindForm()); };
@@ -95,19 +87,7 @@ public sealed class SubscriptionsPage : UserControl
         _export.Click += (_, _) => _ = UiGuard.RunAsync(this, "Subscriptions.Export", () => GridExcelExport.SaveAsync((IWin32Window?)FindForm() ?? this, _grid, _excel, "تصدير الاشتراكات", "الاشتراكات"));
         _grid.SelectionChanged += (_, _) => UpdateActions();
         _grid.KeyDown += (_, e) => { if (e.KeyCode == Keys.F5) { e.Handled = true; _ = UiGuard.RunAsync(this, "Subscriptions.Load", LoadAsync); } };
-        Load += (_, _) => _ = UiGuard.RunAsync(this, "Subscriptions.InitialLoad", async () => { await LoadPlansAsync(); await LoadClassroomsAsync(); await LoadAsync(); });
-    }
-
-    private async Task LoadPlansAsync()
-    {
-        await UiGuard.RunAsync(this, "Subscriptions.LoadPlans", async () =>
-        {
-            await using var s = _scopes.CreateAsyncScope();
-            var svc = s.ServiceProvider.GetRequiredService<ISubscriptionService>();
-            var res = await svc.GetPlansAsync();
-            if (res.IsFailure) return;
-            foreach (var plan in res.Value) _plan.Items.Add(new PlanChoice(plan.Id, plan.Name));
-        }, "تعذر تحميل خطط الاشتراك.");
+        Load += (_, _) => _ = UiGuard.RunAsync(this, "Subscriptions.InitialLoad", async () => { await LoadClassroomsAsync(); await LoadAsync(); });
     }
 
     private async Task LoadClassroomsAsync()
@@ -134,7 +114,7 @@ public sealed class SubscriptionsPage : UserControl
             var status = _status.SelectedItem?.ToString() switch { "مستحق" => SubscriptionStatus.Pending, "مدفوع جزئيًا" => SubscriptionStatus.PartiallyPaid, "مدفوع" => SubscriptionStatus.Paid, "ملغي" => SubscriptionStatus.Cancelled, "معفى" => SubscriptionStatus.Waived, _ => (SubscriptionStatus?)null };
             await using var scope = _scopes.CreateAsyncScope();
             var svc = scope.ServiceProvider.GetRequiredService<ISubscriptionService>();
-            var result = await svc.GetSubscriptionsAsync(new SubscriptionFilter { SearchText = _search.Text, Status = status, PlanId = (_plan.SelectedItem as PlanChoice)?.Id,
+            var result = await svc.GetSubscriptionsAsync(new SubscriptionFilter { SearchText = _search.Text, Status = status,
                 ClassroomId = (_classroom.SelectedItem as ClassroomFilterOptionDto)?.Id is Guid id && id != Guid.Empty ? id : null,
                 PeriodFrom = _from.Checked ? DateOnly.FromDateTime(_from.Value) : null, PeriodTo = _to.Checked ? DateOnly.FromDateTime(_to.Value) : null, OnlyWithBalance = _balance.Checked });
             if (IsDisposed || version != _loadVersion) return;
@@ -148,7 +128,7 @@ public sealed class SubscriptionsPage : UserControl
     {
         _grid.Rows.Clear(); foreach (var row in _rows)
         {
-            var i = _grid.Rows.Add(row.ChildName, row.SubscriptionPlanName ?? "—", row.PeriodStart.ToString("dd/MM/yyyy"), row.PeriodEnd.ToString("dd/MM/yyyy"),
+            var i = _grid.Rows.Add(row.ChildName, row.PeriodStart.ToString("dd/MM/yyyy"), row.PeriodEnd.ToString("dd/MM/yyyy"),
                 row.AmountDue.ToString("N2"), row.PaidAmount.ToString("N2"), row.RemainingAmount.ToString("N2"), StatusName(row.Status), row.Notes ?? "—", row.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy"), row.Id);
             _grid.Rows[i].Tag = row.Id; if (keep == row.Id) { _grid.Rows[i].Selected = true; _grid.CurrentCell = _grid.Rows[i].Cells[0]; }
         }
@@ -279,14 +259,12 @@ public sealed class SubscriptionsPage : UserControl
     {
         public override string ToString() => $"{Receipt.ReceiptNumber} — {Receipt.PaidAt.ToLocalTime():dd/MM/yyyy HH:mm} — {Receipt.PaidNow:N2} ج.م";
     }
-    private sealed record PlanChoice(Guid? Id, string Name) { public override string ToString() => Name; }
 }
 
 internal sealed class SubscriptionEditorForm : ResponsiveForm
 {
     private readonly IServiceScopeFactory _scopes; private readonly UserSession _session; private readonly SubscriptionDto? _item;
     private readonly ComboBox _child = new() { DropDownStyle = ComboBoxStyle.DropDown, AutoCompleteMode = AutoCompleteMode.SuggestAppend, AutoCompleteSource = AutoCompleteSource.ListItems, Width = 300 };
-    private readonly ComboBox _plan = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 300 };
     private readonly ComboBox _statusOverride = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 300 };
     private readonly DateTimePicker _start = new() { Format = DateTimePickerFormat.Short, Width = 300 };
     private readonly DateTimePicker _end = new() { Format = DateTimePickerFormat.Short, Width = 300 };
@@ -307,13 +285,12 @@ internal sealed class SubscriptionEditorForm : ResponsiveForm
         _statusOverride.SelectedIndexChanged += (_, _) => { if (_statusOverride.SelectedIndex == 5 && _item is null) { _due.Value = 0; _initial.Value = 0; } _initial.Enabled = _item is null && _statusOverride.SelectedIndex != 5; };
         _child.TextUpdate += async (_, _) => { if (!_loadingChildren && _item is null) await SearchChildrenAsync(_child.Text); };
         _child.Enabled = item is null;
-        var fields = new List<(string, Control)> { ("الطفل", _child), ("الخطة (اختيارية)", _plan), ("من", _start), ("إلى", _end), ("المستحق", _due), ("حالة الاشتراك", _statusOverride) };
+        var fields = new List<(string, Control)> { ("الطفل", _child), ("من", _start), ("إلى", _end), ("المستحق", _due), ("حالة الاشتراك", _statusOverride) };
         if (session.HasPermission("Payments.Create")) fields.AddRange([("المدفوع الآن", _initial), ("طريقة الدفع", _method), ("المرجع", _reference)]);
         fields.Add(("ملاحظات", _notes));
         var panel = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(16), ColumnCount = 2, RowCount = fields.Count + 1, AutoScroll = true }; panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110)); panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         for (var i = 0; i < fields.Count; i++) { panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 48)); panel.Controls.Add(new Label { Text = fields[i].Item1, TextAlign = ContentAlignment.MiddleRight, Dock = DockStyle.Fill }, 0, i); fields[i].Item2.Anchor = AnchorStyles.Left | AnchorStyles.Right; panel.Controls.Add(fields[i].Item2, 1, i); }
         var save = _saveButton; var cancel = new Button { Text = "إلغاء", DialogResult = DialogResult.Cancel, Width = 110 }; var actions = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Fill }; actions.Controls.AddRange([save, cancel]); panel.Controls.Add(actions, 0, fields.Count); panel.SetColumnSpan(actions, 2); Controls.Add(panel); AcceptButton = save; CancelButton = cancel;
-        _plan.SelectedIndexChanged += (_, _) => { if (_plan.SelectedItem is SubscriptionPlanOptionDto p && _item is null) _due.Value = Math.Min(_due.Maximum, p.DefaultFee); };
         save.Click += async (_, _) => await SaveAsync(); Load += async (_, _) => await LoadOptionsAsync();
     }
     private async Task LoadOptionsAsync()
@@ -323,14 +300,10 @@ internal sealed class SubscriptionEditorForm : ResponsiveForm
             await using var scope = _scopes.CreateAsyncScope();
             var svc = scope.ServiceProvider.GetRequiredService<ISubscriptionService>();
             var children = await svc.GetChildLookupAsync(null);
-            var plans = await svc.GetPlansAsync();
-            if (children.IsFailure || plans.IsFailure) { ShowError("تعذر تحميل بيانات الاختيار."); return; }
+            if (children.IsFailure) { ShowError("تعذر تحميل قائمة الأطفال."); return; }
             _loadingChildren = true;
             foreach (var c in children.Value) _child.Items.Add(c);
             _loadingChildren = false;
-            _plan.Items.Add(new PlanOption(null, "بدون خطة"));
-            foreach (var p in plans.Value) _plan.Items.Add(p);
-            _plan.SelectedIndex = 0;
             if (_item is null) return;
             _child.Items.Add(new ChildLookupDto(_item.ChildId, _item.ChildName));
             _child.SelectedItem = _child.Items.Cast<object>().OfType<ChildLookupDto>().First(x => x.Id == _item.ChildId);
@@ -341,8 +314,6 @@ internal sealed class SubscriptionEditorForm : ResponsiveForm
             _statusOverride.SelectedIndex = _item.Status switch { SubscriptionStatus.Cancelled => 1, SubscriptionStatus.Waived => 2, _ => 0 };
             _statusOverride.Enabled = true;
             _notes.Text = _item.Notes ?? string.Empty;
-            for (var i = 0; i < _plan.Items.Count; i++)
-                if (_plan.Items[i] is SubscriptionPlanOptionDto p && p.Id == _item.SubscriptionPlanId) _plan.SelectedIndex = i;
             _initial.Enabled = _method.Enabled = _reference.Enabled = false;
         }, "تعذر تحميل خيارات الاشتراك.");
     }
@@ -390,7 +361,7 @@ internal sealed class SubscriptionEditorForm : ResponsiveForm
                     var overlapConfirmed = false;
                     while (true)
                     {
-                        var result = await svc.CreateSubscriptionAsync(new CreateSubscriptionDto { ChildId = child.Id, SubscriptionPlanId = (_plan.SelectedItem as SubscriptionPlanOptionDto)?.Id,
+                        var result = await svc.CreateSubscriptionAsync(new CreateSubscriptionDto { ChildId = child.Id,
                             PeriodStart = DateOnly.FromDateTime(_start.Value), PeriodEnd = DateOnly.FromDateTime(_end.Value), AmountDue = _due.Value, Notes = _notes.Text, StatusOverride = SelectedStatusOverride(),
                             InitialPayment = _initial.Value > 0 ? new InitialPaymentDto(_initial.Value, MethodValue(), _reference.Text, PaymentMethodNote()) : null, ConfirmOverlappingPeriod = overlapConfirmed });
                         if (result.IsFailure && result.Error.Code == "Subscriptions.OverlappingPeriod" && !overlapConfirmed)
@@ -407,7 +378,7 @@ internal sealed class SubscriptionEditorForm : ResponsiveForm
                 }
                 var reason = PromptReason();
                 if (string.IsNullOrWhiteSpace(reason)) { ShowError("سبب التعديل مطلوب."); return; }
-                var updated = await svc.UpdateSubscriptionAsync(_item.Id, new UpdateSubscriptionDto { SubscriptionPlanId = (_plan.SelectedItem as SubscriptionPlanOptionDto)?.Id, PeriodStart = DateOnly.FromDateTime(_start.Value), PeriodEnd = DateOnly.FromDateTime(_end.Value), AmountDue = _due.Value, Notes = _notes.Text, Reason = reason, StatusOverride = SelectedStatusOverride() });
+                var updated = await svc.UpdateSubscriptionAsync(_item.Id, new UpdateSubscriptionDto { PeriodStart = DateOnly.FromDateTime(_start.Value), PeriodEnd = DateOnly.FromDateTime(_end.Value), AmountDue = _due.Value, Notes = _notes.Text, Reason = reason, StatusOverride = SelectedStatusOverride() });
                 if (!ResultPresenter.Present(this, "الاشتراكات والمدفوعات", updated)) return;
                 DialogResult = DialogResult.OK;
                 Close();
@@ -420,7 +391,6 @@ internal sealed class SubscriptionEditorForm : ResponsiveForm
     private SubscriptionStatus? SelectedStatusOverride() => _statusOverride.Text switch { "ملغي" => SubscriptionStatus.Cancelled, "معفى" => SubscriptionStatus.Waived, _ => null };
     private string? PromptReason() { using var prompt = new ResponsiveForm { Text = "سبب التعديل", Width = 380, Height = 145, StartPosition = FormStartPosition.CenterParent, RightToLeft = RightToLeft.Yes }; var box = new TextBox { Left = 15, Top = 15, Width = 330 }; var ok = new Button { Text = "موافق", DialogResult = DialogResult.OK, Left = 255, Top = 55 }; prompt.Controls.AddRange([box, ok]); prompt.AcceptButton = ok; return prompt.ShowDialog(this) == DialogResult.OK ? box.Text : null; }
     private void ShowError(string message) => AppDialog.ShowInformation(this, "الاشتراكات والمدفوعات", message);
-    private sealed record PlanOption(Guid? Id, string Name) { public override string ToString() => Name; }
 }
 
 internal sealed class PaymentEditorForm : ResponsiveForm

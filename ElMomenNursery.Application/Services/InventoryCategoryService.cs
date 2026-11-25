@@ -8,7 +8,7 @@ public sealed class InventoryCategoryService(IUnitOfWork unitOfWork, ILogger<Inv
         var rows = await unitOfWork.Repository<InventoryCategory>().Query().Include(x => x.Items).ToListAsync(cancellationToken);
         var search = ArabicNameNormalizer.Normalize(filter.SearchText);
         var selected = rows.Where(x => (filter.IsActive is null || x.IsActive == filter.IsActive) && (search.Length == 0 || ArabicNameNormalizer.Normalize(x.Name).Contains(search, StringComparison.Ordinal))).OrderBy(x => x.Name, StringComparer.CurrentCulture).ToArray();
-        return Result.Success<IReadOnlyList<InventoryCategoryDto>>(WithPaths(selected, rows));
+        return Result.Success<IReadOnlyList<InventoryCategoryDto>>(selected.Select(ToDto).ToArray());
     }
     public async Task<Result<InventoryCategoryDto>> GetCategoryByIdAsync(Guid categoryId, CancellationToken cancellationToken = default)
     {
@@ -20,8 +20,7 @@ public sealed class InventoryCategoryService(IUnitOfWork unitOfWork, ILogger<Inv
             .SingleOrDefaultAsync(c => c.Id == categoryId, cancellationToken);
 
         if (x is null) return InventoryErrors.CategoryNotFound;
-        var all = await unitOfWork.Repository<InventoryCategory>().ListAsync(cancellationToken: cancellationToken);
-        return Result.Success(WithPaths([x], all)[0]);
+        return Result.Success(ToDto(x));
     }
     public async Task<Result<IReadOnlyList<InventoryCategoryLookupDto>>> GetCategoryLookupAsync(bool activeOnly, CancellationToken cancellationToken = default)
     {
@@ -33,7 +32,7 @@ public sealed class InventoryCategoryService(IUnitOfWork unitOfWork, ILogger<Inv
 
         var result = rows.Where(x => !activeOnly || x.IsActive)
                          .OrderBy(x => x.Name, StringComparer.CurrentCulture)
-                         .Select(x => new InventoryCategoryLookupDto(x.Id, Path(x, rows), x.IsActive, x.ParentCategoryId))
+                         .Select(x => new InventoryCategoryLookupDto(x.Id, x.Name, x.IsActive))
                          .ToArray();
 
         return Result.Success<IReadOnlyList<InventoryCategoryLookupDto>>(result);
@@ -46,8 +45,7 @@ public sealed class InventoryCategoryService(IUnitOfWork unitOfWork, ILogger<Inv
         if (name is null || name.Length > 100 || (dto.Description?.Length ?? 0) > 500) return InventoryErrors.InvalidData;
 
         if (await Duplicate(name, null, cancellationToken)) return InventoryErrors.DuplicateCategoryName;
-        if (dto.ParentCategoryId is Guid parentId && !await unitOfWork.Repository<InventoryCategory>().AnyAsync(x => x.Id == parentId, cancellationToken)) return InventoryErrors.CategoryNotFound;
-        var entity = new InventoryCategory { Name = name, Description = Clean(dto.Description), IsActive = dto.IsActive, ParentCategoryId = dto.ParentCategoryId };
+        var entity = new InventoryCategory { Name = name, Description = Clean(dto.Description), IsActive = dto.IsActive };
 
         try
         {
@@ -74,17 +72,7 @@ public sealed class InventoryCategoryService(IUnitOfWork unitOfWork, ILogger<Inv
 
         if (entity is null) return InventoryErrors.CategoryNotFound;
         if (await Duplicate(name, entity.Id, cancellationToken)) return InventoryErrors.DuplicateCategoryName;
-        if (dto.ParentCategoryId == entity.Id) return InventoryErrors.InvalidData;
-        if (dto.ParentCategoryId is Guid parentId)
-        {
-            var all = await unitOfWork.Repository<InventoryCategory>().ListAsync(cancellationToken: cancellationToken);
-            var byId = all.ToDictionary(x => x.Id);
-            var cursor = parentId;
-            while (byId.TryGetValue(cursor, out var ancestor)) { if (ancestor.Id == entity.Id) return InventoryErrors.InvalidData; if (ancestor.ParentCategoryId is not Guid next) break; cursor = next; }
-            if (!byId.ContainsKey(parentId)) return InventoryErrors.CategoryNotFound;
-        }
-
-        var before = Values(entity); entity.Name = name; entity.Description = Clean(dto.Description); entity.IsActive = dto.IsActive; entity.ParentCategoryId = dto.ParentCategoryId;
+        var before = Values(entity); entity.Name = name; entity.Description = Clean(dto.Description); entity.IsActive = dto.IsActive;
 
         try
         {
@@ -120,7 +108,6 @@ public sealed class InventoryCategoryService(IUnitOfWork unitOfWork, ILogger<Inv
         var entity = await unitOfWork.Repository<InventoryCategory>().FirstOrDefaultAsync(x => x.Id == categoryId, false, cancellationToken: cancellationToken); if (entity is null) return InventoryErrors.CategoryNotFound;
 
         if (await unitOfWork.Repository<InventoryItem>().AnyAsync(x => x.CategoryId == categoryId, cancellationToken)) return InventoryErrors.CategoryHasItems;
-        if (await unitOfWork.Repository<InventoryCategory>().AnyAsync(x => x.ParentCategoryId == categoryId, cancellationToken)) return new Error("Inventory.CategoryHasChildren", "لا يمكن حذف فئة لها فئات فرعية.");
 
         unitOfWork.Repository<InventoryCategory>().Remove(entity);
         try
@@ -145,7 +132,7 @@ public sealed class InventoryCategoryService(IUnitOfWork unitOfWork, ILogger<Inv
             .Include(x => x.Items)
             .ToListAsync(cancellationToken);
 
-        return Result.Success<IReadOnlyList<InventoryCategoryDto>>(WithPaths(rows.OrderBy(x => x.Name, StringComparer.CurrentCulture).ToArray(), rows));
+        return Result.Success<IReadOnlyList<InventoryCategoryDto>>(rows.OrderBy(x => x.Name, StringComparer.CurrentCulture).Select(ToDto).ToArray());
     }
     public async Task<Result> RestoreCategoryAsync(Guid categoryId, CancellationToken cancellationToken = default)
     {
@@ -183,13 +170,5 @@ public sealed class InventoryCategoryService(IUnitOfWork unitOfWork, ILogger<Inv
     private async Task Audit(string action, Guid id, string before, string after, CancellationToken ct) => await unitOfWork.Repository<AuditLog>().AddAsync(new AuditLog { Action = action, EntityType = nameof(InventoryCategory), EntityId = id.ToString("D"), UserAccountId = sessions.CurrentUser?.UserId, ChangeSummary = $"قبل: {before}; بعد: {after}; المستخدم: {sessions.CurrentUser?.FullName ?? "—"}" }, ct);
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private static string Values(InventoryCategory x) => $"الاسم: {x.Name}; الوصف: {x.Description ?? "—"}; الحالة: {(x.IsActive ? "نشط" : "موقوف")}";
-    private static InventoryCategoryDto[] WithPaths(IReadOnlyCollection<InventoryCategory> selected, IReadOnlyCollection<InventoryCategory> all)
-        => selected.Select(x => new InventoryCategoryDto { Id = x.Id, Name = x.Name, Description = x.Description, IsActive = x.IsActive, ItemsCount = x.Items.Count(i => !i.IsDeleted), ParentCategoryId = x.ParentCategoryId, DisplayName = Path(x, all) }).ToArray();
-    private static InventoryCategoryDto ToDto(InventoryCategory x) => new() { Id = x.Id, Name = x.Name, Description = x.Description, IsActive = x.IsActive, ItemsCount = x.Items.Count(i => !i.IsDeleted), ParentCategoryId = x.ParentCategoryId, DisplayName = x.Name };
-    private static string Path(InventoryCategory item, IReadOnlyCollection<InventoryCategory> all)
-    {
-        var names = new List<string> { item.Name }; var byId = all.ToDictionary(x => x.Id); var parentId = item.ParentCategoryId; var depth = 0;
-        while (parentId is Guid id && depth++ < 50 && byId.TryGetValue(id, out var parent)) { names.Add(parent.Name); parentId = parent.ParentCategoryId; }
-        names.Reverse(); return string.Join(" / ", names);
-    }
+    private static InventoryCategoryDto ToDto(InventoryCategory x) => new() { Id = x.Id, Name = x.Name, Description = x.Description, IsActive = x.IsActive, ItemsCount = x.Items.Count(i => !i.IsDeleted) };
 }

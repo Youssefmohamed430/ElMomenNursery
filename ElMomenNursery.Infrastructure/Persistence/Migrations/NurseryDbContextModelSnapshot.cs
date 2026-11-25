@@ -212,6 +212,11 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("IsRegistrationComplete")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(true);
+
                     b.Property<string>("MotherName")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -863,17 +868,12 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("ParentCategoryId")
-                        .HasColumnType("TEXT");
-
                     b.HasKey("Id");
 
                     b.HasIndex("Name")
                         .IsUnique()
                         .HasDatabaseName("UX_InventoryCategories_Name")
                         .HasFilter("\"IsDeleted\" = 0");
-
-                    b.HasIndex("ParentCategoryId");
 
                     b.ToTable("InventoryCategories", (string)null);
                 });
@@ -1512,13 +1512,7 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("SubscriptionPlanId")
-                        .HasColumnType("TEXT");
-
                     b.HasKey("Id");
-
-                    b.HasIndex("SubscriptionPlanId")
-                        .HasDatabaseName("IX_Subscriptions_PlanId");
 
                     b.HasIndex("ChildId", "PeriodStart")
                         .HasDatabaseName("IX_Subscriptions_Child_PeriodStart");
@@ -1528,48 +1522,6 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_Subscriptions_AmountDueNonNegative", "CAST(\"AmountDue\" AS REAL) >= 0");
 
                             t.HasCheckConstraint("CK_Subscriptions_PeriodRange", "\"PeriodEnd\" >= \"PeriodStart\"");
-                        });
-                });
-
-            modelBuilder.Entity("ElMomenNursery.Domain.Entities.SubscriptionPlan", b =>
-                {
-                    b.Property<string>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("DefaultFee")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
-
-                    b.Property<long?>("DeletedAt")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("DeletedByUserId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Name")
-                        .IsUnique()
-                        .HasDatabaseName("UX_SubscriptionPlans_Name")
-                        .HasFilter("\"IsDeleted\" = 0");
-
-                    b.ToTable("SubscriptionPlans", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_SubscriptionPlans_DefaultFeeNonNegative", "CAST(\"DefaultFee\" AS REAL) >= 0");
                         });
                 });
 
@@ -1833,16 +1785,6 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.Navigation("UploadedByUser");
                 });
 
-            modelBuilder.Entity("ElMomenNursery.Domain.Entities.InventoryCategory", b =>
-                {
-                    b.HasOne("ElMomenNursery.Domain.Entities.InventoryCategory", "ParentCategory")
-                        .WithMany("Children")
-                        .HasForeignKey("ParentCategoryId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("ParentCategory");
-                });
-
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.InventoryItem", b =>
                 {
                     b.HasOne("ElMomenNursery.Domain.Entities.InventoryCategory", "Category")
@@ -2006,14 +1948,7 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("ElMomenNursery.Domain.Entities.SubscriptionPlan", "SubscriptionPlan")
-                        .WithMany("Subscriptions")
-                        .HasForeignKey("SubscriptionPlanId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("Child");
-
-                    b.Navigation("SubscriptionPlan");
                 });
 
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.UserAccount", b =>
@@ -2100,8 +2035,6 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.InventoryCategory", b =>
                 {
-                    b.Navigation("Children");
-
                     b.Navigation("Items");
                 });
 
@@ -2144,11 +2077,6 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.Subscription", b =>
                 {
                     b.Navigation("PaymentAllocations");
-                });
-
-            modelBuilder.Entity("ElMomenNursery.Domain.Entities.SubscriptionPlan", b =>
-                {
-                    b.Navigation("Subscriptions");
                 });
 
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.UserAccount", b =>

@@ -51,7 +51,6 @@ internal sealed class PayrollPage : UserControl
         var edit = Button("تعديل المحدد"); edit.Click += (_, _) => BeginEdit();
         var cancelEdit = Button("إلغاء التعديل"); cancelEdit.Click += (_, _) => EndEdit();
         var refresh = Button("تحديث"); refresh.Click += (_, _) => _ = UiGuard.RunAsync(this, "Payroll.Load", LoadAsync);
-        var advances = Button("سلف الموظفين"); advances.Click += (_, _) => _ = UiGuard.RunAsync(this, "Payroll.OpenAdvances", async () => { using var dialog = new EmployeeAdvancesForm(_scopes); dialog.ShowDialog(this); await LoadAsync(); });
         var generate = Button("إنشاء سجلات لكل الموظفين"); generate.Click += (_, _) => _ = UiGuard.RunAsync(this, "Payroll.GenerateForAll", GenerateForAllEmployeesAsync);
         var clearDateFilter = Button("إلغاء فلتر التاريخ"); clearDateFilter.Click += (_, _) => { _filterFrom.Checked = _filterTo.Checked = false; _ = UiGuard.RunAsync(this, "Payroll.Load", LoadAsync); };
         var export = Button("تصدير Excel"); export.Click += async (_, _) => await ExportAsync();
@@ -59,7 +58,7 @@ internal sealed class PayrollPage : UserControl
         _filterTo.ValueChanged += (_, _) => { if (_filterTo.Checked) _ = UiGuard.RunAsync(this, "Payroll.Load", LoadAsync); };
         _filterFrom.MouseUp += (_, _) => _ = UiGuard.RunAsync(this, "Payroll.Load", LoadAsync);
         _filterTo.MouseUp += (_, _) => _ = UiGuard.RunAsync(this, "Payroll.Load", LoadAsync);
-        editor.Controls.AddRange([_savePayroll, generate, clearDateFilter, export, _filteredTotal, edit, cancelEdit, calculate, pay, advances, refresh]);
+        editor.Controls.AddRange([_savePayroll, generate, clearDateFilter, export, _filteredTotal, edit, cancelEdit, calculate, pay, refresh]);
         _grid.Columns.Add("Employee", "الموظف"); _grid.Columns.Add("Period", "الفترة"); _grid.Columns.Add("Salary", "الراتب الشهري");
         _grid.Columns.Add("Daily", "أجر اليوم"); _grid.Columns.Add("Absences", "أيام الغياب"); _grid.Columns.Add("LateMinutes", "دقائق التأخير"); _grid.Columns.Add("LateDeduction", "خصم التأخير"); _grid.Columns.Add("Prorated", "الراتب حسب مدة العمل"); _grid.Columns.Add("Insurance", "التأمين");
         _grid.Columns.Add("Deductions", "خصومات أخرى"); _grid.Columns.Add("Additions", "إضافات"); _grid.Columns.Add("Advance", "خصم السلف"); _grid.Columns.Add("Net", "صافي الراتب"); _grid.Columns.Add("Paid", "الحالة");

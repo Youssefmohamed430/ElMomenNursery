@@ -8,7 +8,7 @@ public sealed class FinanceService(
 {
     public async Task<Result<FinanceSummaryDto>> GetSummaryAsync(FinanceDateFilter filter, CancellationToken cancellationToken = default)
     {
-        if (!Allowed("Finance.View") && !Allowed("Payments.View") && !Allowed("Expenses.View"))
+        if (!Allowed("Finance.View"))
             return CommonErrors.PermissionDenied;
 
         try
@@ -93,7 +93,7 @@ public sealed class FinanceService(
 
     public async Task<Result<IReadOnlyList<FinanceTransactionDto>>> GetIncomeTransactionsAsync(FinanceDateFilter filter, CancellationToken cancellationToken = default)
     {
-        if (!Allowed("Finance.View") && !Allowed("Payments.View"))
+        if (!Allowed("Finance.View") && !Allowed("Payments.View") && !Allowed("Finance.ManageIncome"))
             return CommonErrors.PermissionDenied;
 
         try
@@ -103,7 +103,7 @@ public sealed class FinanceService(
             // 1. Subscription Payments
             var paymentsQuery = unitOfWork.Repository<Payment>().Query().IgnoreQueryFilters()
                 .Include(x => x.Child)
-                .Include(x => x.Subscription).ThenInclude(s => s!.SubscriptionPlan)
+                .Include(x => x.Subscription)
                 .Include(x => x.ReceivedByUser)
                 .Where(x => x.Status == PaymentStatus.Posted);
 
@@ -121,8 +121,7 @@ public sealed class FinanceService(
             var payments = await paymentsQuery.ToListAsync(cancellationToken);
             foreach (var p in payments)
             {
-                var planName = p.Subscription?.SubscriptionPlan?.Name;
-                var desc = planName is not null ? $"اشتراك: {planName}" : "دفعة اشتراك";
+                var desc = "دفعة اشتراك";
                 list.Add(new FinanceTransactionDto
                 {
                     Id = p.Id,
@@ -215,7 +214,7 @@ public sealed class FinanceService(
 
     public async Task<Result<IReadOnlyList<FinanceTransactionDto>>> GetExpenseTransactionsAsync(FinanceDateFilter filter, CancellationToken cancellationToken = default)
     {
-        if (!Allowed("Finance.View") && !Allowed("Expenses.View"))
+        if (!Allowed("Finance.View") && !Allowed("Expenses.View") && !Allowed("Finance.ManageExpenses"))
             return CommonErrors.PermissionDenied;
 
         try
@@ -298,7 +297,7 @@ public sealed class FinanceService(
 
     public async Task<Result<FinanceTransactionDto>> CreateExpenseAsync(CreateExpenseDto dto, CancellationToken cancellationToken = default)
     {
-        if (!Allowed("Finance.ManageExpenses") && !Allowed("Expenses.Manage"))
+        if (!Allowed("Finance.ManageExpenses") && !Allowed("Expenses.Manage") && !(Allowed("Employees.Advances") && dto.Category == "سلف موظفين"))
             return CommonErrors.PermissionDenied;
 
         if (dto.Amount <= 0) return FinanceErrors.InvalidAmount;

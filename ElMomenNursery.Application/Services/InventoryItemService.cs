@@ -7,14 +7,12 @@ public sealed class InventoryItemService(IUnitOfWork unitOfWork, ILogger<Invento
         if (!Allowed("Inventory.View")) return InventoryErrors.PermissionDenied;
         var rows = await unitOfWork.Repository<InventoryItem>().Query().Include(x => x.Category).ToListAsync(cancellationToken);
         var search = ArabicNameNormalizer.Normalize(filter.SearchText);
-        var categories = await unitOfWork.Repository<InventoryCategory>().ListAsync(cancellationToken: cancellationToken);
-        var categoryMap = categories.ToDictionary(x => x.Id);
         var result = rows.Where(x => (filter.CategoryId is null || x.CategoryId == filter.CategoryId)
             && (filter.IsActive is null || x.IsActive == filter.IsActive)
             && (search.Length == 0 || ArabicNameNormalizer.Normalize(x.Name).Contains(search, StringComparison.Ordinal))
             && (filter.MinPrice is null || x.UnitPrice >= filter.MinPrice)
             && (filter.MaxPrice is null || x.UnitPrice <= filter.MaxPrice))
-            .OrderBy(x => Path(x.Category, categoryMap), StringComparer.CurrentCulture).ThenBy(x => x.Name, StringComparer.CurrentCulture).Select(x => ToDto(x, Path(x.Category, categoryMap))).ToArray();
+            .OrderBy(x => x.Category.Name, StringComparer.CurrentCulture).ThenBy(x => x.Name, StringComparer.CurrentCulture).Select(x => ToDto(x, x.Category.Name)).ToArray();
         return Result.Success<IReadOnlyList<InventoryItemDto>>(result);
     }
 
@@ -24,7 +22,7 @@ public sealed class InventoryItemService(IUnitOfWork unitOfWork, ILogger<Invento
         var item = await unitOfWork.Repository<InventoryItem>().Query().Include(x => x.Category).SingleOrDefaultAsync(x => x.Id == itemId, cancellationToken);
         if (item is null) return InventoryErrors.ItemNotFound;
         var categories = await unitOfWork.Repository<InventoryCategory>().ListAsync(cancellationToken: cancellationToken);
-        return Result.Success(ToDto(item, Path(item.Category, categories.ToDictionary(x => x.Id))));
+        return Result.Success(ToDto(item));
     }
 
     public async Task<Result<InventoryItemDto>> CreateItemAsync(CreateItemDto dto, CancellationToken cancellationToken = default)
@@ -124,10 +122,5 @@ public sealed class InventoryItemService(IUnitOfWork unitOfWork, ILogger<Invento
     private async Task Audit(string action, Guid id, string before, string after, CancellationToken ct) => await unitOfWork.Repository<AuditLog>().AddAsync(new AuditLog { Action = action, EntityType = nameof(InventoryItem), EntityId = id.ToString("D"), UserAccountId = sessions.CurrentUser?.UserId, ChangeSummary = $"قبل: {before}; بعد: {after}; المستخدم: {sessions.CurrentUser?.FullName ?? "—"}" }, ct);
     private static string Values(InventoryItem x) => $"الاسم: {x.Name}; الفئة: {x.Category?.Name}; السعر: {x.UnitPrice:0.00}; الكمية: {x.Quantity} قطعة; الحالة: {(x.IsActive ? "نشط" : "موقوف")}";
     private static InventoryItemDto ToDto(InventoryItem x, string? categoryName = null) => new() { Id = x.Id, Name = x.Name, CategoryId = x.CategoryId, CategoryName = categoryName ?? x.Category?.Name ?? string.Empty, UnitPrice = x.UnitPrice, Quantity = x.Quantity, IsActive = x.IsActive, CategoryIsActive = x.Category?.IsActive ?? false };
-    private static string Path(InventoryCategory item, IReadOnlyDictionary<Guid, InventoryCategory> categories)
-    {
-        var names = new List<string> { item.Name }; var id = item.ParentCategoryId; var depth = 0;
-        while (id is Guid parentId && depth++ < 50 && categories.TryGetValue(parentId, out var parent)) { names.Add(parent.Name); id = parent.ParentCategoryId; }
-        names.Reverse(); return string.Join(" / ", names);
-    }
+
 }

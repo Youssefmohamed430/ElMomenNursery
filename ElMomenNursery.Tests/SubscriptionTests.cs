@@ -27,7 +27,7 @@ public sealed class SubscriptionTests
     {
         await using var db = await CreateDb(); var child = Child("تجريبي"); var sub = new Subscription { ChildId = child.Id, Child = child, PeriodStart = child.EnrollmentDate, PeriodEnd = child.EnrollmentDate.AddMonths(1), AmountDue = 100 };
         db.AddRange(child, sub); await db.SaveChangesAsync(); var service = Service(db);
-        var result = await service.UpdateSubscriptionAsync(sub.Id, new UpdateSubscriptionDto { SubscriptionPlanId = null, PeriodStart = sub.PeriodStart, PeriodEnd = sub.PeriodEnd, AmountDue = 120, Notes = "تحديث", Reason = "تصحيح" });
+        var result = await service.UpdateSubscriptionAsync(sub.Id, new UpdateSubscriptionDto { PeriodStart = sub.PeriodStart, PeriodEnd = sub.PeriodEnd, AmountDue = 120, Notes = "تحديث", Reason = "تصحيح" });
         Assert.True(result.IsSuccess); Assert.Equal(120, (await db.Subscriptions.AsNoTracking().SingleAsync()).AmountDue); Assert.Equal("تحديث", (await db.Subscriptions.AsNoTracking().SingleAsync()).Notes);
     }
 
@@ -135,7 +135,7 @@ public sealed class SubscriptionTests
     public async Task Receipt_pdf_has_pdf_header_and_arabic_font()
     {
         var service = new ReceiptPdfService(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")));
-        var receipt = new PaymentReceiptDto(Guid.NewGuid(), "R-2026-000001", DateTimeOffset.Now, "طفل تجريبي", "اشتراك", new DateOnly(2026, 1, 1), new DateOnly(2026, 2, 1), 100, 0, 20, 80, PaymentMethod.Cash, null, "مستخدم", null);
+        var receipt = new PaymentReceiptDto(Guid.NewGuid(), "R-2026-000001", DateTimeOffset.Now, "طفل تجريبي", new DateOnly(2026, 1, 1), new DateOnly(2026, 2, 1), 100, 0, 20, 80, PaymentMethod.Cash, null, "مستخدم", null);
         var result = await service.CreateReceiptFileAsync(receipt, false); Assert.True(result.IsSuccess); var bytes = await File.ReadAllBytesAsync(result.Value);
         Assert.StartsWith("%PDF", System.Text.Encoding.ASCII.GetString(bytes, 0, 4)); Assert.True(bytes.Length > 0);
     }
@@ -145,7 +145,7 @@ public sealed class SubscriptionTests
     {
         var root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         var service = new ReceiptPdfService(root);
-        var receipt = new PaymentReceiptDto(Guid.NewGuid(), "R-2026-000001", DateTimeOffset.Now, "طفل تجريبي", "اشتراك", new DateOnly(2026, 1, 1), new DateOnly(2026, 2, 1), 100, 0, 20, 80, PaymentMethod.Cash, null, "مستخدم", null);
+        var receipt = new PaymentReceiptDto(Guid.NewGuid(), "R-2026-000001", DateTimeOffset.Now, "طفل تجريبي", new DateOnly(2026, 1, 1), new DateOnly(2026, 2, 1), 100, 0, 20, 80, PaymentMethod.Cash, null, "مستخدم", null);
         var originalResult = await service.CreateReceiptFileAsync(receipt, false); Assert.True(originalResult.IsSuccess); var original = originalResult.Value;
         var originalBytes = await File.ReadAllBytesAsync(original);
         var copyResult = await service.CreateReceiptFileAsync(receipt, true); Assert.True(copyResult.IsSuccess); var copy = copyResult.Value;

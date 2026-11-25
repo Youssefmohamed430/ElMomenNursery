@@ -4,7 +4,6 @@ public static class SubscriptionErrors
 {
     public static readonly Error NotFound = new("Subscriptions.NotFound", "الاشتراك غير موجود.");
     public static readonly Error ChildNotFound = new("Subscriptions.ChildNotFound", "الطفل غير موجود.");
-    public static readonly Error PlanNotFound = new("Subscriptions.PlanNotFound", "خطة الاشتراك غير موجودة.");
     public static readonly Error InvalidPeriod = new("Subscriptions.InvalidPeriod", "فترة الاشتراك غير صالحة.");
     public static readonly Error PeriodBeforeEnrollment = new("Subscriptions.PeriodBeforeEnrollment", "لا يمكن أن تبدأ فترة الاشتراك قبل تاريخ تسجيل الطفل.");
     public static readonly Error InvalidAmount = new("Subscriptions.InvalidAmount", "المبلغ يجب أن يكون صفرًا أو أكثر، والدفعة أكبر من صفر.");

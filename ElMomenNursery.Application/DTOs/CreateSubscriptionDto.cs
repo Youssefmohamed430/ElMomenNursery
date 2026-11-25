@@ -7,7 +7,6 @@ public class CreateSubscriptionDto
 {
     [Required(ErrorMessage = "يجب اختيار الطفل.")]
     public required Guid ChildId { get; set; }
-    public Guid? SubscriptionPlanId { get; set; }
     [Required(ErrorMessage = "تاريخ بداية الاشتراك مطلوب.")]
     public required DateOnly PeriodStart { get; set; }
     [Required(ErrorMessage = "تاريخ نهاية الاشتراك مطلوب.")]

@@ -23,6 +23,7 @@ public sealed class Child : ISoftDeletable
     public string? Notes { get; set; }
     public bool HasMedicalConditions { get; set; }
     public bool PreviouslyAttendedNursery { get; set; }
+    public bool IsRegistrationComplete { get; set; } = true;
     public Shift Shift { get; set; }
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? UpdatedAt { get; set; }

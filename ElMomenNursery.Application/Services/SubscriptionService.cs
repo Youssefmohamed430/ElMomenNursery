@@ -19,7 +19,7 @@ public sealed class SubscriptionService : ISubscriptionService
     public async Task<Result<IReadOnlyList<SubscriptionDto>>> GetSubscriptionsAsync(SubscriptionFilter filter, CancellationToken ct = default)
     {
         if (!Allowed("Subscriptions.View")) return SubscriptionErrors.PermissionDenied;
-        IQueryable<Subscription> q = unitOfWork.Repository<Subscription>().Query().Include(x => x.Child).Include(x => x.SubscriptionPlan);
+        IQueryable<Subscription> q = unitOfWork.Repository<Subscription>().Query().Include(x => x.Child);
         if (filter.ClassroomId is Guid classroomId)
         {
             var today = DateOnly.FromDateTime(DateTime.Today);
@@ -27,7 +27,6 @@ public sealed class SubscriptionService : ISubscriptionService
                 enrollment.StartDate <= today && (enrollment.EndDate == null || enrollment.EndDate >= today)));
         }
         if (filter.Status is not null) q = q.Where(x => x.Status == filter.Status);
-        if (filter.PlanId is Guid plan) q = q.Where(x => x.SubscriptionPlanId == plan);
         if (filter.PeriodFrom is DateOnly from) q = q.Where(x => x.PeriodEnd >= from);
         if (filter.PeriodTo is DateOnly to) q = q.Where(x => x.PeriodStart <= to);
         var rows = await q.ToListAsync(ct);
@@ -65,7 +64,7 @@ public sealed class SubscriptionService : ISubscriptionService
     public async Task<Result<IReadOnlyList<SubscriptionDto>>> GetSubscriptionsForChildAsync(Guid childId, CancellationToken ct = default)
     {
         if (!Allowed("Subscriptions.View")) return SubscriptionErrors.PermissionDenied;
-        var rows = await unitOfWork.Repository<Subscription>().Query().Include(x => x.Child).Include(x => x.SubscriptionPlan).Where(x => x.ChildId == childId).ToListAsync(ct);
+        var rows = await unitOfWork.Repository<Subscription>().Query().Include(x => x.Child).Where(x => x.ChildId == childId).ToListAsync(ct);
         var payments = await unitOfWork.Repository<PaymentAllocation>().Query().Where(x => rows.Select(s => s.Id).Contains(x.SubscriptionId) && x.Payment.Status == PaymentStatus.Posted).ToListAsync(ct);
         var paid = payments.GroupBy(x => x.SubscriptionId).ToDictionary(g => g.Key, g => g.Sum(x => x.AmountApplied));
         return Result.Success<IReadOnlyList<SubscriptionDto>>(rows.Select(x => ToDto(x, paid.GetValueOrDefault(x.Id))).ToArray());
@@ -83,14 +82,6 @@ public sealed class SubscriptionService : ISubscriptionService
         return Result.Success<IReadOnlyList<ChildLookupDto>>(rows);
     }
 
-    public async Task<Result<IReadOnlyList<SubscriptionPlanOptionDto>>> GetPlansAsync(CancellationToken ct = default)
-    {
-        if (!Allowed("Subscriptions.View")) return SubscriptionErrors.PermissionDenied;
-        var rows = await unitOfWork.Repository<SubscriptionPlan>().Query().Where(x => x.IsActive).OrderBy(x => x.Name)
-            .Select(x => new SubscriptionPlanOptionDto(x.Id, x.Name, x.DefaultFee)).ToListAsync(ct);
-        return Result.Success<IReadOnlyList<SubscriptionPlanOptionDto>>(rows);
-    }
-
     public async Task<Result<SubscriptionDto>> CreateSubscriptionAsync(CreateSubscriptionDto dto, CancellationToken ct = default)
     {
         if (!Allowed("Subscriptions.Manage")) return SubscriptionErrors.PermissionDenied;
@@ -105,13 +96,7 @@ public sealed class SubscriptionService : ISubscriptionService
 
         if (dto.PeriodStart < child.EnrollmentDate) return SubscriptionErrors.PeriodBeforeEnrollment;
 
-        SubscriptionPlan? plan = null;
-        if (dto.SubscriptionPlanId is Guid planId)
-        {
-            plan = await unitOfWork.Repository<SubscriptionPlan>().FirstOrDefaultAsync(x => x.Id == planId, cancellationToken: ct);
-            if (plan is null) return SubscriptionErrors.PlanNotFound;
-        }
-        var amount = dto.StatusOverride == SubscriptionStatus.Waived ? 0m : dto.AmountDue ?? plan?.DefaultFee ?? 0m;
+        var amount = dto.StatusOverride == SubscriptionStatus.Waived ? 0m : dto.AmountDue ?? 0m;
         if (amount < 0) return SubscriptionErrors.InvalidAmount;
         if (dto.StatusOverride is SubscriptionStatus.Cancelled or SubscriptionStatus.Waived && dto.InitialPayment is not null) return SubscriptionErrors.PaymentNotAllowedForStatus;
 
@@ -124,8 +109,7 @@ public sealed class SubscriptionService : ISubscriptionService
         if (overlap && !dto.ConfirmOverlappingPeriod) return SubscriptionErrors.OverlappingPeriod;
         var initialPaid = dto.InitialPayment?.Amount ?? 0;
 
-        var sub = new Subscription { ChildId = child.Id, Child = child, SubscriptionPlanId = plan?.Id, SubscriptionPlan = plan,
-            PeriodStart = dto.PeriodStart, PeriodEnd = dto.PeriodEnd, AmountDue = amount, Notes = Clean(dto.Notes), Status = dto.StatusOverride is SubscriptionStatus.Cancelled or SubscriptionStatus.Waived ? dto.StatusOverride.Value : ComputeStatus(amount, initialPaid) };
+        var sub = new Subscription { ChildId = child.Id, Child = child, PeriodStart = dto.PeriodStart, PeriodEnd = dto.PeriodEnd, AmountDue = amount, Notes = Clean(dto.Notes), Status = dto.StatusOverride is SubscriptionStatus.Cancelled or SubscriptionStatus.Waived ? dto.StatusOverride.Value : ComputeStatus(amount, initialPaid) };
 
         var before = "—";
         Payment? initialPayment = null;
@@ -152,7 +136,7 @@ public sealed class SubscriptionService : ISubscriptionService
             return PersistenceErrorMapper.FromException(ex);
         }
 
-        sub.Child = child; sub.SubscriptionPlan = plan;
+        sub.Child = child;
         var createdDto = ToDto(sub, dto.InitialPayment?.Amount ?? 0);
         if (initialPayment is not null) createdDto.InitialPaymentReceipt = await WithNurserySettings(ToReceipt(initialPayment, sub, 0, initialPayment.Amount), ct);
         return Result.Success(createdDto, "تم إنشاء الاشتراك.");
@@ -167,12 +151,9 @@ public sealed class SubscriptionService : ISubscriptionService
         var paid = await PaidAsync(id, ct);
         var requestedAmount = dto.StatusOverride == SubscriptionStatus.Waived ? 0m : dto.AmountDue;
         if (requestedAmount < paid) return SubscriptionErrors.AmountBelowPaid;
-        SubscriptionPlan? updatedPlan = null;
-        if (dto.SubscriptionPlanId is Guid planId)
-        { updatedPlan = await unitOfWork.Repository<SubscriptionPlan>().FirstOrDefaultAsync(x => x.Id == planId, asNoTracking: false, cancellationToken: ct); if (updatedPlan is null) return SubscriptionErrors.PlanNotFound; }
         if (dto.StatusOverride is SubscriptionStatus.Cancelled or SubscriptionStatus.Waived && string.IsNullOrWhiteSpace(dto.Reason)) return SubscriptionErrors.ReasonRequired;
         var before = SubscriptionValues(item, paid);
-        item.SubscriptionPlanId = dto.SubscriptionPlanId; item.SubscriptionPlan = updatedPlan; item.PeriodStart = dto.PeriodStart; item.PeriodEnd = dto.PeriodEnd;
+        item.PeriodStart = dto.PeriodStart; item.PeriodEnd = dto.PeriodEnd;
         item.AmountDue = requestedAmount; item.Notes = Clean(dto.Notes);
         if (dto.StatusOverride is SubscriptionStatus.Cancelled or SubscriptionStatus.Waived) item.Status = dto.StatusOverride.Value;
         else if (item.Status is not (SubscriptionStatus.Cancelled or SubscriptionStatus.Waived)) item.Status = ComputeStatus(requestedAmount, paid);
@@ -251,7 +232,7 @@ public sealed class SubscriptionService : ISubscriptionService
     public async Task<Result<PaymentReceiptDto>> GetReceiptAsync(Guid paymentId, CancellationToken ct = default)
     {
         if (!Allowed("Payments.View")) return SubscriptionErrors.PermissionDenied;
-        var payment = await unitOfWork.Repository<Payment>().Query().Include(x => x.Child).Include(x => x.Subscription!).ThenInclude(x => x.SubscriptionPlan).Include(x => x.ReceivedByUser).FirstOrDefaultAsync(x => x.Id == paymentId, ct);
+        var payment = await unitOfWork.Repository<Payment>().Query().Include(x => x.Child).Include(x => x.Subscription!).Include(x => x.ReceivedByUser).FirstOrDefaultAsync(x => x.Id == paymentId, ct);
         if (payment?.Subscription is null) return SubscriptionErrors.NotFound;
         var applied = await unitOfWork.Repository<PaymentAllocation>().Query().Where(x => x.SubscriptionId == payment.SubscriptionId && x.Payment.Status == PaymentStatus.Posted)
             .Select(x => new { x.PaymentId, x.AmountApplied, x.Payment.PaidAt }).ToListAsync(ct);
@@ -285,7 +266,7 @@ public sealed class SubscriptionService : ISubscriptionService
         }
     }
     private Task<Subscription?> GetTrackedSubscription(Guid id, bool tracked, CancellationToken ct) => unitOfWork.Repository<Subscription>().FirstOrDefaultAsync(x => x.Id == id, asNoTracking: !tracked,
-        includeProperties: [nameof(Subscription.Child), nameof(Subscription.SubscriptionPlan)], cancellationToken: ct);
+        includeProperties: [nameof(Subscription.Child)], cancellationToken: ct);
     private async Task<decimal> PaidAsync(Guid id, CancellationToken ct) => (await unitOfWork.Repository<PaymentAllocation>().Query().Where(x => x.SubscriptionId == id && x.Payment.Status == PaymentStatus.Posted).Select(x => x.AmountApplied).ToListAsync(ct)).Sum();
 
     private async Task<Payment> CreatePayment(Subscription sub, decimal amount, PaymentMethod method, string? reference, string? notes, CancellationToken ct)
@@ -320,12 +301,12 @@ public sealed class SubscriptionService : ISubscriptionService
       NurseryAddress = settings.FirstOrDefault(x => x.Key == "Nursery.Address")?.Value,
       NurseryPhone = settings.FirstOrDefault(x => x.Key == "Nursery.Phone")?.Value };
 
-    private static string SubscriptionValues(Subscription s, decimal paid) => $"childId={s.ChildId};planId={s.SubscriptionPlanId};period={s.PeriodStart:yyyy-MM-dd}..{s.PeriodEnd:yyyy-MM-dd};due={s.AmountDue};paid={paid};status={s.Status}";
+    private static string SubscriptionValues(Subscription s, decimal paid) => $"childId={s.ChildId};period={s.PeriodStart:yyyy-MM-dd}..{s.PeriodEnd:yyyy-MM-dd};due={s.AmountDue};paid={paid};status={s.Status}";
     private static SubscriptionDto ToDto(Subscription s, decimal paid) => new() { Id = s.Id, ChildId = s.ChildId, ChildName = s.Child.FullName,
-        SubscriptionPlanId = s.SubscriptionPlanId, SubscriptionPlanName = s.SubscriptionPlan?.Name, PeriodStart = s.PeriodStart, PeriodEnd = s.PeriodEnd,
+        PeriodStart = s.PeriodStart, PeriodEnd = s.PeriodEnd,
         AmountDue = s.AmountDue, PaidAmount = paid, RemainingAmount = Math.Max(0, s.AmountDue - paid), Status = s.Status, Notes = s.Notes, CreatedAt = s.CreatedAt };
     private PaymentReceiptDto ToReceipt(Payment p, Subscription s, decimal paidBefore, decimal paidAfter) => new(p.Id, p.ReceiptNumber ?? string.Empty,
-        p.PaidAt, p.Child.FullName, s.SubscriptionPlan?.Name ?? "اشتراك", s.PeriodStart, s.PeriodEnd, s.AmountDue, paidBefore, p.Amount,
+        p.PaidAt, p.Child.FullName, s.PeriodStart, s.PeriodEnd, s.AmountDue, paidBefore, p.Amount,
         Math.Max(0, s.AmountDue - paidAfter), p.PaymentMethod, p.Reference, p.ReceivedByUser?.FullName ?? (p.ReceivedByUserId == sessions.CurrentUser?.UserId ? sessions.CurrentUser?.FullName : "—") ?? "—", p.Notes);
     public static SubscriptionStatus ComputeStatus(decimal due, decimal paid) => SubscriptionRules.ComputeStatus(due, paid);
     private static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();

@@ -100,7 +100,7 @@ public sealed class ClassroomService(IUnitOfWork unitOfWork, IPermissionService 
         var assigned = (await unitOfWork.Repository<ChildClassEnrollment>().ListAsync(x => x.ClassroomId == classroomId
             && x.StartDate <= today && (x.EndDate == null || x.EndDate >= today), cancellationToken: cancellationToken))
             .Select(x => x.ChildId).ToHashSet();
-        var children = await unitOfWork.Repository<Child>().ListAsync(cancellationToken: cancellationToken);
+        var children = await unitOfWork.Repository<Child>().ListAsync(x => x.IsRegistrationComplete, cancellationToken: cancellationToken);
         return Result.Success<IReadOnlyList<ClassroomChildDto>>(children.OrderBy(x => x.FullName)
             .Select(x => new ClassroomChildDto(x.Id, x.FullName, assigned.Contains(x.Id))).ToArray());
     }
@@ -115,7 +115,7 @@ public sealed class ClassroomService(IUnitOfWork unitOfWork, IPermissionService 
             if (room is null) return ClassroomErrors.NotFound;
             var today = DateOnly.FromDateTime(DateTime.Today);
             var selected = childIds.ToHashSet();
-            var children = await unitOfWork.Repository<Child>().ListAsync(x => selected.Contains(x.Id), cancellationToken: cancellationToken);
+            var children = await unitOfWork.Repository<Child>().ListAsync(x => selected.Contains(x.Id) && x.IsRegistrationComplete, cancellationToken: cancellationToken);
             if (children.Count != selected.Count) return ChildErrors.NotFound;
             var activeRows = await unitOfWork.Repository<ChildClassEnrollment>().Query(asNoTracking: false)
                 .Where(x => x.EndDate == null && x.StartDate <= today).ToListAsync(cancellationToken);
@@ -176,7 +176,7 @@ public sealed class ClassroomService(IUnitOfWork unitOfWork, IPermissionService 
         try
         {
             var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(x => x.Id == childId, asNoTracking: false, cancellationToken: cancellationToken);
-            if (child is null) return ChildErrors.NotFound;
+            if (child is null || !child.IsRegistrationComplete) return ChildErrors.NotFound;
             var rooms = await unitOfWork.Repository<Classroom>().ListAsync(x => selected.Contains(x.Id), asNoTracking: false, cancellationToken: cancellationToken);
             if (rooms.Count != selected.Length) return ClassroomErrors.NotFound;
             var today = DateOnly.FromDateTime(DateTime.Today);
@@ -204,7 +204,7 @@ public sealed class ClassroomService(IUnitOfWork unitOfWork, IPermissionService 
         {
             var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(x => x.Id == childId,
                 asNoTracking: false, cancellationToken: cancellationToken);
-            if (child is null) return ChildErrors.NotFound;
+            if (child is null || !child.IsRegistrationComplete) return ChildErrors.NotFound;
             var today = DateOnly.FromDateTime(DateTime.Today);
             var endDate = DateOnly.FromDateTime(DateTime.Today);
             var current = await unitOfWork.Repository<ChildClassEnrollment>().Query(asNoTracking: false)

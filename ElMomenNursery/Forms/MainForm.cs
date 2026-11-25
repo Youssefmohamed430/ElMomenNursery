@@ -324,7 +324,7 @@ public sealed class MainForm : ResponsiveForm
         "الرواتب" => _session.HasPermission("Payroll.Manage"),
         "الاشتراكات والمدفوعات" => _session.HasPermission("Subscriptions.View") || _session.HasPermission("Payments.View"),
         "المخزن" => _session.HasPermission("Inventory.View"),
-        "الماليات" => _session.HasPermission("Finance.View") || _session.HasPermission("Payments.View") || _session.HasPermission("Expenses.View"),
+        "الماليات" => _session.HasPermission("Finance.View") || _session.HasPermission("Payments.View") || _session.HasPermission("Expenses.View") || _session.HasPermission("Finance.ManageIncome") || _session.HasPermission("Finance.ManageExpenses"),
         "إدارة المستخدمين" => _session.HasPermission("Users.View"),
         _ => true
     };

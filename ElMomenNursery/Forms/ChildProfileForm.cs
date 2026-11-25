@@ -1,6 +1,7 @@
 using ElMomenNursery.Application.DTOs;
 using ElMomenNursery.Domain.Enums;
 using System.Diagnostics;
+using System.Drawing;
 
 namespace ElMomenNursery.Forms;
 
@@ -20,7 +21,9 @@ internal sealed class ChildProfileForm : ResponsiveForm
         content.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         content.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         content.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        content.Controls.Add(CreateSection("بيانات الطفل وولي الأمر", $"الاسم: {child.FullName}\nالنوع: {(child.Gender == ChildGender.Boy ? "ولد" : "بنت")}\nتاريخ الميلاد: {child.DateOfBirth:dd/MM/yyyy}\nتاريخ الالتحاق: {child.EnrollmentDate:dd/MM/yyyy}\nالعنوان: {child.Address}\nالأب: {child.FatherName} — {child.FatherPhone}\nالأم: {child.MotherName} — {child.MotherPhone}\nواتساب الأب: {child.FatherWhatsApp ?? "—"}\nواتساب الأم: {child.MotherWhatsApp ?? "—"}\nملاحظات: {child.Notes ?? "—"}"), 0, 0);
+        var personalPhoto = attachments.FirstOrDefault(x => x.Type == AttachmentType.PersonalPhoto);
+        var details = CreateChildDetails(child, personalPhoto);
+        content.Controls.Add(details, 0, 0);
 
         var docs = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = true, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(8) };
         foreach (var type in new[] { AttachmentType.PersonalPhoto, AttachmentType.BirthCertificate, AttachmentType.GuardianIdentityCard })
@@ -36,7 +39,6 @@ internal sealed class ChildProfileForm : ResponsiveForm
         content.Controls.Add(docsSection, 0, 1);
 
         var subscriptionsTable = new DataGridView { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false, AutoGenerateColumns = false, RightToLeft = RightToLeft.Yes, RowHeadersVisible = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
-        subscriptionsTable.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "الخطة", DataPropertyName = nameof(SubscriptionDto.SubscriptionPlanName) });
         subscriptionsTable.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "من", DataPropertyName = nameof(SubscriptionDto.PeriodStart) });
         subscriptionsTable.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "إلى", DataPropertyName = nameof(SubscriptionDto.PeriodEnd) });
         subscriptionsTable.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "المطلوب", DataPropertyName = nameof(SubscriptionDto.AmountDue), DefaultCellStyle = new DataGridViewCellStyle { Format = "N2" } });
@@ -48,6 +50,48 @@ internal sealed class ChildProfileForm : ResponsiveForm
         subscriptionSection.Controls.Add(subscriptionsTable);
         content.Controls.Add(subscriptionSection, 0, 2);
         Controls.Add(content);
+        FormClosed += (_, _) => { var picture = details.Controls.OfType<TableLayoutPanel>().SelectMany(x => x.Controls.OfType<PictureBox>()).FirstOrDefault(); picture?.Image?.Dispose(); };
+    }
+
+    private static GroupBox CreateChildDetails(ChildDto child, ChildAttachmentDto? photo)
+    {
+        var section = new GroupBox { Text = "بيانات الطفل وولي الأمر", Dock = DockStyle.Top, Height = 300, Padding = new Padding(12), Margin = new Padding(0,0,0,10) };
+        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Padding = new Padding(4) };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 65)); layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 35));
+        var detailsText = !child.IsRegistrationComplete
+            ? $"الاسم: {child.FullName}\nهذا تسجيل مبدئي. لم تُستكمل البيانات الشخصية بعد.\nيمكن استكماله من زر تعديل البيانات؛ الاشتراكات والفواتير المرتبطة ستظل على هذا السجل."
+            : $"الاسم: {child.FullName}\nالنوع: {(child.Gender == ChildGender.Boy ? "ولد" : "بنت")}\nتاريخ الميلاد: {child.DateOfBirth:dd/MM/yyyy}\nتاريخ الالتحاق: {child.EnrollmentDate:dd/MM/yyyy}\nالعنوان: {child.Address}\nالأب: {child.FatherName} — {child.FatherPhone}\nالأم: {child.MotherName} — {child.MotherPhone}\nواتساب الأب: {child.FatherWhatsApp ?? "—"}\nواتساب الأم: {child.MotherWhatsApp ?? "—"}\nملاحظات: {child.Notes ?? "—"}";
+        var text = new Label { Text = detailsText, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight, Padding = new Padding(8), AutoEllipsis = true };
+        var picture = new PictureBox { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, BorderStyle = BorderStyle.FixedSingle, BackColor = Color.White, Margin = new Padding(12, 4, 4, 4) };
+        if (photo is not null)
+        {
+            var path = ResolvePath(photo.RelativePath);
+            try
+            {
+                if (File.Exists(path))
+                {
+                    using var image = Image.FromFile(path); picture.Image = new Bitmap(image);
+                    picture.Cursor = Cursors.Hand; picture.Click += (_, _) => ShowPhoto(picture.Image, child.FullName);
+                }
+                else picture.AccessibleDescription = "تعذر العثور على صورة الطفل";
+            }
+            catch { picture.AccessibleDescription = "تعذر فتح صورة الطفل"; }
+        }
+        layout.Controls.Add(text, 0, 0); layout.Controls.Add(picture, 1, 0); section.Controls.Add(layout); return section;
+    }
+
+    private static void ShowPhoto(Image? image, string childName)
+    {
+        if (image is null) return;
+        using var viewer = new Form { Text = $"صورة الطفل - {childName}", Size = new Size(900, 700), MinimumSize = new Size(480, 360), StartPosition = FormStartPosition.CenterParent, BackColor = Color.White };
+        viewer.Controls.Add(new PictureBox { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, Image = image });
+        viewer.ShowDialog();
+    }
+
+    private static string ResolvePath(string path)
+    {
+        if (Path.IsPathRooted(path) || File.Exists(path)) return path;
+        return Path.Combine(AppContext.BaseDirectory, path);
     }
 
     private static GroupBox CreateSection(string title, string value) => new()

@@ -52,6 +52,9 @@ public sealed class FinancePage : UserControl
     private List<FinanceTransactionDto> _incomeRows = [];
     private List<FinanceTransactionDto> _expenseRows = [];
     private int _loadVersion;
+    private bool CanViewSummary => _session?.HasPermission("Finance.View") == true;
+    private bool CanViewIncome => CanViewSummary || _session?.HasPermission("Payments.View") == true || _session?.HasPermission("Finance.ManageIncome") == true;
+    private bool CanViewExpenses => CanViewSummary || _session?.HasPermission("Expenses.View") == true || _session?.HasPermission("Finance.ManageExpenses") == true;
 
     public FinancePage() : this(null, null, null) { }
 
@@ -112,6 +115,7 @@ public sealed class FinancePage : UserControl
 
         // 3. KPI Cards
         var kpiPanel = BuildKpiRow();
+        kpiPanel.Visible = CanViewSummary;
 
         // 4. TabControl
         var tabControl = new TabControl
@@ -128,8 +132,8 @@ public sealed class FinancePage : UserControl
         var expenseTabPage = new TabPage("المصروفات والرواتب") { BackColor = BrandPalette.AppBackground };
         expenseTabPage.Controls.Add(BuildExpenseTabContent());
 
-        tabControl.TabPages.Add(incomeTabPage);
-        tabControl.TabPages.Add(expenseTabPage);
+        if (CanViewIncome) tabControl.TabPages.Add(incomeTabPage);
+        if (CanViewExpenses) tabControl.TabPages.Add(expenseTabPage);
 
         // Assemble overall layout
         var topSection = new Panel { Dock = DockStyle.Top, AutoSize = true };
@@ -278,13 +282,13 @@ public sealed class FinancePage : UserControl
 
         var canManageIncome = _session?.HasPermission("Finance.ManageIncome") == true;
         _addIncomeBtn.Visible = canManageIncome;
-        _editIncomeBtn.Visible = canManageIncome;
-        _deleteIncomeBtn.Visible = canManageIncome;
+        _editIncomeBtn.Visible = canManageIncome && CanViewSummary;
+        _deleteIncomeBtn.Visible = canManageIncome && CanViewSummary;
         _exportIncomeBtn.Visible = _session?.HasPermission("Finance.Export") == true;
 
         actionBar.Controls.AddRange([_addIncomeBtn, _editIncomeBtn, _deleteIncomeBtn, _exportIncomeBtn]);
 
-        var bottomSummary = new Panel { Dock = DockStyle.Bottom, Height = 34, BackColor = BrandPalette.Surface, Padding = new Padding(8, 4, 8, 4) };
+        var bottomSummary = new Panel { Dock = DockStyle.Bottom, Height = 34, BackColor = BrandPalette.Surface, Padding = new Padding(8, 4, 8, 4), Visible = CanViewSummary };
         bottomSummary.Controls.Add(_incomeSummaryLabel);
 
         var gridPanel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 6, 0, 6) };
@@ -320,13 +324,13 @@ public sealed class FinancePage : UserControl
 
         var canManageExpense = _session?.HasPermission("Finance.ManageExpenses") == true || _session?.HasPermission("Expenses.Manage") == true;
         _addExpenseBtn.Visible = canManageExpense;
-        _editExpenseBtn.Visible = canManageExpense;
-        _deleteExpenseBtn.Visible = canManageExpense;
+        _editExpenseBtn.Visible = canManageExpense && CanViewSummary;
+        _deleteExpenseBtn.Visible = canManageExpense && CanViewSummary;
         _exportExpenseBtn.Visible = _session?.HasPermission("Finance.Export") == true;
 
         actionBar.Controls.AddRange([_addExpenseBtn, _editExpenseBtn, _deleteExpenseBtn, _exportExpenseBtn]);
 
-        var bottomSummary = new Panel { Dock = DockStyle.Bottom, Height = 34, BackColor = BrandPalette.Surface, Padding = new Padding(8, 4, 8, 4) };
+        var bottomSummary = new Panel { Dock = DockStyle.Bottom, Height = 34, BackColor = BrandPalette.Surface, Padding = new Padding(8, 4, 8, 4), Visible = CanViewSummary };
         bottomSummary.Controls.Add(_expenseSummaryLabel);
 
         var gridPanel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 6, 0, 6) };
@@ -485,13 +489,13 @@ public sealed class FinancePage : UserControl
             await using var scope = _scopes.CreateAsyncScope();
             var service = scope.ServiceProvider.GetRequiredService<IFinanceService>();
 
-            var summaryRes = await service.GetSummaryAsync(filter);
-            var incomeRes = await service.GetIncomeTransactionsAsync(filter);
-            var expenseRes = await service.GetExpenseTransactionsAsync(filter);
+            var summaryRes = CanViewSummary ? await service.GetSummaryAsync(filter) : null;
+            var incomeRes = CanViewIncome ? await service.GetIncomeTransactionsAsync(filter) : null;
+            var expenseRes = CanViewExpenses ? await service.GetExpenseTransactionsAsync(filter) : null;
 
             if (IsDisposed || currentVersion != _loadVersion) return;
 
-            if (summaryRes.IsFailure || incomeRes.IsFailure || expenseRes.IsFailure)
+            if (summaryRes?.IsFailure == true || incomeRes?.IsFailure == true || expenseRes?.IsFailure == true)
             {
                 AppDialog.ShowInformation(this, "خطأ", "تعذر تحميل البيانات المالية.");
                 return;
@@ -499,18 +503,18 @@ public sealed class FinancePage : UserControl
 
             var selectedType = _typeFilter.SelectedItem?.ToString();
             bool Matches(FinanceTransactionDto row) => selectedType is null or "كل الأنواع" || row.TypeLabel == selectedType || row.Category == selectedType;
-            if (incomeRes.IsSuccess)
+            if (incomeRes?.IsSuccess == true)
             {
                 _incomeRows = incomeRes.Value.Where(Matches).ToList();
                 RenderIncomeGrid();
             }
 
-            if (expenseRes.IsSuccess)
+            if (expenseRes?.IsSuccess == true)
             {
                 _expenseRows = expenseRes.Value.Where(Matches).ToList();
                 RenderExpenseGrid();
             }
-            if (summaryRes.IsSuccess) RenderFilteredSummary(summaryRes.Value);
+            if (summaryRes?.IsSuccess == true) RenderFilteredSummary(summaryRes.Value);
         }, "تعذر تحميل البيانات المالية.");
     }
 
@@ -551,9 +555,12 @@ public sealed class FinancePage : UserControl
         var all = _incomeRows.Select(x => (Row: x, Kind: "مقبوضات")).Concat(_expenseRows.Select(x => (Row: x, Kind: "مصروفات")))
             .OrderByDescending(x => x.Row.Date).ToArray();
         var rows = all.Select(x => (IReadOnlyList<string?>)new[] { x.Kind, x.Row.Date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture), x.Row.TypeLabel, x.Row.Category, x.Row.Description, x.Row.Amount.ToString("N2", CultureInfo.CurrentCulture), x.Row.Reference ?? "—", x.Row.RecordedBy ?? "—" }).ToList();
-        rows.Add(["ملخص", "", "إجمالي المقبوضات", "", "", _incomeRows.Sum(x => x.Amount).ToString("N2", CultureInfo.CurrentCulture), "", ""]);
-        rows.Add(["ملخص", "", "إجمالي المصروفات", "", "", _expenseRows.Sum(x => x.Amount).ToString("N2", CultureInfo.CurrentCulture), "", ""]);
-        rows.Add(["ملخص", "", "الصافي", "", "", (_incomeRows.Sum(x => x.Amount) - _expenseRows.Sum(x => x.Amount)).ToString("N2", CultureInfo.CurrentCulture), "", ""]);
+        if (CanViewSummary)
+        {
+            rows.Add(["ملخص", "", "إجمالي المقبوضات", "", "", _incomeRows.Sum(x => x.Amount).ToString("N2", CultureInfo.CurrentCulture), "", ""]);
+            rows.Add(["ملخص", "", "إجمالي المصروفات", "", "", _expenseRows.Sum(x => x.Amount).ToString("N2", CultureInfo.CurrentCulture), "", ""]);
+            rows.Add(["ملخص", "", "الصافي", "", "", (_incomeRows.Sum(x => x.Amount) - _expenseRows.Sum(x => x.Amount)).ToString("N2", CultureInfo.CurrentCulture), "", ""]);
+        }
         var dateRange = $"من {(_fromPicker.Checked ? _fromPicker.Value.ToString("dd/MM/yyyy") : "البداية")} إلى {(_toPicker.Checked ? _toPicker.Value.ToString("dd/MM/yyyy") : "النهاية")}";
         var filterText = $"الفترة: {dateRange}؛ النوع: {_typeFilter.SelectedItem ?? "كل الأنواع"}";
         var reportTitle = $"التقرير المالي للمقبوضات والمصروفات - {filterText}";

@@ -53,7 +53,6 @@ public sealed class ReceiptPdfService(string dataDirectory) : IReceiptPdfService
                 Pair(column, "رقم الإيصال", receipt.ReceiptNumber);
                 Pair(column, "التاريخ والوقت", receipt.PaidAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm"));
                 Pair(column, "الطفل", receipt.ChildName);
-                Pair(column, "الخطة", receipt.SubscriptionPlanName);
                 Pair(column, "فترة الاشتراك", $"{receipt.PeriodStart:dd/MM/yyyy} — {receipt.PeriodEnd:dd/MM/yyyy}");
                 column.Item().PaddingVertical(3).LineHorizontal(1);
                 Pair(column, "إجمالي المستحق", Money(receipt.AmountDue));

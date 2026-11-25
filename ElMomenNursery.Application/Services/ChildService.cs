@@ -37,6 +37,24 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger, 
             return PersistenceErrorMapper.FromException(exception);
         }
     }
+    public async Task<Result<ChildDto>> CreatePendingRegistrationAsync(string childName, CancellationToken cancellationToken = default)
+    {
+        var permissionError = PermissionGuard.Check(permissions, "Students.Create", ChildErrors.PermissionDenied);
+        if (permissionError is not null) return permissionError;
+        var name = childName?.Trim();
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 100) return ChildErrors.InvalidData;
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var child = new Child
+        {
+            FullName = name, Address = string.Empty, EnrollmentDate = today, DateOfBirth = today,
+            Gender = ChildGender.Boy, FatherName = string.Empty, FatherPhone = string.Empty,
+            MotherName = string.Empty, MotherPhone = string.Empty, Shift = Shift.Morning,
+            IsRegistrationComplete = false
+        };
+        await unitOfWork.Repository<Child>().AddAsync(child, cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        return Result.Success(child.Adapt<ChildDto>(), "تم تسجيل اسم الطفل كتسجيل مبدئي.");
+    }
     public async Task<Result<ChildDto>> UpdateChildAsync(Guid childId, UpdateChildDTO childDto)
     {
         var permissionError = PermissionGuard.Check(permissions, "Students.Edit", ChildErrors.PermissionDenied);
@@ -50,6 +68,7 @@ public class ChildService(IUnitOfWork unitOfWork, ILogger<ChildService> logger, 
             var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(c => c.Id == childId, asNoTracking: false);
             if (child == null) return ChildErrors.NotFound;
             childDto.Adapt(child, MapsterConfigForChild.Config);
+            child.IsRegistrationComplete = true;
             child.UpdatedAt = DateTimeOffset.UtcNow;
             var affectedRows = await unitOfWork.SaveChangesAsync();
             if (affectedRows == 0)

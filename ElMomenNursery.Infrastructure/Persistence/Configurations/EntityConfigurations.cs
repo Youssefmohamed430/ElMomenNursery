@@ -29,6 +29,7 @@ internal sealed class ChildConfiguration : IEntityTypeConfiguration<Child>
         b.Property(x => x.MotherName).IsRequired();
         b.Property(x => x.MotherPhone).IsRequired();
         b.Property(x => x.Gender).HasConversion<string>().HasMaxLength(16).IsRequired();
+          b.Property(x => x.IsRegistrationComplete).HasDefaultValue(true).IsRequired();
         b.Property(x => x.CreatedAt).IsRequired();
         b.HasIndex(x => x.FullName).HasDatabaseName("IX_Children_FullName");
         b.HasMany(x => x.Subscriptions).WithOne(x => x.Child).HasForeignKey(x => x.ChildId).OnDelete(DeleteBehavior.Restrict);
@@ -172,19 +173,6 @@ internal sealed class ClassTeacherAssignmentConfiguration : IEntityTypeConfigura
     }
 }
 
-internal sealed class SubscriptionPlanConfiguration : IEntityTypeConfiguration<SubscriptionPlan>
-{
-    public void Configure(EntityTypeBuilder<SubscriptionPlan> b)
-    {
-        b.ToTable("SubscriptionPlans", t => t.HasCheckConstraint("CK_SubscriptionPlans_DefaultFeeNonNegative", "CAST(\"DefaultFee\" AS REAL) >= 0"));
-        b.HasKey(x => x.Id);
-        b.Property(x => x.Name).IsRequired();
-        b.Property(x => x.DefaultFee).HasPrecision(18, 2);
-        b.HasIndex(x => x.Name).IsUnique().HasFilter("\"IsDeleted\" = 0").HasDatabaseName("UX_SubscriptionPlans_Name");
-        b.HasMany(x => x.Subscriptions).WithOne(x => x.SubscriptionPlan).HasForeignKey(x => x.SubscriptionPlanId).OnDelete(DeleteBehavior.Restrict);
-    }
-}
-
 internal sealed class SubscriptionConfiguration : IEntityTypeConfiguration<Subscription>
 {
     public void Configure(EntityTypeBuilder<Subscription> b)
@@ -197,7 +185,6 @@ internal sealed class SubscriptionConfiguration : IEntityTypeConfiguration<Subsc
         b.Property(x => x.AmountDue).HasPrecision(18, 2);
         b.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
         b.HasIndex(x => new { x.ChildId, x.PeriodStart }).HasDatabaseName("IX_Subscriptions_Child_PeriodStart");
-        b.HasIndex(x => x.SubscriptionPlanId).HasDatabaseName("IX_Subscriptions_PlanId");
         b.HasMany(x => x.PaymentAllocations).WithOne(x => x.Subscription).HasForeignKey(x => x.SubscriptionId).OnDelete(DeleteBehavior.Restrict);
     }
 }
@@ -210,7 +197,6 @@ internal sealed class InventoryCategoryConfiguration : IEntityTypeConfiguration<
         b.HasKey(x => x.Id);
         b.Property(x => x.Name).IsRequired();
         b.HasIndex(x => x.Name).IsUnique().HasFilter("\"IsDeleted\" = 0").HasDatabaseName("UX_InventoryCategories_Name");
-        b.HasOne(x => x.ParentCategory).WithMany(x => x.Children).HasForeignKey(x => x.ParentCategoryId).OnDelete(DeleteBehavior.Restrict);
         b.HasMany(x => x.Items).WithOne(x => x.Category).HasForeignKey(x => x.CategoryId).IsRequired().OnDelete(DeleteBehavior.Restrict);
     }
 }

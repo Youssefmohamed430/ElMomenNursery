@@ -16,7 +16,6 @@ public sealed class InventoryCategoryEditorForm : ResponsiveForm
     private readonly InventoryCategoryDto? _category;
     private readonly TextBox _name = new() { Width = 380, MaxLength = 100 };
     private readonly TextBox _description = new() { Width = 380, Height = 120, Multiline = true, MaxLength = 500, ScrollBars = ScrollBars.Vertical };
-    private readonly ComboBox _parent = new() { Width = 380, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly CheckBox _active = new() { Text = "الفئة نشطة", Checked = true, AutoSize = true };
     private readonly Button _save = MainForm.CreateActionButton("حفظ", true);
 
@@ -26,16 +25,15 @@ public sealed class InventoryCategoryEditorForm : ResponsiveForm
         _scopes = scopes; _category = category; Text = category is null ? "إضافة فئة" : "تعديل فئة";
         StartPosition = FormStartPosition.CenterParent; MinimumSize = new Size(560, 450); Size = new Size(670, 520);
         RightToLeft = RightToLeft.Yes; RightToLeftLayout = true; Font = new Font("Segoe UI", 10F); BackColor = BrandPalette.AppBackground;
-        var fields = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(26), ColumnCount = 2, RowCount = 5, RightToLeft = RightToLeft.Yes, BackColor = BrandPalette.Surface };
+        var fields = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(26), ColumnCount = 2, RowCount = 4, RightToLeft = RightToLeft.Yes, BackColor = BrandPalette.Surface };
         fields.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150)); fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        AddField(fields, "اسم الفئة *", _name, 0, 58); AddField(fields, "الفئة الأعلى", _parent, 1, 58); AddField(fields, "الوصف", _description, 2, 150);
-        fields.RowStyles.Add(new RowStyle(SizeType.Absolute, 56)); fields.Controls.Add(new Label { Text = "الحالة", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight }, 0, 3); fields.Controls.Add(_active, 1, 3);
+        AddField(fields, "اسم الفئة *", _name, 0, 58); AddField(fields, "الوصف", _description, 1, 150);
+        fields.RowStyles.Add(new RowStyle(SizeType.Absolute, 56)); fields.Controls.Add(new Label { Text = "الحالة", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight }, 0, 2); fields.Controls.Add(_active, 1, 2);
         var footer = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 66, FlowDirection = FlowDirection.LeftToRight, RightToLeft = RightToLeft.Yes, Padding = new Padding(16) };
         _save.Width = 125; var cancel = MainForm.CreateActionButton("إلغاء"); cancel.Width = 110; cancel.DialogResult = DialogResult.Cancel;
         _save.Click += async (_, _) => await SaveAsync(); footer.Controls.AddRange([_save, cancel]); Controls.Add(fields); Controls.Add(footer);
         AcceptButton = _save; CancelButton = cancel;
         if (category is not null) { _name.Text = category.Name; _description.Text = category.Description ?? string.Empty; _active.Checked = category.IsActive; }
-        Shown += async (_, _) => await LoadParentsAsync();
     }
 
     private static void AddField(TableLayoutPanel table, string label, Control control, int row, int height)
@@ -54,23 +52,13 @@ public sealed class InventoryCategoryEditorForm : ResponsiveForm
         {
             await using var scope = _scopes.CreateAsyncScope(); var service = scope.ServiceProvider.GetRequiredService<IInventoryCategoryService>();
             var result = _category is null
-                ? await service.CreateCategoryAsync(new CreateCategoryDto { Name = _name.Text.Trim(), Description = EmptyToNull(_description.Text), IsActive = _active.Checked, ParentCategoryId = (_parent.SelectedItem as CategoryOption)?.Id })
-                : await service.UpdateCategoryAsync(_category.Id, new UpdateCategoryDto { Name = _name.Text.Trim(), Description = EmptyToNull(_description.Text), IsActive = _active.Checked, ParentCategoryId = (_parent.SelectedItem as CategoryOption)?.Id });
+                ? await service.CreateCategoryAsync(new CreateCategoryDto { Name = _name.Text.Trim(), Description = EmptyToNull(_description.Text), IsActive = _active.Checked })
+                : await service.UpdateCategoryAsync(_category.Id, new UpdateCategoryDto { Name = _name.Text.Trim(), Description = EmptyToNull(_description.Text), IsActive = _active.Checked });
             if (IsDisposed || !ResultPresenter.Present(this, "الفئة", result)) return;
             DialogResult = DialogResult.OK; Close();
         }
         catch (Exception ex) { Log.Error(ex, "Inventory category save failed"); if (!IsDisposed) AppDialog.ShowInformation(this, "الفئة", "تعذر حفظ الفئة. أعد المحاولة."); }
         finally { if (!IsDisposed) _save.Enabled = true; }
     }
-    private async Task LoadParentsAsync()
-    {
-        if (_scopes is null) return;
-        await using var scope = _scopes.CreateAsyncScope(); var result = await scope.ServiceProvider.GetRequiredService<IInventoryCategoryService>().GetCategoryLookupAsync(false);
-        _parent.Items.Clear(); _parent.Items.Add(new CategoryOption(null, "فئة رئيسية"));
-        if (result.IsSuccess) foreach (var row in result.Value.Where(x => x.Id != _category?.Id)) _parent.Items.Add(new CategoryOption(row.Id, row.Name));
-        _parent.SelectedIndex = 0;
-        if (_category?.ParentCategoryId is Guid parent) for (var i = 0; i < _parent.Items.Count; i++) if (_parent.Items[i] is CategoryOption option && option.Id == parent) _parent.SelectedIndex = i;
-    }
-    private sealed record CategoryOption(Guid? Id, string Name) { public override string ToString() => Name; }
     private static string? EmptyToNull(string text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
 }

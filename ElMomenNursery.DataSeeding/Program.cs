@@ -94,9 +94,8 @@ static async Task SeedMockupAsync(NurseryDbContext db)
         IsDeleted = i >= 58, DeletedAt = i >= 58 ? now.AddDays(-5) : null
     }).ToList();
     var rooms = Enumerable.Range(1, 6).Select(i => new Classroom { Name = new[] { "الفراشات", "النجوم", "الزهور", "الأشبال", "الطيور", "الأصدقاء" }[i - 1], Description = $"قاعة تجريبية رقم {i}", IsActive = i != 6 }).ToList();
-    var plans = new[] { new SubscriptionPlan { Name = "اشتراك صباحي", DefaultFee = 1800, Description = "الفترة الصباحية" }, new SubscriptionPlan { Name = "اشتراك مسائي", DefaultFee = 1600, Description = "الفترة المسائية" }, new SubscriptionPlan { Name = "اشتراك يوم كامل", DefaultFee = 2500, Description = "اليوم الكامل" }, new SubscriptionPlan { Name = "اشتراك فترة ونصف", DefaultFee = 2200, Description = "فترة ونصف" } };
     var categories = new[] { "أدوات تعليمية", "نظافة", "أغذية", "ألعاب", "قرطاسية" }.Select(n => new InventoryCategory { Name = n, Description = $"تصنيف {n}" }).ToList();
-    db.AddRange(employees); db.AddRange(children); db.AddRange(rooms); db.AddRange(plans); db.AddRange(categories);
+    db.AddRange(employees); db.AddRange(children); db.AddRange(rooms); db.AddRange(categories);
     await db.SaveChangesAsync();
 
     var items = Enumerable.Range(0, 40).Select(i => new InventoryItem { Name = $"{new[] { "ألوان خشبية", "كراسات", "مناديل", "صابون", "ألعاب تركيب", "أقلام" }[i % 6]} {i + 1:00}", Category = categories[i % categories.Count], UnitPrice = 15 + i * 3, Quantity = i % 9 == 0 ? 0 : 5 + i, IsActive = i % 11 != 0 }).ToList();
@@ -117,8 +116,7 @@ static async Task SeedMockupAsync(NurseryDbContext db)
     {
         var start = new DateOnly(today.Year, today.Month, 1).AddMonths(-month);
         var status = statuses[(ci + month) % statuses.Length];
-        var plan = plans[ci % plans.Length];
-        var sub = new Subscription { Child = children[ci], SubscriptionPlan = plan, PeriodStart = start, PeriodEnd = start.AddMonths(1).AddDays(-1), AmountDue = plan.DefaultFee + (ci % 3) * 100, Status = status, Notes = month == 0 && status == ElMomenNursery.Domain.Enums.SubscriptionStatus.Pending ? "بانتظار التحصيل" : null };
+        var sub = new Subscription { Child = children[ci], PeriodStart = start, PeriodEnd = start.AddMonths(1).AddDays(-1), AmountDue = 1600 + (ci % 4) * 200, Status = status, Notes = month == 0 && status == ElMomenNursery.Domain.Enums.SubscriptionStatus.Pending ? "بانتظار التحصيل" : null };
         subscriptions.Add(sub);
         if (status is ElMomenNursery.Domain.Enums.SubscriptionStatus.Paid or ElMomenNursery.Domain.Enums.SubscriptionStatus.PartiallyPaid)
         {

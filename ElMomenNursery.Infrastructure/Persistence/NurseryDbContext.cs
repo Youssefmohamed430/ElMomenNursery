@@ -20,7 +20,6 @@ public sealed class NurseryDbContext(DbContextOptions<NurseryDbContext> options)
     public DbSet<Classroom> Classrooms => Set<Classroom>();
     public DbSet<ChildClassEnrollment> ChildClassEnrollments => Set<ChildClassEnrollment>();
     public DbSet<ClassTeacherAssignment> ClassTeacherAssignments => Set<ClassTeacherAssignment>();
-    public DbSet<SubscriptionPlan> SubscriptionPlans => Set<SubscriptionPlan>();
     public DbSet<Subscription> Subscriptions => Set<Subscription>();
     public DbSet<InventoryCategory> InventoryCategories => Set<InventoryCategory>();
     public DbSet<InventoryItem> InventoryItems => Set<InventoryItem>();

@@ -20,6 +20,7 @@ public interface IChildService
     Task<Result<IReadOnlyList<ChildAttachmentDto>>> GetChildAttachmentsAsync(Guid childId, CancellationToken cancellationToken = default);
     Task<Result> AddChildAttachmentAsync(Guid childId, ChildAttachmentDto attachment, CancellationToken cancellationToken = default);
     Task<Result<ChildDto>> CreateChildAsync(CreateChildDTO childDto);
+    Task<Result<ChildDto>> CreatePendingRegistrationAsync(string childName, CancellationToken cancellationToken = default);
     Task<Result<ChildDto>> UpdateChildAsync(Guid childId, UpdateChildDTO childDto);
     Task<Result> DeleteChildAsync(Guid childId);
 }

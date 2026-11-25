@@ -38,6 +38,7 @@ internal sealed class ChildrenPage : UserControl
     {
         var page = CreateDataPage("الأطفال", "استعرض الأطفال وادمج أكثر من فلتر للوصول إلى المجموعة المطلوبة.", includePrototypeBanner: false);
         var addButton = CreateActionButton("إضافة طفل", primary: true);
+        var addPendingButton = CreateActionButton("تسجيل طفل جديد");
         var editButton = CreateActionButton("تعديل البيانات");
         var deleteButton = CreateActionButton("حذف طفل");
         var detailsButton = CreateActionButton("عرض الملف");
@@ -46,6 +47,7 @@ internal sealed class ChildrenPage : UserControl
         var deletedButton = CreateActionButton("عرض المحذوفين");
         var restoreButton = CreateActionButton("استعادة طفل");
         addButton.Visible = _session.HasPermission("Students.Create");
+        addPendingButton.Visible = _session.HasPermission("Students.Create");
         editButton.Visible = _session.HasPermission("Students.Edit");
         deleteButton.Visible = _session.HasPermission("Students.Delete");
         detailsButton.Visible = _session.HasPermission("Students.View");
@@ -54,6 +56,7 @@ internal sealed class ChildrenPage : UserControl
         deletedButton.Visible = _session.HasPermission("Students.Restore");
         restoreButton.Visible = false;
         addButton.Name = "actions.add";
+        addPendingButton.Name = "actions.add-pending";
         editButton.Name = "actions.edit";
         deleteButton.Name = "actions.delete";
         detailsButton.Name = "actions.details";
@@ -62,6 +65,7 @@ internal sealed class ChildrenPage : UserControl
         deletedButton.Name = "actions.deleted";
         restoreButton.Name = "actions.restore";
         addButton.Width = 150;
+        addPendingButton.Width = 170;
         editButton.Width = 140;
         deleteButton.Width = 126;
         detailsButton.Width = 142;
@@ -120,22 +124,26 @@ internal sealed class ChildrenPage : UserControl
         resetLayoutButton.Name = "layout.reset";
         resetLayoutButton.Width = 150;
         resetLayoutButton.Visible = false;
-        actions.Controls.AddRange([addButton, editButton, deleteButton, detailsButton, exportButton, schoolAgeButton, deletedButton, restoreButton, customizeButton, resetLayoutButton]);
+        actions.Controls.AddRange([addButton, addPendingButton, editButton, deleteButton, detailsButton, exportButton, schoolAgeButton, deletedButton, restoreButton, customizeButton, resetLayoutButton]);
 
         var grid = CreateGrid([
             "المعرف", "اسم الطفل", "العنوان", "تاريخ الالتحاق", "تاريخ الميلاد", "النوع", "الفترة",
             "اسم الأب", "مهنة الأب", "هاتف الأب", "واتساب الأب", "اسم الأم", "مهنة الأم",
-            "هاتف الأم", "واتساب الأم", "ملاحظات", "حالة طبية", "سبق له الالتحاق",
+            "هاتف الأم", "واتساب الأم", "ملاحظات", "حالة طبية", "سبق له الالتحاق", "حالة التسجيل",
             "تاريخ الإضافة", "آخر تعديل"
         ]);
         grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
         grid.Name = "children.grid";
-        var columnWidths = new[] { 265, 170, 220, 140, 140, 90, 120, 150, 140, 140, 140, 150, 140, 140, 140, 240, 120, 150, 160, 160 };
+        var columnWidths = new[] { 265, 170, 220, 140, 140, 90, 120, 150, 140, 140, 140, 150, 140, 140, 140, 240, 120, 150, 150, 160, 160 };
         for (var columnIndex = 0; columnIndex < grid.Columns.Count; columnIndex++)
             grid.Columns[columnIndex].Width = columnWidths[columnIndex];
+        grid.SelectionChanged += (_, _) => editButton.Text = grid.SelectedRows.Count > 0 &&
+            Convert.ToString(grid.SelectedRows[0].Cells[18].Value)?.StartsWith("مبدئي", StringComparison.Ordinal) == true
+                ? "استكمال التسجيل" : "تعديل البيانات";
         resultCount.Name = "children.count";
 
         RegisterDraggable(addButton);
+        RegisterDraggable(addPendingButton);
         RegisterDraggable(editButton);
         RegisterDraggable(deleteButton);
         RegisterDraggable(deletedButton);
@@ -167,6 +175,12 @@ internal sealed class ChildrenPage : UserControl
             if (editor.ShowDialog(this) == DialogResult.OK)
                 await LoadChildrenAsync();
         }, "Open child creation form");
+        addPendingButton.Click += (_, _) => RunSafeEvent(async () =>
+        {
+            if (isCustomizing) return;
+            using var registration = new ChildRegistrationForm(_scopeFactory, _session);
+            if (registration.ShowDialog(this) == DialogResult.OK) await LoadChildrenAsync();
+        }, "Open pending child registration form");
         editButton.Click += (_, _) => RunSafeEvent(async () =>
         {
             if (isCustomizing) return;
@@ -185,6 +199,8 @@ internal sealed class ChildrenPage : UserControl
                     childResult = await scope.ServiceProvider.GetRequiredService<IChildService>().GetChildByIdAsync(childId);
                 if (childResult.IsFailure) { AppDialog.ShowInformation(this, "تعديل بيانات طفل", childResult.Error.Description); return; }
                 var child = childResult.Value;
+                if (!child.IsRegistrationComplete && !AppDialog.Confirm(this, "استكمال تسجيل الطفل",
+                    $"هل تؤكد أن «{child.FullName}» هو نفس الطفل صاحب الاشتراك وأي فواتير مخزن مرتبطة بهذا التسجيل المبدئي؟ عند الحفظ ستكتمل بيانات نفس السجل وتظل الحركات المالية مرتبطة به.")) return;
                 if (page.IsDisposed)
                 {
                     _log.Debug("Child editor opening cancelled: page disposed");
@@ -260,6 +276,7 @@ internal sealed class ChildrenPage : UserControl
             addButton.Visible = editButton.Visible = deleteButton.Visible = !showingDeleted && _session.HasPermission("Students.Create") && _session.HasPermission("Students.Edit") && _session.HasPermission("Students.Delete");
             // Preserve each action's own permission while switching modes.
             addButton.Visible = !showingDeleted && _session.HasPermission("Students.Create");
+            addPendingButton.Visible = !showingDeleted && _session.HasPermission("Students.Create");
             editButton.Visible = !showingDeleted && _session.HasPermission("Students.Edit");
             deleteButton.Visible = !showingDeleted && _session.HasPermission("Students.Delete");
             filterPanel.Enabled = !showingDeleted;
@@ -470,10 +487,10 @@ internal sealed class ChildrenPage : UserControl
                         child.Id,
                         child.FullName,
                         child.Address,
-                        child.EnrollmentDate.ToString("dd/MM/yyyy"),
-                        child.DateOfBirth.ToString("dd/MM/yyyy"),
-                        child.Gender == ChildGender.Boy ? "ولد" : "بنت",
-                        child.Shift switch { Shift.Morning => "صباحية", Shift.Afternoon => "مسائية", Shift.FullDay => "يوم كامل", Shift.PeriodAndAHalf => "فترة ونصف", _ => "—" },
+                        child.IsRegistrationComplete ? child.EnrollmentDate.ToString("dd/MM/yyyy") : "—",
+                        child.IsRegistrationComplete ? child.DateOfBirth.ToString("dd/MM/yyyy") : "—",
+                        child.IsRegistrationComplete ? child.Gender == ChildGender.Boy ? "ولد" : "بنت" : "—",
+                        child.IsRegistrationComplete ? child.Shift switch { Shift.Morning => "صباحية", Shift.Afternoon => "مسائية", Shift.FullDay => "يوم كامل", Shift.PeriodAndAHalf => "فترة ونصف", _ => "—" } : "—",
                         child.FatherName,
                         child.FatherOccupation ?? string.Empty,
                         child.FatherPhone,
@@ -483,8 +500,9 @@ internal sealed class ChildrenPage : UserControl
                         child.MotherPhone,
                         child.MotherWhatsApp ?? string.Empty,
                         child.Notes ?? string.Empty,
-                        child.HasMedicalConditions ? "نعم" : "لا",
-                        child.PreviouslyAttendedNursery ? "نعم" : "لا",
+                        child.IsRegistrationComplete ? child.HasMedicalConditions ? "نعم" : "لا" : "—",
+                        child.IsRegistrationComplete ? child.PreviouslyAttendedNursery ? "نعم" : "لا" : "—",
+                        child.IsRegistrationComplete ? "مكتمل" : "مبدئي – استكمل البيانات",
                         child.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm"),
                         child.UpdatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? string.Empty);
                     grid.Rows[index].Tag = child.Id;
@@ -548,7 +566,7 @@ internal sealed class ChildrenPage : UserControl
         void ArrangeDefaultActions()
         {
             var right = actions.ClientSize.Width - 8;
-            foreach (var button in new[] { addButton, editButton, deleteButton, detailsButton, exportButton, schoolAgeButton, deletedButton, restoreButton })
+            foreach (var button in new[] { addButton, addPendingButton, editButton, deleteButton, detailsButton, exportButton, schoolAgeButton, deletedButton, restoreButton })
             {
                 right -= button.Width;
                 button.SetBounds(right, 1, button.Width, 42);

@@ -7,8 +7,6 @@ public class SubscriptionDto
     public Guid Id { get; init; } = Guid.NewGuid();
     public Guid ChildId { get; set; }
     public string ChildName { get; set; } = string.Empty;
-    public Guid? SubscriptionPlanId { get; set; }
-    public string? SubscriptionPlanName { get; set; }
     public DateOnly PeriodStart { get; set; }
     public DateOnly PeriodEnd { get; set; }
     public decimal AmountDue { get; set; }

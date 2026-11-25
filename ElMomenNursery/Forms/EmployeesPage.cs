@@ -39,6 +39,8 @@ internal sealed class EmployeesPage : UserControl
         var deletedButton = CreateActionButton("عرض المحذوفين");
         var restoreButton = CreateActionButton("استعادة موظف");
         var exportButton = CreateActionButton("تصدير Excel");
+        var advancesButton = CreateActionButton("سلف الموظفين");
+        advancesButton.Visible = _session.HasPermission("Employees.Advances");
         exportButton.Visible = _session.HasPermission("Employees.Export");
         var canManage = _session.HasPermission("Employees.Manage");
         addButton.Visible = editButton.Visible = deleteButton.Visible = canManage;
@@ -93,6 +95,12 @@ internal sealed class EmployeesPage : UserControl
         }, "Open employee editor");
         exportButton.Click += async (_, _) => await GridExcelExport.SaveAsync(this, grid, _excelExportService,
             "تصدير قائمة الموظفين", "الموظفون");
+        advancesButton.Click += (_, _) => RunSafeEvent(() =>
+        {
+            using var dialog = new EmployeeAdvancesForm(_scopeFactory);
+            dialog.ShowDialog(this);
+            return Task.CompletedTask;
+        }, "Open employee advances");
         deletedButton.Click += (_, _) => RunSafeEvent(async () =>
         {
             showingDeleted = !showingDeleted;
@@ -144,7 +152,7 @@ internal sealed class EmployeesPage : UserControl
         }, "Delete employee");
 
         var toolbar = new ActionToolbar { Name = "employees.actions" };
-        toolbar.Add(addButton, editButton, deleteButton, deletedButton, restoreButton, exportButton);
+        toolbar.Add(addButton, editButton, deleteButton, deletedButton, restoreButton, advancesButton, exportButton);
         page.Controls.AddRange([filters, toolbar, resultCount, grid]);
         page.Resize += (_, _) => LayoutEmployeesPage();
         LayoutEmployeesPage();
