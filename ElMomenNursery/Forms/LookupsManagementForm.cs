@@ -21,7 +21,20 @@ internal sealed class LookupsManagementForm : ResponsiveForm
         Controls.Add(_grid); Controls.Add(toolbar); Controls.Add(_category); _category.SelectedIndexChanged += async (_, _) => await LoadRows();
         add.Click += async (_, _) => await Edit(null); edit.Click += async (_, _) => { if (Selected() is { } item) await Edit(item); };
         toggle.Click += async (_, _) => { if (Selected() is { } item) await Save(item, item.Name, item.SortOrder, !item.IsActive); };
-        delete.Click += async (_, _) => { if (Selected() is not { } item || item.IsSystem) return; if (!AppDialog.Confirm(this, "حذف عنصر", "هل تريد حذف العنصر المحدد؟")) return; await WithService(s => s.DeleteAsync(item.Id)); await LoadRows(); };
+        delete.Click += async (_, _) => await UiGuard.RunAsync(this, "Lookups.Delete", async () =>
+        {
+            if (Selected() is not { } item)
+            {
+                AppDialog.ShowInformation(this, "إدارة القوائم", "اختر عنصرًا من الجدول أولًا.");
+                return;
+            }
+            if (!AppDialog.Confirm(this, "حذف عنصر", $"هل تريد حذف «{item.Name}» من القائمة؟ لن تتأثر السجلات السابقة التي استخدمت هذه القيمة.")) return;
+
+            await using var scope = _scopes.CreateAsyncScope();
+            var result = await scope.ServiceProvider.GetRequiredService<ILookupService>().DeleteAsync(item.Id);
+            if (!ResultPresenter.Present(this, "إدارة القوائم", result)) return;
+            await LoadRows();
+        }, "تعذر حذف العنصر من القائمة.");
         Shown += async (_, _) => await LoadRows();
     }
     private LookupItemDto? Selected() => _grid.SelectedRows.Count == 0 ? null : _grid.SelectedRows[0].Tag as LookupItemDto;

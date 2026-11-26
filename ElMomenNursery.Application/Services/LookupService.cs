@@ -36,7 +36,6 @@ public sealed class LookupService(IUnitOfWork uow, IPermissionService permission
         if (!permissions.HasPermission("Lookups.Manage")) return new Error("Lookups.PermissionDenied", "لا تملك صلاحية إدارة القوائم.");
         var item = await uow.Repository<LookupItem>().FirstOrDefaultAsync(x => x.Id == id, asNoTracking: false, cancellationToken: cancellationToken);
         if (item is null) return new Error("Lookups.NotFound", "العنصر غير موجود.");
-        if (item.IsSystem) return new Error("Lookups.SystemItem", "لا يمكن حذف عنصر أساسي في النظام.");
         uow.Repository<LookupItem>().Remove(item); await AuditAsync("Lookup.Deleted", item, cancellationToken); await uow.SaveChangesAsync(cancellationToken); return Result.Success("تم نقل العنصر إلى المحذوفات.");
     }
     private static Error? Validate(SaveLookupItemDto dto) => string.IsNullOrWhiteSpace(dto.Category) || string.IsNullOrWhiteSpace(dto.Name) || dto.Name.Trim().Length > 120 ? new Error("Lookups.Invalid", "أدخل اسمًا صالحًا للقائمة.") : null;

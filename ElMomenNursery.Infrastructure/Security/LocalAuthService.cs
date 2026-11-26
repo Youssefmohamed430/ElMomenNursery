@@ -20,8 +20,8 @@ public sealed class LocalAuthService(NurseryDbContext db, ISessionManager sessio
 
     public async Task<Result<bool>> NeedsInitialAdministratorSetupAsync(CancellationToken cancellationToken = default)
     {
-        var setupNeeded = !await HasRecognizedPasswordHashAsync(cancellationToken);
-        if (setupNeeded) logger.LogInformation("Initial administrator setup mode entered");
+        var setupNeeded = !await HasAdministratorRoleAssignmentAsync(cancellationToken);
+        if (setupNeeded) logger.LogInformation("Initial administrator setup mode entered because no Admin UserRole assignment exists");
         return Result.Success(setupNeeded);
     }
 
@@ -137,7 +137,7 @@ public sealed class LocalAuthService(NurseryDbContext db, ISessionManager sessio
         if (username.Length is < 3 or > 64 || fullName.Length is < 2 or > 200)
             return (null, CommonErrors.InvalidRequest);
         if (!ValidPassword(password)) return (null, AuthErrors.WeakPassword);
-        if (await HasRecognizedPasswordHashAsync(cancellationToken))
+        if (await HasAdministratorRoleAssignmentAsync(cancellationToken))
             return (null, AuthErrors.SetupAlreadyComplete);
         var role = await db.Roles.SingleOrDefaultAsync(x => x.Name == "Admin", cancellationToken);
         if (role is null) return (null, AuthErrors.SetupUnavailable);
@@ -181,25 +181,8 @@ public sealed class LocalAuthService(NurseryDbContext db, ISessionManager sessio
     private static bool ValidPassword(string? password) => password is { Length: >= 12 and <= 256 }
         && password.Any(char.IsLetter) && password.Any(char.IsDigit);
 
-    // Decode the Identity hash marker instead of coupling setup detection to its Base64 text prefix.
-    // Version 2 and version 3 markers are both recognized so existing accounts keep setup mode disabled.
-    private static bool IsRecognizedPasswordHash(string passwordHash)
-    {
-        try
-        {
-            var bytes = Convert.FromBase64String(passwordHash);
-            if (bytes.Length == 0) return false;
-            return (bytes[0] == 0 && bytes.Length == 49) || (bytes[0] == 1 && bytes.Length >= 26);
-        }
-        catch (FormatException)
-        {
-            return false;
-        }
-    }
-
-    private async Task<bool> HasRecognizedPasswordHashAsync(CancellationToken cancellationToken) =>
-        (await db.UserAccounts.AsNoTracking().Select(user => user.PasswordHash).ToListAsync(cancellationToken))
-        .Any(IsRecognizedPasswordHash);
+    private Task<bool> HasAdministratorRoleAssignmentAsync(CancellationToken cancellationToken) =>
+        db.UserRoles.AnyAsync(userRole => userRole.Role.Name == "Admin", cancellationToken);
 
     private async Task SaveChangesWithLoggingAsync(string operation, Guid? userId, CancellationToken cancellationToken)
     {

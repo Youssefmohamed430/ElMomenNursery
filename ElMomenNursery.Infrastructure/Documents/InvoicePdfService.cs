@@ -24,11 +24,11 @@ public sealed class InvoicePdfService(string dataDirectory) : IInvoicePdfService
         {
             cancellationToken.ThrowIfCancellationRequested();
             var folder = Path.Combine(dataDirectory, "Invoices", invoice.CreatedAt.LocalDateTime.Year.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            var path = Path.Combine(folder, $"{invoice.InvoiceNumber}.pdf");
             var timer = Stopwatch.StartNew();
             try
             {
                 Directory.CreateDirectory(folder);
-                var path = Path.Combine(folder, $"{invoice.InvoiceNumber}.pdf");
                 Document.Create(document => document.Page(page =>
                 {
                     page.Size(PageSizes.A5); page.Margin(24); page.DefaultTextStyle(style => style.FontFamily("Noto Naskh Arabic").FontSize(11));
@@ -58,7 +58,8 @@ public sealed class InvoicePdfService(string dataDirectory) : IInvoicePdfService
             {
                 var kind = (ex is IOException io && (io.HResult & 0xFFFF) is 32 or 33) ? "in-use"
                     : ex is UnauthorizedAccessException or IOException or ArgumentException or NotSupportedException ? "not-writable" : "unknown";
-                Log.ForContext<InvoicePdfService>().Warning("Invoice PDF generation failed; operation={Operation}; failureKind={FailureKind}; durationMs={DurationMs}; targetFolder={TargetFolder}", "CreateInvoiceFile", kind, timer.ElapsedMilliseconds, folder);
+                try { if (File.Exists(path)) File.Delete(path); } catch { }
+                Log.ForContext<InvoicePdfService>().Warning(ex, "Invoice PDF generation failed; operation={Operation}; failureKind={FailureKind}; exceptionType={ExceptionType}; exceptionMessage={ExceptionMessage}; durationMs={DurationMs}; targetFolder={TargetFolder}", "CreateInvoiceFile", kind, ex.GetType().FullName, ex.Message, timer.ElapsedMilliseconds, folder);
                 return Result.Failure<string>(new Error("Invoices.PdfFailed", "تم حفظ الفاتورة، لكن تعذر إنشاء ملف PDF."));
             }
         }, cancellationToken);

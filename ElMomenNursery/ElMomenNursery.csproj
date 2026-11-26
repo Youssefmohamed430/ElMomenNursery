@@ -31,6 +31,11 @@
     <PackageReference Include="Serilog.Settings.Configuration" Version="9.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
   </ItemGroup>
+  <Target Name="CopyQuestPdfDefaultFontArchive" AfterTargets="Publish">
+    <Copy SourceFiles="$(NuGetPackageRoot)questpdf\2026.9.2\questpdf_fonts_lato.br"
+          DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true"
+          Condition="Exists('$(NuGetPackageRoot)questpdf\2026.9.2\questpdf_fonts_lato.br')" />
+  </Target>
 </Project>
 
 

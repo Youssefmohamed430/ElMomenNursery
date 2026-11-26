@@ -26,13 +26,13 @@ public sealed class ReceiptPdfService(string dataDirectory) : IReceiptPdfService
         cancellationToken.ThrowIfCancellationRequested();
         var year = receipt.PaidAt.LocalDateTime.Year;
         var folder = Path.Combine(dataDirectory, "Receipts", year.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        var safeNumber = string.Concat(receipt.ReceiptNumber.Where(c => char.IsLetterOrDigit(c) || c == '-'));
+        var suffix = isCopy ? "-نسخة" : string.Empty;
+        var path = Path.Combine(folder, $"{safeNumber}{suffix}.pdf");
         var timer = Stopwatch.StartNew();
         try
         {
         Directory.CreateDirectory(folder);
-        var safeNumber = string.Concat(receipt.ReceiptNumber.Where(c => char.IsLetterOrDigit(c) || c == '-'));
-        var suffix = isCopy ? "-نسخة" : string.Empty;
-        var path = Path.Combine(folder, $"{safeNumber}{suffix}.pdf");
         var logo = Path.Combine(AppContext.BaseDirectory, "Resources", "Branding", "AlMoumenNurseryLogo.jpeg");
         Document.Create(document => document.Page(page =>
         {
@@ -74,7 +74,8 @@ public sealed class ReceiptPdfService(string dataDirectory) : IReceiptPdfService
         {
             var kind = exception is IOException io && (io.HResult & 0xFFFF) is 32 or 33 ? "in-use"
                 : exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException ? "not-writable" : "unknown";
-            Log.ForContext<ReceiptPdfService>().Warning("Receipt PDF generation failed; operation={Operation}; failureKind={FailureKind}; durationMs={DurationMs}; targetFolder={TargetFolder}", "CreateReceiptFile", kind, timer.ElapsedMilliseconds, folder);
+            try { if (File.Exists(path)) File.Delete(path); } catch { }
+            Log.ForContext<ReceiptPdfService>().Warning(exception, "Receipt PDF generation failed; operation={Operation}; failureKind={FailureKind}; exceptionType={ExceptionType}; exceptionMessage={ExceptionMessage}; durationMs={DurationMs}; targetFolder={TargetFolder}", "CreateReceiptFile", kind, exception.GetType().FullName, exception.Message, timer.ElapsedMilliseconds, folder);
             return Result.Failure<string>(exception is IOException && kind == "in-use" ? FileErrors.FileInUse
                 : kind == "not-writable" ? FileErrors.NotWritable
                 : new Error("Receipts.PdfFailed", "تعذر إنشاء ملف الإيصال."));
