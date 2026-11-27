@@ -70,6 +70,8 @@ public static class InfrastructureServiceCollectionExtensions
                 sqlite => sqlite.MigrationsAssembly(typeof(NurseryDbContext).Assembly.FullName))
             .ConfigureWarnings(warnings => warnings
                 .Ignore(RelationalEventId.PendingModelChangesWarning)));
+        services.AddSingleton<IDatabaseBackupService>(provider => new SqliteDatabaseBackupService(
+            connectionString, provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<SqliteDatabaseBackupService>>()));
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.Configure<AuthSecurityOptions>(options =>
         {

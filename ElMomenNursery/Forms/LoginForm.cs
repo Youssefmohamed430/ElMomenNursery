@@ -18,9 +18,13 @@ public sealed class LoginForm : ResponsiveForm
         ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 11F, FontStyle.Bold), UseVisualStyleBackColor = false };
     private readonly Button _switchDatabase = new() { Height = 40, FlatStyle = FlatStyle.Flat, BackColor = Color.White,
         ForeColor = BrandPalette.PrimaryGreen, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), UseVisualStyleBackColor = false };
+    private readonly Button _restoreBackup = new() { Text = "استعادة نسخة احتياطية", Height = 40, FlatStyle = FlatStyle.Flat, BackColor = Color.White,
+        ForeColor = BrandPalette.PrimaryGreen, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), UseVisualStyleBackColor = false };
     private readonly bool _isMockupDatabase;
     private Action? _layoutCard;
     private bool _setupMode;
+
+    public string? RestoreBackupPath { get; private set; }
 
     public LoginForm(IAuthService auth, bool isMockupDatabase)
     {
@@ -31,17 +35,19 @@ public sealed class LoginForm : ResponsiveForm
             : "القاعدة الحالية: الفعلية | التبديل للتجريبية";
         _switchDatabase.FlatAppearance.BorderColor = BrandPalette.Border;
         _switchDatabase.Click += SwitchDatabase;
+        _restoreBackup.FlatAppearance.BorderColor = BrandPalette.Border;
+        _restoreBackup.Click += RestoreBackup;
         Text = "تسجيل الدخول - حضانة المؤمن";
         StartPosition = FormStartPosition.CenterScreen; MinimumSize = new Size(520, 670); Size = new Size(560, 700);
         BackColor = BrandPalette.AppBackground; Font = new Font("Segoe UI", 10F); RightToLeft = RightToLeft.Yes; RightToLeftLayout = true;
-        var card = new Panel { BackColor = BrandPalette.Surface, Size = new Size(410, 550), Anchor = AnchorStyles.None };
+        var card = new Panel { BackColor = BrandPalette.Surface, Size = new Size(410, 600), Anchor = AnchorStyles.None };
         var heading = new Label { Text = "تسجيل الدخول", Font = new Font("Segoe UI", 21F, FontStyle.Bold), ForeColor = BrandPalette.Text, TextAlign = ContentAlignment.MiddleCenter };
         var subtitle = new Label { Text = "نظام إدارة حضانة المؤمن", ForeColor = BrandPalette.MutedText, TextAlign = ContentAlignment.MiddleCenter };
         var userLabel = LabelFor("اسم المستخدم"); var passLabel = LabelFor("كلمة المرور");
         _password.UseSystemPasswordChar = true;
         _submit.FlatAppearance.BorderSize = 0; _submit.Click += Submit;
         _note.Height = 48; _note.ForeColor = BrandPalette.MutedText; _note.Font = new Font("Segoe UI", 9F);
-        card.Controls.AddRange([heading, subtitle, userLabel, _username, _nameLabel, _fullName, passLabel, _password, _submit, _note, _switchDatabase]);
+        card.Controls.AddRange([heading, subtitle, userLabel, _username, _nameLabel, _fullName, passLabel, _password, _submit, _note, _switchDatabase, _restoreBackup]);
         Controls.Add(card);
         Shown += (_, _) => _ = LoadInitialSetupAsync(heading, subtitle);
         void LayoutCard()
@@ -54,10 +60,32 @@ public sealed class LoginForm : ResponsiveForm
             passLabel.SetBounds(32, _setupMode ? 280 : 212, w, 24); _password.SetBounds(32, _setupMode ? 306 : 238, w, 40);
             _submit.SetBounds(32, _setupMode ? 365 : 300, w, 48); _note.SetBounds(32, _setupMode ? 417 : 355, w, 54);
             _switchDatabase.SetBounds(32, _setupMode ? 480 : 430, w, 40);
+            _restoreBackup.SetBounds(32, _setupMode ? 525 : 475, w, 40);
         }
         _layoutCard = LayoutCard;
         Resize += (_, _) => LayoutCard();
         Shown += (_, _) => LayoutCard();
+    }
+
+    private void RestoreBackup(object? sender, EventArgs e)
+    {
+        using var picker = new OpenFileDialog
+        {
+            Title = "اختيار ملف النسخة الاحتياطية",
+            Filter = "نسخة قاعدة بيانات الحضانة (*.db)|*.db|كل الملفات (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+        if (picker.ShowDialog(this) != DialogResult.OK) return;
+        if (MessageBox.Show(this,
+                "سيتم استبدال بيانات القاعدة الحالية بالبيانات الموجودة في النسخة المختارة. سيتم حفظ نسخة أمان من القاعدة الحالية قبل الاستعادة. هل تريد المتابعة؟",
+                "استعادة نسخة احتياطية", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+                MessageBoxDefaultButton.Button2, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign) != DialogResult.Yes)
+            return;
+
+        RestoreBackupPath = picker.FileName;
+        DialogResult = DialogResult.Retry;
+        Close();
     }
 
     private void SwitchDatabase(object? sender, EventArgs e)

@@ -59,50 +59,30 @@ internal static class Program
             services.AddNurseryApplication();
             services.AddNurseryInfrastructure(configuration);
             using var serviceProvider = services.BuildServiceProvider();
-            using (var scope = serviceProvider.CreateScope())
-            {
-                var db = scope.ServiceProvider.GetRequiredService<NurseryDbContext>();
-                var databasePath = new SqliteConnectionStringBuilder(db.Database.GetConnectionString()).DataSource;
-                var pendingMigrations = db.Database.GetPendingMigrations().ToArray();
-                Log.Information("Database startup check; databasePath={DatabasePath}; pendingMigrations={PendingMigrations}",
-                    databasePath, pendingMigrations);
-                if (pendingMigrations.Length > 0 && File.Exists(databasePath))
-                    BackupDatabaseBeforeMigration(databasePath);
-
-                var migrationTimer = Stopwatch.StartNew();
-                try
-                {
-                    db.Database.Migrate();
-                    Log.Information("Database migration completed; durationMs={DurationMs}", migrationTimer.ElapsedMilliseconds);
-                }
-                catch (Exception exception)
-                {
-                    Log.Fatal(exception, "Database migration failed; durationMs={DurationMs}", migrationTimer.ElapsedMilliseconds);
-                    ShowStartupError();
-                    return;
-                }
-
-                var seedTimer = Stopwatch.StartNew();
-                try
-                {
-                    AuthSeed.InitializeAsync(db).GetAwaiter().GetResult();
-                    LookupSeed.InitializeAsync(db).GetAwaiter().GetResult();
-                    Log.Information("Authentication seed completed; durationMs={DurationMs}", seedTimer.ElapsedMilliseconds);
-                }
-                catch (Exception exception)
-                {
-                    Log.Fatal(exception, "Authentication seed failed; durationMs={DurationMs}", seedTimer.ElapsedMilliseconds);
-                    ShowStartupError();
-                    return;
-                }
-            }
+            var databasePath = Path.GetFullPath(new SqliteConnectionStringBuilder(configuration.GetConnectionString("Nursery")).DataSource);
+            if (!InitializeDatabase(serviceProvider, databasePath)) return;
 
             var session = serviceProvider.GetRequiredService<ISessionManager>();
             while (true)
             {
+                DialogResult loginResult;
+                string? restorePath;
                 using (var loginScope = serviceProvider.CreateScope())
                 using (var login = new LoginForm(loginScope.ServiceProvider.GetRequiredService<IAuthService>(), IsMockupDatabaseSelected()))
-                    if (login.ShowDialog() != DialogResult.OK) break;
+                {
+                    loginResult = login.ShowDialog();
+                    restorePath = login.RestoreBackupPath;
+                }
+
+                if (loginResult == DialogResult.Retry && !string.IsNullOrWhiteSpace(restorePath))
+                {
+                    if (RestoreDatabaseBackup(restorePath, databasePath) && InitializeDatabase(serviceProvider, databasePath))
+                        MessageBox.Show("تمت استعادة النسخة الاحتياطية بنجاح. يمكنك تسجيل الدخول الآن.", "استعادة النسخة الاحتياطية",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information, MessageBoxDefaultButton.Button1,
+                            MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+                    continue;
+                }
+                if (loginResult != DialogResult.OK) break;
 
                 if (session.CurrentUser is null) break;
                 var userId = session.CurrentUser.UserId;
@@ -168,6 +148,109 @@ internal static class Program
         finally
         {
             Log.CloseAndFlush();
+        }
+    }
+
+    private static bool InitializeDatabase(IServiceProvider serviceProvider, string databasePath)
+    {
+        using var scope = serviceProvider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<NurseryDbContext>();
+        var pendingMigrations = db.Database.GetPendingMigrations().ToArray();
+        Log.Information("Database startup check; databasePath={DatabasePath}; pendingMigrations={PendingMigrations}", databasePath, pendingMigrations);
+        if (pendingMigrations.Length > 0 && File.Exists(databasePath)) BackupDatabaseBeforeMigration(databasePath);
+
+        var migrationTimer = Stopwatch.StartNew();
+        try
+        {
+            db.Database.Migrate();
+            Log.Information("Database migration completed; durationMs={DurationMs}", migrationTimer.ElapsedMilliseconds);
+        }
+        catch (Exception exception)
+        {
+            Log.Fatal(exception, "Database migration failed; durationMs={DurationMs}", migrationTimer.ElapsedMilliseconds);
+            ShowStartupError();
+            return false;
+        }
+
+        var seedTimer = Stopwatch.StartNew();
+        try
+        {
+            AuthSeed.InitializeAsync(db).GetAwaiter().GetResult();
+            LookupSeed.InitializeAsync(db).GetAwaiter().GetResult();
+            Log.Information("Authentication seed completed; durationMs={DurationMs}", seedTimer.ElapsedMilliseconds);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Log.Fatal(exception, "Authentication seed failed; durationMs={DurationMs}", seedTimer.ElapsedMilliseconds);
+            ShowStartupError();
+            return false;
+        }
+    }
+
+    private static bool RestoreDatabaseBackup(string backupPath, string databasePath)
+    {
+        try
+        {
+            backupPath = Path.GetFullPath(backupPath);
+            databasePath = Path.GetFullPath(databasePath);
+            if (string.Equals(backupPath, databasePath, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("ملف النسخة المختار هو قاعدة البيانات الحالية.");
+
+            var sourceBuilder = new SqliteConnectionStringBuilder
+            {
+                DataSource = backupPath,
+                Mode = SqliteOpenMode.ReadOnly,
+                Pooling = false
+            };
+            using (var validationConnection = new SqliteConnection(sourceBuilder.ToString()))
+            {
+                validationConnection.Open();
+                using var integrity = validationConnection.CreateCommand();
+                integrity.CommandText = "PRAGMA integrity_check";
+                if (!string.Equals(Convert.ToString(integrity.ExecuteScalar()), "ok", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("ملف النسخة الاحتياطية تالف أو غير مكتمل.");
+
+                foreach (var requiredTable in new[] { "__EFMigrationsHistory", "Children", "UserAccounts" })
+                {
+                    using var tableCheck = validationConnection.CreateCommand();
+                    tableCheck.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=$table";
+                    tableCheck.Parameters.AddWithValue("$table", requiredTable);
+                    if (Convert.ToInt64(tableCheck.ExecuteScalar(), CultureInfo.InvariantCulture) == 0)
+                        throw new InvalidDataException("الملف المحدد ليس نسخة احتياطية صالحة لقاعدة بيانات الحضانة.");
+                }
+            }
+
+            Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
+            var safetyPath = $"{databasePath}.pre-restore-{DateTime.Now:yyyyMMdd-HHmmss}.db";
+            if (File.Exists(databasePath))
+            {
+                var targetBuilder = new SqliteConnectionStringBuilder { DataSource = databasePath, Pooling = false };
+                using var current = new SqliteConnection(targetBuilder.ToString());
+                using var safety = new SqliteConnection(new SqliteConnectionStringBuilder
+                {
+                    DataSource = safetyPath, Mode = SqliteOpenMode.ReadWriteCreate, Pooling = false
+                }.ToString());
+                current.Open(); safety.Open(); current.BackupDatabase(safety);
+            }
+
+            using var restoreSource = new SqliteConnection(sourceBuilder.ToString());
+            using var restoreTarget = new SqliteConnection(new SqliteConnectionStringBuilder
+            {
+                DataSource = databasePath, Mode = SqliteOpenMode.ReadWriteCreate, Pooling = false
+            }.ToString());
+            restoreSource.Open(); restoreTarget.Open(); restoreSource.BackupDatabase(restoreTarget);
+            Log.Information("Database backup restored; backupPath={BackupPath}; databasePath={DatabasePath}; safetyBackupPath={SafetyBackupPath}",
+                backupPath, databasePath, File.Exists(safetyPath) ? safetyPath : null);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Log.Error(exception, "Database backup restore failed; backupPath={BackupPath}; databasePath={DatabasePath}", backupPath, databasePath);
+            MessageBox.Show($"تعذر استعادة النسخة الاحتياطية.\n{exception.Message}", "تعذر الاستعادة",
+                MessageBoxButtons.OK, MessageBoxIcon.Error, MessageBoxDefaultButton.Button1,
+                MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+            return false;
         }
     }
 

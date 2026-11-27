@@ -391,6 +391,47 @@ public sealed class MainForm : ResponsiveForm
             File.WriteAllText(profilePath, targetMode, System.Text.Encoding.UTF8);
             System.Windows.Forms.Application.Restart();
         };
+        var createBackup = CreateActionButton("إنشاء نسخة احتياطية");
+        createBackup.Width = 210;
+        createBackup.Height = 42;
+        createBackup.Enabled = canSwitchDatabase;
+        createBackup.Click += async (_, _) =>
+        {
+            using var picker = new SaveFileDialog
+            {
+                Title = "حفظ نسخة احتياطية من قاعدة البيانات",
+                Filter = "نسخة قاعدة بيانات الحضانة (*.db)|*.db",
+                FileName = $"AlMoumenNursery-backup-{DateTime.Now:yyyyMMdd-HHmm}.db",
+                DefaultExt = "db",
+                AddExtension = true,
+                OverwritePrompt = true
+            };
+            if (picker.ShowDialog(this) != DialogResult.OK) return;
+
+            createBackup.Enabled = false;
+            try
+            {
+                await using var scope = _scopeFactory.CreateAsyncScope();
+                var result = await scope.ServiceProvider.GetRequiredService<IDatabaseBackupService>()
+                    .CreateBackupAsync(picker.FileName);
+                MessageBox.Show(this,
+                    result.IsSuccess ? $"تم إنشاء النسخة الاحتياطية بنجاح.\n{picker.FileName}" : result.Error.Description,
+                    result.IsSuccess ? "نسخ احتياطي" : "تعذر إنشاء النسخة",
+                    MessageBoxButtons.OK, result.IsSuccess ? MessageBoxIcon.Information : MessageBoxIcon.Error,
+                    MessageBoxDefaultButton.Button1, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+            }
+            catch (Exception exception)
+            {
+                _log.Error(exception, "Database backup UI operation failed");
+                MessageBox.Show(this, "تعذر إنشاء النسخة الاحتياطية. تحقق من صلاحية الكتابة في المكان المحدد.",
+                    "تعذر إنشاء النسخة", MessageBoxButtons.OK, MessageBoxIcon.Error,
+                    MessageBoxDefaultButton.Button1, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+            }
+            finally
+            {
+                if (!IsDisposed) createBackup.Enabled = canSwitchDatabase;
+            }
+        };
 
         page.Controls.Add(title);
         page.Controls.Add(subtitle);
@@ -398,6 +439,7 @@ public sealed class MainForm : ResponsiveForm
         page.Controls.Add(shortcuts);
         page.Controls.Add(guidance);
         page.Controls.Add(changeDatabase);
+        page.Controls.Add(createBackup);
 
         void LayoutHomePage()
         {
@@ -408,6 +450,7 @@ public sealed class MainForm : ResponsiveForm
             shortcuts.SetBounds(26, 166, Math.Max(300, page.ClientSize.Width - 52), 300);
             guidance.SetBounds(34, 480, contentWidth, 76);
             changeDatabase.SetBounds(34, 570, 330, 42);
+            createBackup.SetBounds(380, 570, 210, 42);
         }
 
         page.Resize += (_, _) => LayoutHomePage();
