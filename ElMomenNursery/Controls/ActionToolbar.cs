@@ -12,11 +12,18 @@ namespace ElMomenNursery.Controls;
 public sealed class ActionToolbar : Panel
 {
     private readonly List<Control> _items = [];
+    private readonly Panel _viewport = new() { BackColor = Color.Transparent };
+    private readonly HScrollBar _horizontalScroll = new() { Visible = false, RightToLeft = RightToLeft.Yes };
+    private int _contentWidth;
+    private int _scrollValue;
 
     public ActionToolbar()
     {
         BackColor = BrandPalette.AppBackground;
         Margin = Padding.Empty;
+        Controls.Add(_viewport);
+        Controls.Add(_horizontalScroll);
+        _horizontalScroll.Scroll += (_, _) => { _scrollValue = _horizontalScroll.Value; PositionItems(); };
     }
 
     public IReadOnlyList<Control> Items => _items;
@@ -38,38 +45,54 @@ public sealed class ActionToolbar : Panel
         {
             if (control is Button button) button.Height = ItemHeight;
             _items.Add(control);
-            Controls.Add(control);
+            _viewport.Controls.Add(control);
         }
     }
 
-    /// <summary>Arranges the toolbar for the given width, wraps rows, sets its height, and returns it.</summary>
+    /// <summary>Arranges all actions in one right-to-left row and enables horizontal scrolling when needed.</summary>
     public int ArrangeItems(int width)
     {
-        var x = width;
-        var y = 0;
-        var placedInRow = false;
-        foreach (var item in _items)
+        var visible = _items.Where(item => item.Visible).ToArray();
+        var widths = visible.Select(item => item.Width > 0 ? Math.Max(item.Width, item.PreferredSize.Width) : item.PreferredSize.Width).ToArray();
+        _contentWidth = widths.Sum() + Math.Max(0, visible.Length - 1) * ItemSpacing;
+        var hasOverflow = _contentWidth > width;
+        _horizontalScroll.Visible = hasOverflow;
+        var scrollHeight = hasOverflow ? SystemInformation.HorizontalScrollBarHeight : 0;
+        _viewport.SetBounds(0, 0, width, ItemHeight);
+        _horizontalScroll.SetBounds(0, ItemHeight, width, scrollHeight);
+        var maxScroll = Math.Max(0, _contentWidth - width);
+        _scrollValue = hasOverflow ? maxScroll : 0;
+        if (hasOverflow)
         {
-            if (!item.Visible) continue;
-            var itemWidth = item.Width > 0 ? item.Width : item.PreferredSize.Width;
-            if (placedInRow && x - itemWidth < 0)
-            {
-                y += ItemHeight + RowGap;
-                x = width;
-            }
-            x -= itemWidth;
-            item.SetBounds(x, y + (ItemHeight - item.Height) / 2, itemWidth, item.Height);
-            x -= ItemSpacing;
-            placedInRow = true;
+            _horizontalScroll.Minimum = 0;
+            _horizontalScroll.LargeChange = Math.Max(1, width / 2);
+            _horizontalScroll.SmallChange = Math.Max(1, ItemSpacing * 2);
+            _horizontalScroll.Maximum = maxScroll + _horizontalScroll.LargeChange - 1;
+            _horizontalScroll.Value = _scrollValue;
         }
+        PositionItems(visible, widths);
 
-        var height = _items.Any(item => item.Visible) ? y + ItemHeight : 0;
+        var height = visible.Length > 0 ? ItemHeight + scrollHeight : 0;
         if (Height != height)
         {
             Height = height;
             LayoutChanged?.Invoke(this, EventArgs.Empty);
         }
         return height;
+    }
+
+    private void PositionItems() => PositionItems(_items.Where(item => item.Visible).ToArray(),
+        _items.Where(item => item.Visible).Select(item => item.Width > 0 ? Math.Max(item.Width, item.PreferredSize.Width) : item.PreferredSize.Width).ToArray());
+
+    private void PositionItems(IReadOnlyList<Control> visible, IReadOnlyList<int> widths)
+    {
+        var x = Math.Max(_contentWidth, ClientSize.Width) - _scrollValue;
+        for (var i = 0; i < visible.Count; i++)
+        {
+            x -= widths[i];
+            visible[i].SetBounds(x, (ItemHeight - visible[i].Height) / 2, widths[i], visible[i].Height);
+            x -= ItemSpacing;
+        }
     }
 
     protected override void OnVisibleChanged(EventArgs e)

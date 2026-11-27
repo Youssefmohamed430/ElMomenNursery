@@ -6,6 +6,7 @@ using ElMomenNursery.Domain.Abstractions;
 using ElMomenNursery.Controls;
 using ElMomenNursery.Styling;
 using Microsoft.Extensions.DependencyInjection;
+using Serilog;
 
 namespace ElMomenNursery.Forms;
 
@@ -230,6 +231,20 @@ public sealed class SubscriptionsPage : UserControl
             var fileResult = await pdf.CreateReceiptFileAsync(receipt, copy);
             if (!ResultPresenter.Present(this, "الإيصال", fileResult)) return;
             var path = fileResult.Value;
+
+            // Print to the configured Windows printer; the PDF remains available if printing is unavailable.
+            try
+            {
+                var printer = scope.ServiceProvider.GetRequiredService<IReceiptPrinterService>();
+                var printerResult = await printer.PrintReceiptAsync(receipt, copy);
+                if (printerResult.IsFailure)
+                    Log.ForContext<SubscriptionsPage>().Warning("Receipt PDF saved but thermal printer failed: {Error}", printerResult.Error.Description);
+            }
+            catch (Exception ex)
+            {
+                Log.ForContext<SubscriptionsPage>().Error(ex, "Thermal printer call failed");
+            }
+
             Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
             if (AppDialog.Confirm(this, "حفظ نسخة", "هل تريد حفظ نسخة من الإيصال في موقع تختاره؟"))
             {

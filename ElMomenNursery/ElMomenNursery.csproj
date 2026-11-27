@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <None Update="Resources\Branding\AlMoumenNurseryLogo.jpeg" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Resources\Branding\AlMoumenNurseryLogoTransparent.png" CopyToOutputDirectory="PreserveNewest" />
     <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
     <None Update="appsettings.Development.json" CopyToOutputDirectory="PreserveNewest" Condition="'$(Configuration)' == 'Debug'" />
   </ItemGroup>

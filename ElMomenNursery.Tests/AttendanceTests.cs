@@ -65,6 +65,38 @@ public sealed class AttendanceRulesTests
     }
 
     [Fact]
+    public async Task Bulk_attendance_marks_selected_children_absent_and_the_rest_present()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:"); await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<NurseryDbContext>().UseSqlite(connection).Options;
+        await using var db = new NurseryDbContext(options); await db.Database.EnsureCreatedAsync();
+        var date = DateOnly.FromDateTime(DateTime.Today);
+        var children = Enumerable.Range(1, 3).Select(i => new Child
+        {
+            FullName = $"طفل {i}", Address = "عنوان", EnrollmentDate = date,
+            DateOfBirth = date.AddYears(-4), Gender = ChildGender.Girl,
+            FatherName = "الأب", FatherPhone = "01000000000", MotherName = "الأم", MotherPhone = "01100000000"
+        }).ToArray();
+        db.Children.AddRange(children);
+        db.ChildAttendances.Add(new ChildAttendance { Child = children[1], ChildId = children[1].Id, AttendanceDate = date,
+            Status = AttendanceStatus.Present, CheckInTime = DateTimeOffset.Now, EntryMethod = AttendanceEntryMethod.Manual });
+        await db.SaveChangesAsync();
+        var service = new ChildAttendanceService(new TestUnitOfWork(db), NullLogger<ChildAttendanceService>.Instance,
+            new TestPermissionService(), new TestSessionManager(null));
+
+        var result = await service.MarkSelectedAbsentAndOthersPresentAsync(date, null, [children[0].Id]);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(3, result.Value);
+        var saved = await db.ChildAttendances.OrderBy(x => x.ChildId).ToListAsync();
+        Assert.Equal(3, saved.Count);
+        Assert.Equal(AttendanceStatus.Absent, saved.Single(x => x.ChildId == children[0].Id).Status);
+        Assert.Equal(AttendanceStatus.Present, saved.Single(x => x.ChildId == children[1].Id).Status);
+        Assert.Equal(AttendanceStatus.Present, saved.Single(x => x.ChildId == children[2].Id).Status);
+        Assert.NotNull(saved.Single(x => x.ChildId == children[2].Id).CheckInTime);
+    }
+
+    [Fact]
     public async Task Child_service_update_persists_tracked_changes()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");

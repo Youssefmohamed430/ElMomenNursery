@@ -11,10 +11,11 @@ public interface IPayRollRecordService
     Task<Result<IReadOnlyList<PayrollRecordDto>>> GetPayrollRecordsByEmployeeNameByRangeAsync(string employeeName, DateOnly startDate, DateOnly endDate);
     Task<Result<PayrollRecordDto>> CreatePayRollRecord(CreatePayrollRecordDto payrollRecordDto);
     Task<Result<PayrollBatchResultDto>> CreatePayrollRecordsForAllEmployeesAsync(DateOnly startDate, DateOnly endDate, CancellationToken cancellationToken = default);
+    Task<Result<PayrollBatchResultDto>> CreateMonthlyPayrollRecordsAsync(DateOnly startDate, DateOnly endDate, CancellationToken cancellationToken = default);
     Task<Result<PayrollRecordDto>> UpdatePayRollRecordAsync(Guid payrollRecordId, UpdatePayrollRecordDto payrollRecordDto);
     Task<Result> DeletePayRollRecordAsync(Guid payrollRecordId);
     Task<Result<IReadOnlyList<PayrollRecordDto>>> GetDeletedPayrollRecordsAsync(CancellationToken cancellationToken = default);
-    Task<Result<PayrollRecordDto>> MarkRecordAsPaid(Guid payrollRecordId);
+    Task<Result<PayrollRecordDto>> MarkRecordAsPaid(Guid payrollRecordId, decimal? advanceDeduction = null);
     Task<Result<PayrollRecordDto>> CalculateFinalSalary(Guid payrollRecordId);
     Task<Result<EmployeeAdvanceDto>> CreateEmployeeAdvanceAsync(CreateEmployeeAdvanceDto dto, CancellationToken cancellationToken = default);
     Task<Result<IReadOnlyList<EmployeeAdvanceDto>>> GetEmployeeAdvancesAsync(Guid? employeeId = null, CancellationToken cancellationToken = default);

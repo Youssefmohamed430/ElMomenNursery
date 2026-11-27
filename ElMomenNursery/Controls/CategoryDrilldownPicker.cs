@@ -51,16 +51,16 @@ internal sealed class CategoryDrilldownPicker : UserControl
 
     private Control BuildItemRow(InventoryItemDto item)
     {
-        var row = new TableLayoutPanel { Width = Math.Max(600, ClientSize.Width - 36), Height = 62, ColumnCount = 6, RowCount = 1, Margin = new Padding(3), Padding = new Padding(5), BackColor = Color.White };
-        row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 76));
-        row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 112)); row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 62));
-        row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 78)); row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 100));
+        var row = new TableLayoutPanel { Width = Math.Max(700, ClientSize.Width - 36), Height = 76, ColumnCount = 6, RowCount = 1, Margin = new Padding(3, 5, 3, 5), Padding = new Padding(8, 6, 8, 6), BackColor = Color.White };
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 112));
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 132)); row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92));
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 100)); row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 108));
         row.Controls.Add(new Label { Text = $"{item.Name}  (المتاح: {item.Quantity})", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight, AutoEllipsis = true }, 0, 0);
-        row.Controls.Add(new Label { Text = "سعر البيع", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter }, 1, 0);
-        var price = new NumericUpDown { Minimum = 0, Maximum = 10_000_000, DecimalPlaces = 2, ThousandsSeparator = true, Value = Math.Clamp(item.UnitPrice, 0m, 10_000_000m), Dock = DockStyle.Fill, TextAlign = HorizontalAlignment.Center };
+        row.Controls.Add(new Label { Text = "سعر الفاتورة", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, AutoSize = false }, 1, 0);
+        var price = new NumericUpDown { Minimum = 0, Maximum = 10_000_000, DecimalPlaces = 2, ThousandsSeparator = true, Value = Math.Clamp(item.UnitPrice, 0m, 10_000_000m), Dock = DockStyle.Fill, TextAlign = HorizontalAlignment.Center, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
         price.BackColor = BrandPalette.SoftBlue; price.AccessibleName = $"سعر بيع {item.Name}"; row.Controls.Add(price, 2, 0);
-        row.Controls.Add(new Label { Text = "الكمية", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter }, 3, 0);
-        var quantity = new NumericUpDown { Minimum = 1, Maximum = Math.Max(1, Math.Min(9999, item.Quantity)), Value = 1, Dock = DockStyle.Fill, TextAlign = HorizontalAlignment.Center };
+        row.Controls.Add(new Label { Text = "الكمية المضافة", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, AutoSize = false }, 3, 0);
+        var quantity = new NumericUpDown { Minimum = 1, Maximum = Math.Max(1, Math.Min(9999, item.Quantity)), Value = 1, Dock = DockStyle.Fill, TextAlign = HorizontalAlignment.Center, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
         quantity.AccessibleName = $"الكمية المضافة من {item.Name}"; row.Controls.Add(quantity, 4, 0);
         var add = BrandControls.ActionButton("إضافة", true); add.Dock = DockStyle.Fill; add.Height = 38;
         add.Click += (_, _) => { PickedUnitPrice = price.Value; PickedQuantity = (int)quantity.Value; ItemPicked?.Invoke(item); }; row.Controls.Add(add, 5, 0);

@@ -90,11 +90,15 @@ public sealed class SubscriptionService : ISubscriptionService
 
         if (dto.PeriodStart == default || dto.PeriodEnd < dto.PeriodStart) return SubscriptionErrors.InvalidPeriod;
 
-        var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(x => x.Id == dto.ChildId, asNoTracking: false, cancellationToken: ct);
+        var child = await unitOfWork.Repository<Child>().FirstOrDefaultAsync(x => x.Id == dto.ChildId, asNoTracking: false, includeProperties: ["Attendances"] ,cancellationToken: ct);
 
         if (child is null) return SubscriptionErrors.ChildNotFound;
 
         if (dto.PeriodStart < child.EnrollmentDate) return SubscriptionErrors.PeriodBeforeEnrollment;
+
+        var lastAttendance = child.Attendances.OrderByDescending(x => x.AttendanceDate).FirstOrDefault();
+
+        if(lastAttendance is not null && dto.PeriodStart.DayNumber - lastAttendance.AttendanceDate.DayNumber > 15) return AttendanceErrors.AttendanceCountExceeded;
 
         var amount = dto.StatusOverride == SubscriptionStatus.Waived ? 0m : dto.AmountDue ?? 0m;
         if (amount < 0) return SubscriptionErrors.InvalidAmount;

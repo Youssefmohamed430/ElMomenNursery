@@ -2,6 +2,7 @@ using ElMomenNursery.Application.DTOs;
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Domain.Abstractions;
 using ElMomenNursery.Domain.Enums;
+using ElMomenNursery.Infrastructure.Configuration;
 using QuestPDF.Fluent;
 using QuestPDF.Drawing;
 using QuestPDF.Helpers;
@@ -11,8 +12,10 @@ using System.Diagnostics;
 
 namespace ElMomenNursery.Infrastructure.Documents;
 
-public sealed class ReceiptPdfService(string dataDirectory) : IReceiptPdfService
+public sealed class ReceiptPdfService(string dataDirectory, PrinterOptions? printerOptions = null) : IReceiptPdfService
 {
+    private readonly PrinterOptions _options = printerOptions ?? new PrinterOptions();
+
     static ReceiptPdfService()
     {
         QuestPDF.Settings.License = LicenseType.Community;
@@ -33,28 +36,43 @@ public sealed class ReceiptPdfService(string dataDirectory) : IReceiptPdfService
         try
         {
         Directory.CreateDirectory(folder);
-        var logo = Path.Combine(AppContext.BaseDirectory, "Resources", "Branding", "AlMoumenNurseryLogo.jpeg");
+        var logo = Path.Combine(AppContext.BaseDirectory, "Resources", "Branding", "AlMoumenNurseryLogoTransparent.png");
+        if (!File.Exists(logo)) logo = Path.Combine(AppContext.BaseDirectory, "Resources", "Branding", "AlMoumenNurseryLogo.jpeg");
+
+        // Thermal receipt: width from printer options, continuous height role
+        var widthMm = _options.PaperWidthMm > 0 ? _options.PaperWidthMm : 80;
+        var fontSize = _options.FontSize > 0 ? _options.FontSize : 10f;
+
         Document.Create(document => document.Page(page =>
         {
-            page.Size(PageSizes.A5);
-            page.Margin(24);
-            page.DefaultTextStyle(x => x.FontFamily("Noto Naskh Arabic").FontSize(11).FontColor(Colors.Black));
+            page.ContinuousSize(widthMm, Unit.Millimetre);
+            page.MarginHorizontal(4);
+            page.MarginVertical(3);
+            page.DefaultTextStyle(x => x.FontFamily("Noto Naskh Arabic").FontSize(fontSize).FontColor(Colors.Black));
             page.Content().ContentFromRightToLeft().Column(column =>
             {
-                column.Spacing(8);
-                column.Item().Row(row =>
+                column.Spacing(4);
+                column.Item().AlignCenter().Row(row =>
                 {
-                    row.RelativeItem().Column(c => { c.Item().Text(receipt.NurseryName).Bold().FontSize(17); c.Item().Text("إيصال سداد اشتراك").Bold().FontSize(14);
-                        if (!string.IsNullOrWhiteSpace(receipt.NurseryAddress)) c.Item().Text(receipt.NurseryAddress);
-                        if (!string.IsNullOrWhiteSpace(receipt.NurseryPhone)) c.Item().Text(receipt.NurseryPhone); });
-                    if (File.Exists(logo)) row.ConstantItem(65).Height(54).Image(logo).FitArea();
+                    if (File.Exists(logo))
+                    {
+                        row.ConstantItem(46).Height(38).Image(logo).FitArea();
+                        row.ConstantItem(4);
+                    }
+                    row.RelativeItem().Column(c =>
+                    {
+                        c.Item().AlignCenter().Text(receipt.NurseryName).Bold().FontSize(fontSize + 3);
+                        c.Item().AlignCenter().Text("إيصال سداد اشتراك").Bold().FontSize(fontSize + 1);
+                        if (!string.IsNullOrWhiteSpace(receipt.NurseryAddress)) c.Item().AlignCenter().Text(receipt.NurseryAddress);
+                        if (!string.IsNullOrWhiteSpace(receipt.NurseryPhone)) c.Item().AlignCenter().Text(receipt.NurseryPhone);
+                    });
                 });
-                if (isCopy) column.Item().AlignCenter().Text("نسخة").Bold().FontSize(13);
+                if (isCopy) column.Item().AlignCenter().Text("نسخة").Bold().FontSize(fontSize + 1);
                 Pair(column, "رقم الإيصال", receipt.ReceiptNumber);
                 Pair(column, "التاريخ والوقت", receipt.PaidAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm"));
                 Pair(column, "الطفل", receipt.ChildName);
                 Pair(column, "فترة الاشتراك", $"{receipt.PeriodStart:dd/MM/yyyy} — {receipt.PeriodEnd:dd/MM/yyyy}");
-                column.Item().PaddingVertical(3).LineHorizontal(1);
+                column.Item().PaddingVertical(2).LineHorizontal(1).LineColor(Colors.Black);
                 Pair(column, "إجمالي المستحق", Money(receipt.AmountDue));
                 Pair(column, "المدفوع سابقًا", Money(receipt.PaidBefore));
                 Pair(column, "المدفوع الآن", Money(receipt.PaidNow));
@@ -63,7 +81,8 @@ public sealed class ReceiptPdfService(string dataDirectory) : IReceiptPdfService
                 if (!string.IsNullOrWhiteSpace(receipt.Reference)) Pair(column, "المرجع", receipt.Reference);
                 Pair(column, "المستلم", receipt.ReceivedBy ?? "—");
                 if (!string.IsNullOrWhiteSpace(receipt.Notes)) Pair(column, "ملاحظات", receipt.Notes);
-                column.Item().PaddingTop(20).Text("توقيع المستلم: ____________________");
+                column.Item().PaddingTop(10).Text("توقيع المستلم: ____________________");
+                column.Item().AlignCenter().PaddingTop(6).Text("شكرًا لتعاملكم معنا").FontSize(fontSize - 1);
             });
         })).GeneratePdf(path);
         Log.ForContext<ReceiptPdfService>().Information("Receipt PDF generated; operation={Operation}; durationMs={DurationMs}; targetFolder={TargetFolder}", "CreateReceiptFile", timer.ElapsedMilliseconds, folder);
@@ -84,7 +103,7 @@ public sealed class ReceiptPdfService(string dataDirectory) : IReceiptPdfService
     }
 
     private static void Pair(ColumnDescriptor column, string label, string value) =>
-        column.Item().Row(row => { row.RelativeItem().Text(value); row.ConstantItem(100).Text(label).Bold(); });
+        column.Item().Row(row => { row.RelativeItem().Text(value); row.ConstantItem(62).Text(label).Bold(); });
     private static string Money(decimal value) => value.ToString("N2", System.Globalization.CultureInfo.GetCultureInfo("ar-EG")) + " ج.م";
     private static string Method(PaymentMethod method) => method switch { PaymentMethod.Cash => "نقدًا", PaymentMethod.BankTransfer => "تحويل بنكي", _ => "أخرى" };
 }

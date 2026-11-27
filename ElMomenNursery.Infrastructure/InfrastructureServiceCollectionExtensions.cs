@@ -82,9 +82,28 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IAccountManagementService, LocalAccountManagementService>();
         services.AddSingleton<IExcelExportService, ExcelExportService>();
         QuestPDF.Settings.License = LicenseType.Community;
-        services.AddSingleton<IReceiptPdfService>(_ => new ReceiptPdfService(dataDirectory));
+        var printerOptions = configuration.GetSection(PrinterOptions.SectionName).Get<PrinterOptions>() ?? new PrinterOptions();
+        services.AddSingleton<IReceiptPdfService>(_ => new ReceiptPdfService(dataDirectory, printerOptions));
         services.AddSingleton<IInvoicePdfService>(_ => new InvoicePdfService(dataDirectory));
+        if (OperatingSystem.IsWindows())
+        {
+#pragma warning disable CA1416
+            services.AddSingleton<IReceiptPrinterService>(_ => new ReceiptPrinterService(printerOptions));
+#pragma warning restore CA1416
+        }
+        else
+        {
+            services.AddSingleton<IReceiptPrinterService, UnsupportedReceiptPrinterService>();
+        }
         services.AddSingleton<ISessionManager, SessionManager>();
         return services;
     }
+}
+
+internal sealed class UnsupportedReceiptPrinterService : IReceiptPrinterService
+{
+    public Task<ElMomenNursery.Domain.Abstractions.Result> PrintReceiptAsync(
+        ElMomenNursery.Application.DTOs.PaymentReceiptDto receipt, bool isCopy, CancellationToken cancellationToken = default) =>
+        Task.FromResult(ElMomenNursery.Domain.Abstractions.Result.Failure(
+            new ElMomenNursery.Domain.Abstractions.Error("Receipts.WindowsPrintingOnly", "طباعة الإيصالات متاحة على Windows فقط.")));
 }

@@ -108,6 +108,33 @@ internal static class Program
                 var userId = session.CurrentUser.UserId;
                 Log.Information("User logged in; UserId={UserId}", userId);
 
+                var today = DateOnly.FromDateTime(DateTime.Today);
+                if (today.Day == 1)
+                {
+                    var periodStart = new DateOnly(today.Year, today.Month, 1);
+                    var periodEnd = new DateOnly(today.Year, today.Month, DateTime.DaysInMonth(today.Year, today.Month));
+                    try
+                    {
+                        using var payrollScope = serviceProvider.CreateScope();
+                        var payrollResult = payrollScope.ServiceProvider
+                            .GetRequiredService<IPayRollRecordService>()
+                            .CreateMonthlyPayrollRecordsAsync(periodStart, periodEnd)
+                            .GetAwaiter().GetResult();
+
+                        if (payrollResult.IsSuccess)
+                            Log.Information("Monthly payroll records generated; periodStart={PeriodStart}; periodEnd={PeriodEnd}; created={CreatedCount}; skipped={SkippedCount}",
+                                periodStart, periodEnd, payrollResult.Value.CreatedCount, payrollResult.Value.SkippedCount);
+                        else
+                            Log.Warning("Monthly payroll generation failed; periodStart={PeriodStart}; periodEnd={PeriodEnd}; error={Error}",
+                                periodStart, periodEnd, payrollResult.Error.Description);
+                    }
+                    catch (Exception exception)
+                    {
+                        Log.Error(exception, "Monthly payroll generation threw an exception; periodStart={PeriodStart}; periodEnd={PeriodEnd}",
+                            periodStart, periodEnd);
+                    }
+                }
+
                 using var appScope = serviceProvider.CreateScope();
                 var auth = appScope.ServiceProvider.GetRequiredService<IAuthService>();
                 using (LogContext.PushProperty("UserId", userId))

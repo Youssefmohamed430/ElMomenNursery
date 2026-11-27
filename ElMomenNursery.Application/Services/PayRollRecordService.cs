@@ -93,15 +93,28 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
     public async Task<Result<PayrollBatchResultDto>> CreatePayrollRecordsForAllEmployeesAsync(DateOnly startDate, DateOnly endDate, CancellationToken cancellationToken = default)
     {
         if (!permissions.HasPermission("Payroll.Manage")) return PayrollRecordErrors.PermissionDenied;
+        return await CreatePayrollRecordsCoreAsync(startDate, endDate, cancellationToken);
+    }
+
+    public Task<Result<PayrollBatchResultDto>> CreateMonthlyPayrollRecordsAsync(DateOnly startDate, DateOnly endDate, CancellationToken cancellationToken = default)
+        => CreatePayrollRecordsCoreAsync(startDate, endDate, cancellationToken);
+
+    private async Task<Result<PayrollBatchResultDto>> CreatePayrollRecordsCoreAsync(DateOnly startDate, DateOnly endDate, CancellationToken cancellationToken)
+    {
         if (startDate == default || endDate < startDate) return PayrollRecordErrors.InvalidData;
         try
         {
             var employees = await unitOfWork.Repository<Employee>().ListAsync(cancellationToken: cancellationToken);
+
             var records = await unitOfWork.Repository<PayrollRecord>().ListAsync(
                 x => x.PeriodStart <= endDate && x.PeriodEnd >= startDate, cancellationToken: cancellationToken);
+
             var existingEmployeeIds = records.Select(x => x.EmployeeId).ToHashSet();
+
             var eligible = employees.Where(x => !existingEmployeeIds.Contains(x.Id)).ToArray();
+
             await unitOfWork.BeginTransactionAsync(cancellationToken);
+
             foreach (var employee in eligible)
             {
                 var newRecord = new PayrollRecord
@@ -163,13 +176,16 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
         return Result.Success(ToDto(record, record.Employee.FullName, await GetPaidDaysPerMonthAsync()));
     }
 
-    public async Task<Result<PayrollRecordDto>> MarkRecordAsPaid(Guid id)
+    public async Task<Result<PayrollRecordDto>> MarkRecordAsPaid(Guid id, decimal? advanceDeduction = null)
     {
         if (!permissions.HasPermission("Payroll.Manage")) return PayrollRecordErrors.PermissionDenied;
         var record = await unitOfWork.Repository<PayrollRecord>().FirstOrDefaultAsync(x => x.Id == id, false, [nameof(PayrollRecord.Employee)]);
         if (record is null) return PayrollRecordErrors.NotFound;
         if (record.IsPaid) return PayrollRecordErrors.AlreadyPaid;
         if (!record.IsCalculated) return PayrollRecordErrors.NotCalculated;
+        if (advanceDeduction is decimal requestedDeduction &&
+            (requestedDeduction < 0 || decimal.Round(requestedDeduction, 2) != requestedDeduction || requestedDeduction > record.AdvanceDeduction))
+            return PayrollRecordErrors.InvalidData;
         var paymentDate = record.PaymentDate ?? DateOnly.FromDateTime(DateTime.Today);
         int absenceDays = 0;
         try
@@ -191,12 +207,16 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
                 cancellationToken: CancellationToken.None);
             var alreadyRepaid = existingRepayments.Sum(x => x.Amount);
             var advancesAlreadyLinked = existingRepayments.Select(x => x.EmployeeAdvanceId).ToHashSet();
-            var amountToAllocate = Math.Max(0, record.AdvanceDeduction - alreadyRepaid);
+            var requestedTotalDeduction = advanceDeduction ?? record.AdvanceDeduction;
+            var amountToAllocate = Math.Max(0, requestedTotalDeduction - alreadyRepaid);
             if (advances.Sum(x => x.RemainingAmount) < amountToAllocate)
             {
                 await unitOfWork.RollbackTransactionAsync();
                 return PayrollRecordErrors.AdvanceBalanceChanged;
             }
+            var grossSalaryBeforeAdvances = record.AmountPaid + record.AdvanceDeduction;
+            record.AdvanceDeduction = requestedTotalDeduction;
+            record.AmountPaid = Math.Max(0, grossSalaryBeforeAdvances - requestedTotalDeduction);
             var expenseResult = record.AmountPaid > 0
                 ? await financeService.CreateExpenseAsync(new CreateExpenseDto
                 {
