@@ -7,7 +7,15 @@ public sealed class InventoryItemService(IUnitOfWork unitOfWork, ILogger<Invento
         if (!Allowed("Inventory.View")) return InventoryErrors.PermissionDenied;
         var rows = await unitOfWork.Repository<InventoryItem>().Query().Include(x => x.Category).ToListAsync(cancellationToken);
         var search = ArabicNameNormalizer.Normalize(filter.SearchText);
-        var result = rows.Where(x => (filter.CategoryId is null || x.CategoryId == filter.CategoryId)
+        HashSet<Guid>? categoryIds = null;
+        if (filter.CategoryId is Guid selectedCategory)
+        {
+            var categories = await unitOfWork.Repository<InventoryCategory>().Query().Select(x => new { x.Id, x.ParentCategoryId }).ToListAsync(cancellationToken);
+            var children = categories.ToLookup(x => x.ParentCategoryId, x => x.Id);
+            categoryIds = []; var pending = new Stack<Guid>(); pending.Push(selectedCategory);
+            while (pending.Count > 0) { var id = pending.Pop(); if (!categoryIds.Add(id)) continue; foreach (var descendant in children[id]) pending.Push(descendant); }
+        }
+        var result = rows.Where(x => (categoryIds is null || categoryIds.Contains(x.CategoryId))
             && (filter.IsActive is null || x.IsActive == filter.IsActive)
             && (search.Length == 0 || ArabicNameNormalizer.Normalize(x.Name).Contains(search, StringComparison.Ordinal))
             && (filter.MinPrice is null || x.UnitPrice >= filter.MinPrice)
@@ -32,6 +40,7 @@ public sealed class InventoryItemService(IUnitOfWork unitOfWork, ILogger<Invento
         var category = await unitOfWork.Repository<InventoryCategory>().FirstOrDefaultAsync(x => x.Id == dto.CategoryId, asNoTracking: false, cancellationToken: cancellationToken);
         if (category is null) return InventoryErrors.CategoryNotFound;
         if (!category.IsActive) return InventoryErrors.CategoryInactive;
+        if (await unitOfWork.Repository<InventoryCategory>().AnyAsync(x => x.ParentCategoryId == category.Id, cancellationToken)) return InventoryErrors.CategoryMustBeLeafForItems;
         var name = dto.Name.Trim();
         if (await HasDuplicate(name, category.Id, null, cancellationToken)) return InventoryErrors.DuplicateItemName;
         var item = new InventoryItem { Name = name, CategoryId = category.Id, Category = category, UnitPrice = dto.UnitPrice, Quantity = dto.Quantity, IsActive = dto.IsActive };
@@ -53,6 +62,7 @@ public sealed class InventoryItemService(IUnitOfWork unitOfWork, ILogger<Invento
             var category = await unitOfWork.Repository<InventoryCategory>().FirstOrDefaultAsync(x => x.Id == dto.CategoryId, asNoTracking: false, cancellationToken: cancellationToken);
             if (category is null) return InventoryErrors.CategoryNotFound;
             if (dto.CategoryId != item.CategoryId && !category.IsActive) return InventoryErrors.CategoryInactive;
+            if (await unitOfWork.Repository<InventoryCategory>().AnyAsync(x => x.ParentCategoryId == category.Id, cancellationToken)) return InventoryErrors.CategoryMustBeLeafForItems;
             if (await HasDuplicate(dto.Name.Trim(), category.Id, item.Id, cancellationToken)) return InventoryErrors.DuplicateItemName;
             var before = Values(item);
             var quantityDelta = dto.Quantity - item.Quantity;

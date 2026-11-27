@@ -19,15 +19,11 @@ internal sealed class CashierInvoiceForm : ResponsiveForm
     {
         public override string ToString() => Name;
     }
-    private sealed record ItemChoice(InventoryItemDto Item)
-    {
-        public override string ToString() => $"{Item.Name} — {Item.UnitPrice:N2} ج.م (المتاح: {Item.Quantity})";
-    }
 
     private readonly IServiceScopeFactory _scopes;
     private readonly Guid? _initialChildId;
     private readonly string? _initialChildName;
-    private readonly ComboBox _items = new() { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
+    private readonly CategoryDrilldownPicker _categoryPicker = new() { Dock = DockStyle.Fill };
     private readonly NumericUpDown _itemQuantity = new() { Minimum = 1, Maximum = 9999, Value = 1, Width = 100, ThousandsSeparator = true };
     private readonly TextBox _manualName = new() { Dock = DockStyle.Fill, PlaceholderText = "مثال: مدفوع آخر – اكتب وصفه" };
     private readonly NumericUpDown _manualPrice = new() { Minimum = 0, Maximum = 10000000, DecimalPlaces = 2, ThousandsSeparator = true, Width = 125 };
@@ -47,6 +43,7 @@ internal sealed class CashierInvoiceForm : ResponsiveForm
     };
     private readonly Label _total = new() { AutoSize = true, Font = new Font("Segoe UI", 14, FontStyle.Bold), ForeColor = BrandPalette.PrimaryGreen, Text = "الإجمالي: 0.00 ج.م" };
     private readonly List<CartLine> _cart = [];
+    private readonly Dictionary<Guid, InventoryItemDto> _catalog = [];
     private readonly Button _saveButton = Button("إصدار الفاتورة", primary: true);
 
     public CashierInvoiceForm(IServiceScopeFactory scopes, Guid? initialChildId = null, string? initialChildName = null)
@@ -70,7 +67,7 @@ internal sealed class CashierInvoiceForm : ResponsiveForm
 
         var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(16), ColumnCount = 1, RowCount = 5, BackColor = BrandPalette.AppBackground };
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 100));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 160));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 360));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 58));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
@@ -123,22 +120,10 @@ internal sealed class CashierInvoiceForm : ResponsiveForm
     private Control BuildAddLinesSection()
     {
         var section = Section("إضافة بنود للفاتورة");
-        var rows = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = new Padding(8, 3, 8, 5), BackColor = Color.White };
-        rows.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
-        rows.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
-
-        var stock = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 1 };
-        stock.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 125));
-        stock.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        stock.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 60));
-        stock.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 100));
-        stock.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 155));
-        var addStock = Button("إضافة من المخزن", primary: true);
-        stock.Controls.Add(FieldLabel("منتجات المخزن"), 0, 0);
-        stock.Controls.Add(_items, 1, 0);
-        stock.Controls.Add(FieldLabel("الكمية"), 2, 0);
-        stock.Controls.Add(_itemQuantity, 3, 0);
-        stock.Controls.Add(addStock, 4, 0);
+        var rows = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Padding = new Padding(8, 3, 8, 5), BackColor = Color.White };
+        rows.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); rows.RowStyles.Add(new RowStyle(SizeType.Absolute, 46)); rows.RowStyles.Add(new RowStyle(SizeType.Absolute, 62));
+        var quantityRow = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft, WrapContents = false };
+        quantityRow.Controls.Add(FieldLabel("كمية الإضافة")); quantityRow.Controls.Add(_itemQuantity);
 
         var manual = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 7, RowCount = 1 };
         manual.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 125));
@@ -157,10 +142,9 @@ internal sealed class CashierInvoiceForm : ResponsiveForm
         manual.Controls.Add(_manualQuantity, 5, 0);
         manual.Controls.Add(addManual, 6, 0);
 
-        rows.Controls.Add(stock, 0, 0);
-        rows.Controls.Add(manual, 0, 1);
+        rows.Controls.Add(_categoryPicker, 0, 0); rows.Controls.Add(quantityRow, 0, 1); rows.Controls.Add(manual, 0, 2);
         section.Controls.Add(rows);
-        addStock.Click += (_, _) => AddCatalogItem();
+        _categoryPicker.ItemPicked += AddCatalogItem;
         addManual.Click += (_, _) => AddManualItem();
         return section;
     }
@@ -208,10 +192,10 @@ internal sealed class CashierInvoiceForm : ResponsiveForm
         {
             await using var scope = _scopes.CreateAsyncScope();
             var invoiceService = scope.ServiceProvider.GetRequiredService<IInvoiceService>();
-            var items = await invoiceService.GetAvailableItemsAsync();
-            if (!ResultPresenter.Present(this, "منتجات المخزن", items)) return;
-            foreach (var item in items.Value) _items.Items.Add(new ItemChoice(item));
-            if (_items.Items.Count > 0) _items.SelectedIndex = 0;
+            var tree = await scope.ServiceProvider.GetRequiredService<IInventoryCategoryService>().GetCategoryTreeAsync(true);
+            if (!ResultPresenter.Present(this, "فئات المخزن", tree)) return;
+            _categoryPicker.LoadTree(tree.Value);
+            _catalog.Clear(); AddItems(tree.Value);
 
             var children = await invoiceService.GetInvoiceChildrenAsync();
             if (children.IsSuccess)
@@ -224,10 +208,8 @@ internal sealed class CashierInvoiceForm : ResponsiveForm
         }, "تعذر تحميل منتجات المخزن.");
     }
 
-    private void AddCatalogItem()
+    private void AddCatalogItem(InventoryItemDto item)
     {
-        if (_items.SelectedItem is not ItemChoice choice) return;
-        var item = choice.Item;
         var quantity = (int)_itemQuantity.Value;
         var current = _cart.FirstOrDefault(x => x.ItemId == item.Id);
         var newQuantity = quantity + (current?.Quantity ?? 0);
@@ -288,7 +270,7 @@ internal sealed class CashierInvoiceForm : ResponsiveForm
         {
             AppDialog.ShowInformation(this, Text, "الكمية يجب أن تكون رقمًا أكبر من صفر."); RenderCart(); return;
         }
-        if (line.ItemId is Guid itemId && _items.Items.Cast<object>().OfType<ItemChoice>().FirstOrDefault(x => x.Item.Id == itemId)?.Item is { } item && quantity > item.Quantity)
+        if (line.ItemId is Guid itemId && FindCatalogItem(itemId) is { } item && quantity > item.Quantity)
         {
             AppDialog.ShowInformation(this, Text, $"الكمية المتاحة من «{item.Name}» هي {item.Quantity}."); RenderCart(); return;
         }
@@ -296,6 +278,16 @@ internal sealed class CashierInvoiceForm : ResponsiveForm
         _cart[index] = line with { Quantity = quantity };
         RenderCart();
     }
+
+    private void AddItems(IEnumerable<InventoryCategoryNodeDto> nodes)
+    {
+        foreach (var node in nodes)
+        {
+            foreach (var item in node.Items ?? []) _catalog[item.Id] = item;
+            AddItems(node.Children);
+        }
+    }
+    private InventoryItemDto? FindCatalogItem(Guid itemId) => _catalog.GetValueOrDefault(itemId);
 
     private async Task SaveAsync()
     {

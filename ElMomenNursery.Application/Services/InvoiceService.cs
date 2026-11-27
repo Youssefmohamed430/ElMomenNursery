@@ -26,8 +26,8 @@ public sealed class InvoiceService(IUnitOfWork uow, ILogger<InvoiceService> logg
     public async Task<Result<IReadOnlyList<InventoryCategoryLookupDto>>> GetInvoiceCategoriesAsync(CancellationToken ct = default)
     {
         if (!Allowed("Payments.View")) return InventoryErrors.PermissionDenied;
-        var rows = await uow.Repository<InventoryCategory>().Query().Where(x => x.IsActive).OrderBy(x => x.Name).ToListAsync(ct);
-        return Result.Success<IReadOnlyList<InventoryCategoryLookupDto>>(rows.Select(x => new InventoryCategoryLookupDto(x.Id, x.Name, x.IsActive)).ToArray());
+        var rows = await uow.Repository<InventoryCategory>().Query().Include(x => x.ParentCategory).Where(x => x.IsActive).OrderBy(x => x.Name).ToListAsync(ct);
+        return Result.Success<IReadOnlyList<InventoryCategoryLookupDto>>(rows.Select(x => new InventoryCategoryLookupDto(x.Id, x.Name, x.IsActive, x.ParentCategoryId, x.ParentCategory?.Name)).ToArray());
     }
 
     public async Task<Result<IReadOnlyList<ChildLookupDto>>> GetInvoiceChildrenAsync(CancellationToken ct = default)
@@ -41,7 +41,14 @@ public sealed class InvoiceService(IUnitOfWork uow, ILogger<InvoiceService> logg
     {
         if (!Allowed("Payments.View")) return InventoryErrors.PermissionDenied;
         var query = uow.Repository<InventoryItem>().Query().Include(x => x.Category).Where(x => x.IsActive && x.Category.IsActive);
-        if (categoryId is Guid selectedCategory) query = query.Where(x => x.CategoryId == selectedCategory);
+        if (categoryId is Guid selectedCategory)
+        {
+            var categories = await uow.Repository<InventoryCategory>().Query().Select(x => new { x.Id, x.ParentCategoryId }).ToListAsync(ct);
+            var children = categories.ToLookup(x => x.ParentCategoryId, x => x.Id);
+            var ids = new HashSet<Guid>(); var pending = new Stack<Guid>(); pending.Push(selectedCategory);
+            while (pending.Count > 0) { var id = pending.Pop(); if (!ids.Add(id)) continue; foreach (var descendant in children[id]) pending.Push(descendant); }
+            query = query.Where(x => ids.Contains(x.CategoryId));
+        }
         if (!string.IsNullOrWhiteSpace(searchText))
         {
             var term = searchText.Trim();

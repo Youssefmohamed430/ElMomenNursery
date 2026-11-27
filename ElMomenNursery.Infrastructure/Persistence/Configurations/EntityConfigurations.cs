@@ -198,6 +198,7 @@ internal sealed class InventoryCategoryConfiguration : IEntityTypeConfiguration<
         b.Property(x => x.Name).IsRequired();
         b.HasIndex(x => x.Name).IsUnique().HasFilter("\"IsDeleted\" = 0").HasDatabaseName("UX_InventoryCategories_Name");
         b.HasMany(x => x.Items).WithOne(x => x.Category).HasForeignKey(x => x.CategoryId).IsRequired().OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(x => x.ParentCategory).WithMany().HasForeignKey(x => x.ParentCategoryId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 

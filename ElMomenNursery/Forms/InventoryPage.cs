@@ -184,7 +184,7 @@ public sealed class InventoryPage : UserControl
         var apply = CreateActionButton("تطبيق"); var clear = CreateActionButton("مسح الفلاتر");
         var add = CreateActionButton("إضافة فئة", true); var edit = CreateActionButton("تعديل"); var toggle = CreateActionButton("تفعيل / إيقاف"); var delete = CreateActionButton("حذف");
         var deleted = CreateActionButton("عرض المحذوفات"); var restore = CreateActionButton("استعادة"); var export = CreateActionButton("تصدير Excel");
-        var count = CountLabel(); var grid = CreateGrid(["الفئة", "الوصف", "عدد الأصناف", "الحالة"]);
+        var count = CountLabel(); var grid = CreateGrid(["الفئة", "الفئة الأب", "الوصف", "عدد الأصناف", "الحالة"]);
         var rows = new List<InventoryCategoryDto>(); var showingDeleted = false; var busy = false; var categoryReloadPending = false;
         _refreshCategories = Load;
         var canManage = _session?.HasPermission("Inventory.Manage") == true;
@@ -230,7 +230,10 @@ public sealed class InventoryPage : UserControl
                 if (IsDisposed || grid.IsDisposed || version != _categoryLoadVersion) return;
                 if (result.IsFailure) { ResultPresenter.Present(this, "الفئات", result); return; }
                 rows = result.Value.ToList(); grid.Rows.Clear();
-                foreach (var row in rows) { var idx = grid.Rows.Add(row.Name, row.Description ?? string.Empty, row.ItemsCount, row.IsActive ? "نشط" : "موقوف"); grid.Rows[idx].Tag = row.Id; }
+                var children = rows.ToLookup(x => x.ParentCategoryId); var visited = new HashSet<Guid>();
+                void AddLevel(Guid? parent, int depth) { foreach (var row in children[parent].OrderBy(x => x.Name, StringComparer.CurrentCulture)) { if (!visited.Add(row.Id)) continue; var idx = grid.Rows.Add(new string(' ', depth * 4) + "— " + row.Name, row.ParentCategoryName ?? "—", row.Description ?? string.Empty, row.ItemsCount, row.IsActive ? "نشط" : "موقوف"); grid.Rows[idx].Tag = row.Id; AddLevel(row.Id, depth + 1); } }
+                AddLevel(null, 0);
+                foreach (var row in rows.Where(x => !visited.Contains(x.Id)).OrderBy(x => x.Name, StringComparer.CurrentCulture)) { var idx = grid.Rows.Add("— " + row.Name, row.ParentCategoryName ?? "—", row.Description ?? string.Empty, row.ItemsCount, row.IsActive ? "نشط" : "موقوف"); grid.Rows[idx].Tag = row.Id; }
                 count.Text = $"عدد الفئات: {rows.Count}";
             }
             catch (Exception ex) { await UiGuard.RunAsync(this, "Inventory.LoadCategories", () => Task.FromException(ex), "تعذر تحميل الفئات. أعد المحاولة."); }

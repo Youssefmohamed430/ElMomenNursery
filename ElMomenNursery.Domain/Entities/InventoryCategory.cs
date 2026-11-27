@@ -9,5 +9,7 @@ public sealed class InventoryCategory : ISoftDeletable
     public required string Name { get; set; }
     public string? Description { get; set; }
     public bool IsActive { get; set; } = true;
+    public Guid? ParentCategoryId { get; set; }
+    public InventoryCategory? ParentCategory { get; set; }
     public ICollection<InventoryItem> Items { get; } = new List<InventoryItem>();
 }

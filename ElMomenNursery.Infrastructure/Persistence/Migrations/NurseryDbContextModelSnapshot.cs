@@ -868,12 +868,17 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ParentCategoryId")
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Name")
                         .IsUnique()
                         .HasDatabaseName("UX_InventoryCategories_Name")
                         .HasFilter("\"IsDeleted\" = 0");
+
+                    b.HasIndex("ParentCategoryId");
 
                     b.ToTable("InventoryCategories", (string)null);
                 });
@@ -1783,6 +1788,16 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.Navigation("Employee");
 
                     b.Navigation("UploadedByUser");
+                });
+
+            modelBuilder.Entity("ElMomenNursery.Domain.Entities.InventoryCategory", b =>
+                {
+                    b.HasOne("ElMomenNursery.Domain.Entities.InventoryCategory", "ParentCategory")
+                        .WithMany()
+                        .HasForeignKey("ParentCategoryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ParentCategory");
                 });
 
             modelBuilder.Entity("ElMomenNursery.Domain.Entities.InventoryItem", b =>

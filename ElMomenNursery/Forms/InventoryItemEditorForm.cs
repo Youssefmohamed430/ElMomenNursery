@@ -12,6 +12,7 @@ namespace ElMomenNursery.Forms;
 
 public sealed class InventoryItemEditorForm : ResponsiveForm
 {
+    private sealed record CategoryOption(Guid Id, string Name) { public override string ToString() => Name; }
     private static readonly ILogger Log = Serilog.Log.ForContext<InventoryItemEditorForm>();
     private readonly IServiceScopeFactory? _scopes;
     private readonly InventoryItemDto? _item;
@@ -57,10 +58,18 @@ public sealed class InventoryItemEditorForm : ResponsiveForm
             await using (var scope = _scopes!.CreateAsyncScope()) result = await scope.ServiceProvider.GetRequiredService<IInventoryCategoryService>().GetCategoryLookupAsync(true);
             if (IsDisposed) return;
             if (result.IsFailure) { ResultPresenter.Present(this, "الفئات", result); return; }
-            foreach (var option in result.Value) _category.Items.Add(option);
-            if (_item is not null && !_category.Items.Cast<object>().OfType<InventoryCategoryLookupDto>().Any(x => x.Id == _item.CategoryId))
-                _category.Items.Add(new InventoryCategoryLookupDto(_item.CategoryId, _item.CategoryName + " (موقوفة)", false));
-            var selected = _category.Items.Cast<object>().OfType<InventoryCategoryLookupDto>().FirstOrDefault(x => x.Id == _item?.CategoryId);
+            var byId = result.Value.ToDictionary(x => x.Id);
+            var parents = result.Value.Where(x => x.ParentCategoryId.HasValue).Select(x => x.ParentCategoryId!.Value).ToHashSet();
+            string Path(InventoryCategoryLookupDto node)
+            {
+                var parts = new Stack<string>(); var cursor = node; var guard = 0;
+                while (true) { parts.Push(cursor.Name); if (cursor.ParentCategoryId is not Guid parent || !byId.TryGetValue(parent, out var next) || ++guard > 100) break; cursor = next; }
+                return string.Join(" / ", parts);
+            }
+            foreach (var option in result.Value.Where(x => !parents.Contains(x.Id))) _category.Items.Add(new CategoryOption(option.Id, Path(option)));
+            if (_item is not null && !_category.Items.Cast<object>().OfType<CategoryOption>().Any(x => x.Id == _item.CategoryId))
+                _category.Items.Add(new CategoryOption(_item.CategoryId, _item.CategoryName + " (موقوفة)"));
+            var selected = _category.Items.Cast<object>().OfType<CategoryOption>().FirstOrDefault(x => x.Id == _item?.CategoryId);
             if (selected is not null) _category.SelectedItem = selected; else if (_category.Items.Count > 0) _category.SelectedIndex = 0;
         }
         catch (Exception ex) { Log.Error(ex, "Inventory item category lookup failed"); if (!IsDisposed) AppDialog.ShowInformation(this, "الأصناف", "تعذر تحميل الفئات."); }
@@ -69,7 +78,7 @@ public sealed class InventoryItemEditorForm : ResponsiveForm
     private async Task SaveAsync()
     {
         if (string.IsNullOrWhiteSpace(_name.Text)) { AppDialog.ShowInformation(this, "الصنف", "أدخل اسم الصنف."); _name.Focus(); return; }
-        if (_category.SelectedItem is not InventoryCategoryLookupDto category) { AppDialog.ShowInformation(this, "الصنف", "اختر فئة للصنف."); _category.Focus(); return; }
+        if (_category.SelectedItem is not CategoryOption category) { AppDialog.ShowInformation(this, "الصنف", "اختر فئة للصنف."); _category.Focus(); return; }
         if (_scopes is null) { DialogResult = DialogResult.OK; Close(); return; }
         _save.Enabled = false;
         try

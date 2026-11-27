@@ -32,6 +32,42 @@ public sealed class InventoryTests
     }
 
     [Fact]
+    public async Task Category_tree_updates_parent_rejects_cycles_and_protects_children()
+    {
+        await using var db = await CreateDb(); var uow = new TestUnitOfWork(db);
+        var service = new InventoryCategoryService(uow, NullLogger<InventoryCategoryService>.Instance, new TestPermissionService(), new TestSessionManager(null));
+        var root = (await service.CreateCategoryAsync(new CreateCategoryDto { Name = "كتب", IsActive = true })).Value;
+        var child = (await service.CreateCategoryAsync(new CreateCategoryDto { Name = "إنجليزي", IsActive = true, ParentCategoryId = root.Id })).Value;
+        var leaf = (await service.CreateCategoryAsync(new CreateCategoryDto { Name = "مستوى أول", IsActive = true, ParentCategoryId = child.Id })).Value;
+
+        var cycle = await service.UpdateCategoryAsync(root.Id, new UpdateCategoryDto { Name = root.Name, IsActive = true, ParentCategoryId = leaf.Id });
+        Assert.Equal(InventoryErrors.InvalidParentCategory, cycle.Error);
+        var move = await service.UpdateCategoryAsync(leaf.Id, new UpdateCategoryDto { Name = leaf.Name, IsActive = true, ParentCategoryId = root.Id });
+        Assert.True(move.IsSuccess);
+        Assert.Equal(root.Id, (await db.InventoryCategories.SingleAsync(x => x.Id == leaf.Id)).ParentCategoryId);
+        Assert.Equal("Inventory.CategoryHasSubcategories", (await service.DeleteCategoryAsync(root.Id)).Error.Code);
+
+        var tree = await service.GetCategoryTreeAsync(true);
+        Assert.True(tree.IsSuccess);
+        Assert.Equal(root.Id, tree.Value.Single().Id);
+        Assert.Contains(tree.Value.Single().Children, x => x.Id == leaf.Id);
+    }
+
+    [Fact]
+    public async Task Items_can_only_be_assigned_to_leaf_categories()
+    {
+        await using var db = await CreateDb(); var uow = new TestUnitOfWork(db);
+        var root = new InventoryCategory { Name = "كتب", IsActive = true };
+        var leaf = new InventoryCategory { Name = "مستوى أول", IsActive = true, ParentCategory = root, ParentCategoryId = root.Id };
+        db.AddRange(root, leaf); await db.SaveChangesAsync();
+        var service = new InventoryItemService(uow, NullLogger<InventoryItemService>.Instance, new TestPermissionService(), new TestSessionManager(null));
+        var parentItem = await service.CreateItemAsync(new CreateItemDto { Name = "خطأ", CategoryId = root.Id, UnitPrice = 1m, Quantity = 1, IsActive = true });
+        Assert.Equal(InventoryErrors.CategoryMustBeLeafForItems, parentItem.Error);
+        var leafItem = await service.CreateItemAsync(new CreateItemDto { Name = "صحيح", CategoryId = leaf.Id, UnitPrice = 1m, Quantity = 1, IsActive = true });
+        Assert.True(leafItem.IsSuccess);
+    }
+
+    [Fact]
     public async Task Item_create_normalizes_duplicates_and_records_price_change_in_audit()
     {
         await using var db = await CreateDb(); var uow = new TestUnitOfWork(db);
