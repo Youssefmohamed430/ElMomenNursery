@@ -11,6 +11,7 @@ public sealed class ManualIncome : ISoftDeletable
     public required string Source { get; set; }
     public decimal Amount { get; set; }
     public required string Description { get; set; }
+    public string? PayerName { get; set; }
     public string? Reference { get; set; }
     public string? IdempotencyKey { get; set; }
     public Guid? RecordedByUserId { get; set; }

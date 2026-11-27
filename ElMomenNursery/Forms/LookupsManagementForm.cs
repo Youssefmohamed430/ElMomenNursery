@@ -13,7 +13,7 @@ internal sealed class LookupsManagementForm : ResponsiveForm
     public LookupsManagementForm(IServiceScopeFactory scopes)
     {
         _scopes = scopes; Text = "إدارة القوائم"; Width = 760; Height = 520; MinimumSize = new Size(560, 380); RightToLeft = RightToLeft.Yes; RightToLeftLayout = true;
-        foreach (var pair in new[] { ("PaymentMethod", "طرق الدفع"), ("IncomeSource", "مصادر الإيراد"), ("ExpenseCategory", "فئات المصروف"), ("JobDesignation", "المسميات الوظيفية"), ("FinanceType", "أنواع الحركة المالية") }) _category.Items.Add(new CategoryOption(pair.Item1, pair.Item2));
+        foreach (var pair in new[] { ("PaymentMethod", "طرق الدفع"), ("IncomeSource", "مصادر الإيراد"), ("ExpenseCategory", "فئات المصروف"), ("JobDesignation", "المسميات الوظيفية"), ("EmployeeShiftStartTime", "مواعيد بداية دوام الموظفين"), ("FinanceType", "أنواع الحركة المالية") }) _category.Items.Add(new CategoryOption(pair.Item1, pair.Item2));
         _category.SelectedIndex = 0;
         _grid.Columns.Add("Name", "الاسم"); _grid.Columns.Add("Sort", "الترتيب"); _grid.Columns.Add("Active", "الحالة"); _grid.Columns.Add("System", "أساسي");
         var add = new Button { Text = "إضافة", AutoSize = true }; var edit = new Button { Text = "تعديل", AutoSize = true }; var toggle = new Button { Text = "تفعيل/إيقاف", AutoSize = true }; var delete = new Button { Text = "حذف", AutoSize = true };

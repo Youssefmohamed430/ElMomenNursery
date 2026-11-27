@@ -121,10 +121,10 @@ public sealed class InvoiceService(IUnitOfWork uow, ILogger<InvoiceService> logg
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { await uow.RollbackTransactionAsync(CancellationToken.None); throw; }
         catch (Exception ex) { await uow.RollbackTransactionAsync(CancellationToken.None); logger.LogError(ex,"Invoice posting failed; invoiceId={InvoiceId}",invoice.Id); return PersistenceErrorMapper.FromException(ex); }
-        return Result.Success(ToReceipt(invoice, child, now, dto.PaymentMethod), "تم حفظ الفاتورة وتحديث كميات المخزن.");
+        return Result.Success(ToReceipt(invoice, child, now, dto.PaymentMethod, sessions.CurrentUser?.FullName), "تم حفظ الفاتورة وتحديث كميات المخزن.");
     }
 
-    private static InvoiceReceiptDto ToReceipt(Invoice invoice, Child? child, DateTimeOffset now, PaymentMethod method) => new(invoice.Id, invoice.InvoiceNumber, now, invoice.CustomerName, child?.FullName,
-        invoice.Lines.Select(x => new InvoiceReceiptLineDto(x.ItemNameSnapshot,x.UnitPriceSnapshot,x.Quantity,x.LineTotal)).ToArray(),invoice.TotalAmount,method,invoice.PaymentReference);
+    private static InvoiceReceiptDto ToReceipt(Invoice invoice, Child? child, DateTimeOffset now, PaymentMethod method, string? issuedByName) => new(invoice.Id, invoice.InvoiceNumber, now, invoice.CustomerName, child?.FullName,
+        invoice.Lines.Select(x => new InvoiceReceiptLineDto(x.ItemNameSnapshot,x.UnitPriceSnapshot,x.Quantity,x.LineTotal)).ToArray(),invoice.TotalAmount,method,invoice.PaymentReference, issuedByName);
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

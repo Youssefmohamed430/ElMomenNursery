@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using ElMomenNursery.Application.DTOs;
 using ElMomenNursery.Application.IServices;
 using ElMomenNursery.Domain.Enums;
@@ -24,7 +25,6 @@ internal sealed class CashierInvoiceForm : ResponsiveForm
     private readonly Guid? _initialChildId;
     private readonly string? _initialChildName;
     private readonly CategoryDrilldownPicker _categoryPicker = new() { Dock = DockStyle.Fill };
-    private readonly NumericUpDown _itemQuantity = new() { Minimum = 1, Maximum = 9999, Value = 1, Width = 100, ThousandsSeparator = true };
     private readonly TextBox _manualName = new() { Dock = DockStyle.Fill, PlaceholderText = "مثال: مدفوع آخر – اكتب وصفه" };
     private readonly NumericUpDown _manualPrice = new() { Minimum = 0, Maximum = 10000000, DecimalPlaces = 2, ThousandsSeparator = true, Width = 125 };
     private readonly NumericUpDown _manualQuantity = new() { Minimum = 1, Maximum = 9999, Value = 1, Width = 100, ThousandsSeparator = true };
@@ -63,7 +63,7 @@ internal sealed class CashierInvoiceForm : ResponsiveForm
         _method.SelectedIndex = 0;
         Shown += async (_, _) => await LookupOptions.LoadAsync(_scopes, _method, "PaymentMethod", ["نقدًا", "تحويل بنكي", "أخرى"]);
         ConfigureGrid();
-        _grid.CellEndEdit += (_, e) => UpdateCartQuantity(e.RowIndex, e.ColumnIndex);
+        _grid.CellEndEdit += (_, e) => UpdateCartLine(e.RowIndex, e.ColumnIndex);
 
         var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(16), ColumnCount = 1, RowCount = 5, BackColor = BrandPalette.AppBackground };
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 100));
@@ -120,10 +120,8 @@ internal sealed class CashierInvoiceForm : ResponsiveForm
     private Control BuildAddLinesSection()
     {
         var section = Section("إضافة بنود للفاتورة");
-        var rows = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Padding = new Padding(8, 3, 8, 5), BackColor = Color.White };
-        rows.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); rows.RowStyles.Add(new RowStyle(SizeType.Absolute, 46)); rows.RowStyles.Add(new RowStyle(SizeType.Absolute, 62));
-        var quantityRow = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft, WrapContents = false };
-        quantityRow.Controls.Add(FieldLabel("كمية الإضافة")); quantityRow.Controls.Add(_itemQuantity);
+        var rows = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = new Padding(8, 3, 8, 5), BackColor = Color.White };
+        rows.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); rows.RowStyles.Add(new RowStyle(SizeType.Absolute, 62));
 
         var manual = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 7, RowCount = 1 };
         manual.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 125));
@@ -142,7 +140,7 @@ internal sealed class CashierInvoiceForm : ResponsiveForm
         manual.Controls.Add(_manualQuantity, 5, 0);
         manual.Controls.Add(addManual, 6, 0);
 
-        rows.Controls.Add(_categoryPicker, 0, 0); rows.Controls.Add(quantityRow, 0, 1); rows.Controls.Add(manual, 0, 2);
+        rows.Controls.Add(_categoryPicker, 0, 0); rows.Controls.Add(manual, 0, 1);
         section.Controls.Add(rows);
         _categoryPicker.ItemPicked += AddCatalogItem;
         addManual.Click += (_, _) => AddManualItem();
@@ -154,7 +152,7 @@ internal sealed class CashierInvoiceForm : ResponsiveForm
         _grid.Columns.AddRange([
             new DataGridViewTextBoxColumn { HeaderText = "الصنف / البيان", FillWeight = 45 },
             new DataGridViewTextBoxColumn { HeaderText = "الكمية", FillWeight = 15 },
-            new DataGridViewTextBoxColumn { HeaderText = "سعر الوحدة", FillWeight = 20 },
+            new DataGridViewTextBoxColumn { HeaderText = "سعر البيع (يمكن تعديله)", FillWeight = 20, ToolTipText = "يمكن تغيير سعر البيع لهذا البند دون تعديل سعر المخزن." },
             new DataGridViewTextBoxColumn { HeaderText = "الإجمالي", FillWeight = 20 },
             new DataGridViewTextBoxColumn { Visible = false },
             new DataGridViewTextBoxColumn { Visible = false }
@@ -165,7 +163,8 @@ internal sealed class CashierInvoiceForm : ResponsiveForm
         _grid.DefaultCellStyle.SelectionBackColor = BrandPalette.SoftBlue;
         _grid.DefaultCellStyle.SelectionForeColor = BrandPalette.Text;
         _grid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 250, 249);
-        foreach (DataGridViewColumn column in _grid.Columns) column.ReadOnly = column.Index != 1;
+        foreach (DataGridViewColumn column in _grid.Columns) column.ReadOnly = column.Index is not (1 or 2) || column.Visible == false;
+        _grid.Columns[2].DefaultCellStyle.BackColor = BrandPalette.SoftBlue;
     }
 
     private static GroupBox Section(string title) => new()
@@ -210,7 +209,8 @@ internal sealed class CashierInvoiceForm : ResponsiveForm
 
     private void AddCatalogItem(InventoryItemDto item)
     {
-        var quantity = (int)_itemQuantity.Value;
+        var quantity = _categoryPicker.PickedQuantity;
+        var salePrice = _categoryPicker.PickedUnitPrice;
         var current = _cart.FirstOrDefault(x => x.ItemId == item.Id);
         var newQuantity = quantity + (current?.Quantity ?? 0);
         if (newQuantity > item.Quantity)
@@ -219,7 +219,7 @@ internal sealed class CashierInvoiceForm : ResponsiveForm
             return;
         }
         _cart.RemoveAll(x => x.ItemId == item.Id);
-        _cart.Add(new CartLine(Guid.NewGuid(), item.Id, item.Name, item.UnitPrice, newQuantity));
+        _cart.Add(new CartLine(Guid.NewGuid(), item.Id, item.Name, current?.Price ?? salePrice, newQuantity));
         RenderCart();
     }
 
@@ -260,9 +260,9 @@ internal sealed class CashierInvoiceForm : ResponsiveForm
         _total.Text = $"الإجمالي: {_cart.Sum(x => x.Total):N2} ج.م";
     }
 
-    private void UpdateCartQuantity(int rowIndex, int columnIndex)
+    private void UpdateCartLine(int rowIndex, int columnIndex)
     {
-        if (columnIndex != 1 || rowIndex < 0 || rowIndex >= _grid.Rows.Count) return;
+        if (columnIndex is not (1 or 2) || rowIndex < 0 || rowIndex >= _grid.Rows.Count) return;
         var lineId = (Guid)_grid.Rows[rowIndex].Cells[5].Value!;
         var line = _cart.FirstOrDefault(x => x.LineId == lineId);
         if (line is null) return;
@@ -274,8 +274,13 @@ internal sealed class CashierInvoiceForm : ResponsiveForm
         {
             AppDialog.ShowInformation(this, Text, $"الكمية المتاحة من «{item.Name}» هي {item.Quantity}."); RenderCart(); return;
         }
+        if (!decimal.TryParse(Convert.ToString(_grid.Rows[rowIndex].Cells[2].Value), NumberStyles.Number, CultureInfo.CurrentCulture, out var price)
+            || price < 0 || decimal.Round(price, 2) != price)
+        {
+            AppDialog.ShowInformation(this, Text, "سعر الوحدة يجب أن يكون صفرًا أو أكثر وبحد أقصى منزلتين عشريتين."); RenderCart(); return;
+        }
         var index = _cart.FindIndex(x => x.LineId == lineId);
-        _cart[index] = line with { Quantity = quantity };
+        _cart[index] = line with { Quantity = quantity, Price = price };
         RenderCart();
     }
 

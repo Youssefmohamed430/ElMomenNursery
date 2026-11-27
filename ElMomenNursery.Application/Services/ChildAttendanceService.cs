@@ -272,6 +272,79 @@ public sealed class ChildAttendanceService(IUnitOfWork unitOfWork, ILogger<Child
         catch { await unitOfWork.RollbackTransactionAsync(CancellationToken.None); throw; }
     }
 
+    public async Task<Result<int>> MarkSelectedAbsentAndOthersPresentAsync(DateOnly date, Guid? classroomId,
+        IReadOnlyCollection<Guid> absentChildIds, CancellationToken cancellationToken = default)
+    {
+        var permissionError = PermissionGuard.Check(permissions, "Attendance.Record", AttendanceErrors.PermissionDenied);
+        if (permissionError is not null) return permissionError;
+        if (date == default || date > DateOnly.FromDateTime(DateTime.Today)) return AttendanceErrors.InvalidDate;
+
+        var children = await unitOfWork.Repository<Child>().ListAsync(x => x.IsRegistrationComplete && x.EnrollmentDate <= date,
+            asNoTracking: false, cancellationToken: cancellationToken);
+        if (classroomId.HasValue)
+        {
+            var ids = children.Select(x => x.Id).ToArray();
+            var enrollments = await unitOfWork.Repository<ChildClassEnrollment>().ListAsync(x => ids.Contains(x.ChildId)
+                && x.ClassroomId == classroomId && x.StartDate <= date && (x.EndDate == null || x.EndDate >= date), cancellationToken: cancellationToken);
+            var enrolledIds = enrollments.Select(x => x.ChildId).ToHashSet();
+            children = children.Where(x => enrolledIds.Contains(x.Id)).ToList();
+        }
+        if (children.Count == 0) return AttendanceErrors.PersonNotFound;
+
+        var absentIds = absentChildIds.ToHashSet();
+        var rosterIds = children.Select(x => x.Id).ToHashSet();
+        if (absentIds.Count == 0 || absentIds.Any(x => !rosterIds.Contains(x))) return AttendanceErrors.InvalidDate;
+
+        var rows = await unitOfWork.Repository<ChildAttendance>().Query(asNoTracking: false)
+            .Where(x => rosterIds.Contains(x.ChildId) && x.AttendanceDate == date).ToListAsync(cancellationToken);
+        if (rows.Count > 0 && !permissions.HasPermission("Attendance.Edit")) return AttendanceErrors.PermissionDenied;
+        var byChild = rows.ToDictionary(x => x.ChildId);
+        var now = DateTimeOffset.Now;
+        var defaultCheckIn = date == DateOnly.FromDateTime(DateTime.Today)
+            ? now
+            : new DateTimeOffset(date.ToDateTime(new TimeOnly(8, 0)), now.Offset);
+        await unitOfWork.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            foreach (var child in children)
+            {
+                var absent = absentIds.Contains(child.Id);
+                var status = absent ? AttendanceStatus.Absent : AttendanceStatus.Present;
+                if (byChild.TryGetValue(child.Id, out var existing))
+                {
+                    var before = Values(existing);
+                    DateTimeOffset? checkIn = absent ? null : existing.CheckInTime ?? defaultCheckIn;
+                    existing.Status = status; existing.CheckInTime = checkIn;
+                    existing.CheckOutTime = absent || existing.CheckOutTime is DateTimeOffset checkOut && checkIn is DateTimeOffset newCheckIn && checkOut < newCheckIn
+                        ? null : existing.CheckOutTime;
+                    existing.UpdatedAt = now;
+                    await AddAuditAsync(existing, "ChildAttendance.Corrected", before, Values(existing),
+                        "تسجيل جماعي: المحدد غائب والباقي حاضر", cancellationToken);
+                }
+                else
+                {
+                    var item = new ChildAttendance { ChildId = child.Id, Child = child, AttendanceDate = date,
+                        Status = status, CheckInTime = absent ? null : defaultCheckIn, EntryMethod = AttendanceEntryMethod.Manual,
+                        RecordedByUserId = sessions.CurrentUser?.UserId };
+                    await unitOfWork.Repository<ChildAttendance>().AddAsync(item, cancellationToken);
+                    await AddAuditAsync(item, "ChildAttendance.Created", "—", Values(item), null, cancellationToken);
+                }
+            }
+            await unitOfWork.CommitTransactionAsync(cancellationToken);
+            return Result.Success(children.Count, $"تم تسجيل {absentIds.Count} طفلًا غائبًا وباقي الأطفال حاضرًا.");
+        }
+        catch (DbUpdateException ex)
+        {
+            await unitOfWork.RollbackTransactionAsync(CancellationToken.None);
+            return IsDuplicate(ex) ? AttendanceErrors.AlreadyRecorded : PersistenceErrorMapper.FromException(ex);
+        }
+        catch
+        {
+            await unitOfWork.RollbackTransactionAsync(CancellationToken.None);
+            throw;
+        }
+    }
+
     private async Task AddAuditAsync(ChildAttendance item, string action, string before, string after, string? reason, CancellationToken ct)
     {
         var actor = sessions.CurrentUser?.FullName ?? "مستخدم غير معروف";

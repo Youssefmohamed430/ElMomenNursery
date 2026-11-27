@@ -190,6 +190,7 @@ public sealed class FinanceService(
                     TypeLabel = "إيراد يدوي",
                     Category = mi.Source,
                     Description = mi.Description,
+                    PayerName = mi.PayerName,
                     Amount = mi.Amount,
                     Reference = mi.Reference,
                     RecordedBy = mi.RecordedByUser?.FullName ?? "—",
@@ -474,6 +475,7 @@ public sealed class FinanceService(
                 Source = dto.Source.Trim(),
                 Amount = dto.Amount,
                 Description = dto.Description.Trim(),
+                PayerName = Clean(dto.PayerName),
                 Reference = Clean(dto.Reference),
                 Notes = Clean(dto.Notes),
                 RecordedByUserId = sessions.CurrentUser?.UserId,
@@ -502,6 +504,7 @@ public sealed class FinanceService(
                 TypeLabel = "إيراد يدوي",
                 Category = income.Source,
                 Description = income.Description,
+                PayerName = income.PayerName,
                 Amount = income.Amount,
                 Reference = income.Reference,
                 RecordedBy = sessions.CurrentUser?.FullName ?? "—",
@@ -593,6 +596,7 @@ public sealed class FinanceService(
             income.Source = dto.Source.Trim();
             income.Amount = dto.Amount;
             income.Description = dto.Description.Trim();
+            income.PayerName = Clean(dto.PayerName);
             income.Reference = Clean(dto.Reference);
             income.Notes = Clean(dto.Notes);
             income.UpdatedAt = DateTimeOffset.UtcNow;
@@ -619,6 +623,7 @@ public sealed class FinanceService(
                 TypeLabel = "إيراد يدوي",
                 Category = income.Source,
                 Description = income.Description,
+                PayerName = income.PayerName,
                 Amount = income.Amount,
                 Reference = income.Reference,
                 RecordedBy = sessions.CurrentUser?.FullName ?? "—",

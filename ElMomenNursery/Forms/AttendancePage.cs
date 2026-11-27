@@ -40,6 +40,7 @@ internal sealed class ChildAttendancePage : UserControl
     private readonly Button _manual = MakeButton("تسجيل يدوي");
     private readonly Button _correct = MakeButton("تصحيح السجل");
     private readonly Button _markAll = MakeButton("تسجيل الكل حاضر", true);
+    private readonly Button _selectedAbsentOthersPresent = MakeButton("المحددون غياب والباقي حاضر", true);
     private readonly Button _refresh = MakeButton("تحديث");
     private readonly Button _history = MakeButton("سجل طفل لفترة");
     private List<ChildDailyAttendanceDto> _rows = [];
@@ -54,6 +55,7 @@ internal sealed class ChildAttendancePage : UserControl
         _status.Items.AddRange(["الكل", "لم يسجل", "حاضر", "غائب", "متأخر", "غياب بعذر"]); _status.SelectedIndex = 0;
         _classroom.Items.Add(new ClassroomFilterOptionDto(Guid.Empty, "كل الفصول")); _classroom.SelectedIndex = 0;
         _markAll.Visible = session.HasPermission("Attendance.Record");
+        _selectedAbsentOthersPresent.Visible = session.HasPermission("Attendance.Record");
         _present.Visible = _absent.Visible = _checkout.Visible = session.HasPermission("Attendance.Record");
         _manual.Visible = session.HasPermission("Attendance.Record"); _correct.Visible = session.HasPermission("Attendance.Edit");
         _history.Visible = session.HasPermission("Attendance.View");
@@ -75,7 +77,7 @@ internal sealed class ChildAttendancePage : UserControl
         filters.AddField("attendance.search", "بحث", _search, columnSpan: 3);
 
         var toolbar = new ActionToolbar { Name = "attendance.actions" };
-        toolbar.Add(_refresh, _history, _manual, _present, _absent, _checkout, _correct, _markAll, exportSheet, export);
+        toolbar.Add(_refresh, _history, _manual, _present, _absent, _checkout, _correct, _markAll, _selectedAbsentOthersPresent, exportSheet, export);
 
         _grid.Dock = DockStyle.None;
         _summary.Dock = DockStyle.None;
@@ -105,6 +107,7 @@ internal sealed class ChildAttendancePage : UserControl
         _present.Click += async (_, _) => await RecordAsync(AttendanceStatus.Present);
         _absent.Click += async (_, _) => await RecordAsync(AttendanceStatus.Absent);
         _checkout.Click += async (_, _) => await CheckOutAsync(); _markAll.Click += async (_, _) => await MarkAllAsync();
+        _selectedAbsentOthersPresent.Click += async (_, _) => await MarkSelectedAbsentAndOthersPresentAsync();
         _manual.Click += async (_, _) => await OpenEditorAsync(correction: false);
         _correct.Click += async (_, _) => await OpenEditorAsync(correction: true);
         _history.Click += (_, _) =>
@@ -237,6 +240,27 @@ internal sealed class ChildAttendancePage : UserControl
         }, "تعذر تسجيل الحضور الجماعي.");
     }
 
+    private async Task MarkSelectedAbsentAndOthersPresentAsync()
+    {
+        var roster = _rows.Select(x => x.ChildId).ToHashSet();
+        var absentIds = _checkedChildren.Where(roster.Contains).Distinct().ToArray();
+        if (absentIds.Length == 0) { ShowError("حدد الأطفال الغائبين من مربعات الاختيار أولًا."); return; }
+        var classroom = _classroom.SelectedItem as ClassroomFilterOptionDto;
+        var rosterName = classroom?.Id == Guid.Empty ? "كل الفصول" : classroom?.Name ?? "كل الفصول";
+        var presentCount = roster.Count - absentIds.Length;
+        if (!AppDialog.Confirm(this, "تسجيل الحضور والغياب", $"سيتم تسجيل {absentIds.Length} طفلًا محددًا غائبًا و{presentCount} طفلًا من باقي {rosterName} حاضرًا. قد تتغير سجلات اليوم الموجودة. هل تريد المتابعة؟")) return;
+
+        await UiGuard.RunAsync(this, "Attendance.MarkSelectedAbsentAndOthersPresent", async () =>
+        {
+            await using var scope = _scopes.CreateAsyncScope();
+            var service = scope.ServiceProvider.GetRequiredService<IChildAttendanceService>();
+            var result = await service.MarkSelectedAbsentAndOthersPresentAsync(DateOnly.FromDateTime(_date.Value),
+                classroom?.Id == Guid.Empty ? null : classroom?.Id, absentIds);
+            if (result.IsFailure) { ShowError(result.Error.Description); return; }
+            _checkedChildren.Clear(); ShowError(result.Message ?? "تم تسجيل الحضور والغياب."); await LoadAsync();
+        }, "تعذر تسجيل الحضور والغياب الجماعي.");
+    }
+
     private async Task OpenEditorAsync(bool correction)
     {
         var row = Selected(); if (row is null || correction != row.IsMarked) return;
@@ -260,7 +284,7 @@ internal sealed class ChildAttendancePage : UserControl
     private ChildDailyAttendanceDto? Selected() => _grid.SelectedRows.Count == 0 ? null : _grid.SelectedRows[0].Tag as ChildDailyAttendanceDto;
     private Guid? SelectedId() => Selected()?.ChildId;
     private void RestoreSelection(Guid? id) { if (id is null) return; foreach (DataGridViewRow row in _grid.Rows) if ((row.Tag as ChildDailyAttendanceDto)?.ChildId == id) { row.Selected = true; _grid.CurrentCell = row.Cells[0]; break; } }
-    private void UpdateActions() { var row = Selected(); _present.Enabled = _absent.Enabled = _manual.Enabled = row is { IsMarked: false }; _correct.Enabled = _correct.Visible && row is { IsMarked: true }; _checkout.Enabled = _checkout.Visible && row is { IsMarked: true, CheckIn: not null, CheckOut: null }; }
+    private void UpdateActions() { var row = Selected(); _present.Enabled = _absent.Enabled = _manual.Enabled = row is { IsMarked: false }; _correct.Enabled = _correct.Visible && row is { IsMarked: true }; _checkout.Enabled = _checkout.Visible && row is { IsMarked: true, CheckIn: not null, CheckOut: null }; _selectedAbsentOthersPresent.Enabled = _selectedAbsentOthersPresent.Visible && _checkedChildren.Any(id => _rows.Any(x => x.ChildId == id)); }
     private void ShowError(string message) { if (!IsDisposed) AppDialog.ShowInformation((IWin32Window?)FindForm() ?? this, "حضور الأطفال", message); }
     private static string Time(DateTimeOffset? time) => time?.ToLocalTime().ToString("HH:mm") ?? "—";
     private static Button MakeButton(string text, bool primary = false)

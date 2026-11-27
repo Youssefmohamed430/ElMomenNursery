@@ -38,6 +38,8 @@ public sealed class FinancePage : UserControl
     private readonly DataGridView _expenseGrid;
 
     private readonly Button _addIncomeBtn = MainForm.CreateActionButton("إضافة إيراد يدوي", true);
+    private readonly Button _addHostingBtn = MainForm.CreateActionButton("استضافة طفل (إيراد)", true);
+    private readonly ToolTip _incomeTips = new();
     private readonly Button _editIncomeBtn = MainForm.CreateActionButton("تعديل");
     private readonly Button _deleteIncomeBtn = MainForm.CreateActionButton("حذف");
     private readonly Button _exportIncomeBtn = MainForm.CreateActionButton("تصدير Excel");
@@ -69,7 +71,7 @@ public sealed class FinancePage : UserControl
         BackColor = BrandPalette.AppBackground;
 
         _typeFilter.Items.AddRange(["كل الأنواع", "دفعة اشتراك", "مبيعات مخزن", "إيراد يدوي", "راتب", "مصروف خارجي"]); _typeFilter.SelectedIndex = 0;
-        _incomeGrid = MainForm.CreateGrid(["التاريخ", "النوع", "المصدر / الطرف", "البيان", "المبلغ", "المرجع", "بواسطة"]);
+        _incomeGrid = MainForm.CreateGrid(["التاريخ", "النوع", "المصدر", "البيان", "اسم الدافع", "المبلغ", "المرجع", "بواسطة"]);
         _expenseGrid = MainForm.CreateGrid(["التاريخ", "النوع", "الفئة", "البيان", "المبلغ", "المرجع", "بواسطة"]);
 
         // Set default filter to current month
@@ -183,12 +185,14 @@ public sealed class FinancePage : UserControl
         filterBox.AddField("finance.type", "نوع الحركة", _typeFilter);
         filterBox.AddGroup("finance.quick-period", "فترة سريعة", 3, _quickToday, _quickThisMonth, _quickLastMonth, _quickAll);
         var applyBtn = FilterTheme.CreatePrimaryButton("تطبيق");
+        var clearBtn = FilterTheme.CreateSecondaryButton("مسح الفلاتر");
         var refreshBtn = FilterTheme.CreateSecondaryButton("تحديث");
         _exportReportBtn.Visible = _session?.HasPermission("Finance.Export") == true;
-        filterBox.AddActions(applyBtn, refreshBtn, _exportReportBtn);
+        filterBox.AddActions(applyBtn, clearBtn, refreshBtn, _exportReportBtn);
         _exportReportBtn.Click += async (_, _) => await ExportCombinedReportAsync();
 
         applyBtn.Click += async (_, _) => await LoadDataAsync();
+        clearBtn.Click += async (_, _) => { _fromPicker.Checked = false; _toPicker.Checked = false; _typeFilter.SelectedIndex = 0; await LoadDataAsync(); };
         refreshBtn.Click += async (_, _) => await LoadDataAsync();
 
         filterBox.Resize += (_, _) => filterBox.Arrange();
@@ -282,11 +286,15 @@ public sealed class FinancePage : UserControl
 
         var canManageIncome = _session?.HasPermission("Finance.ManageIncome") == true;
         _addIncomeBtn.Visible = canManageIncome;
+        _addHostingBtn.Visible = canManageIncome;
+        _addHostingBtn.MinimumSize = new Size(190, 38);
+        _addHostingBtn.AccessibleDescription = "يسجل اسم الطفل المستضاف والمبلغ والتاريخ ضمن المقبوضات.";
+        _incomeTips.SetToolTip(_addHostingBtn, "تسجيل اسم الطفل المستضاف والمبلغ وتاريخ التحصيل ضمن المقبوضات.");
         _editIncomeBtn.Visible = canManageIncome && CanViewSummary;
         _deleteIncomeBtn.Visible = canManageIncome && CanViewSummary;
         _exportIncomeBtn.Visible = _session?.HasPermission("Finance.Export") == true;
 
-        actionBar.Controls.AddRange([_addIncomeBtn, _editIncomeBtn, _deleteIncomeBtn, _exportIncomeBtn]);
+        actionBar.Controls.AddRange([_addIncomeBtn, _addHostingBtn, _editIncomeBtn, _deleteIncomeBtn, _exportIncomeBtn]);
 
         var bottomSummary = new Panel { Dock = DockStyle.Bottom, Height = 34, BackColor = BrandPalette.Surface, Padding = new Padding(8, 4, 8, 4), Visible = CanViewSummary };
         bottomSummary.Controls.Add(_incomeSummaryLabel);
@@ -392,6 +400,12 @@ public sealed class FinancePage : UserControl
             using var form = new ManualIncomeEditorForm(_scopes);
             if (form.ShowDialog(FindForm()) == DialogResult.OK)
                 await LoadDataAsync();
+        };
+
+        _addHostingBtn.Click += async (_, _) =>
+        {
+            using var form = new ManualIncomeEditorForm(_scopes, hostingMode: true);
+            if (form.ShowDialog(FindForm()) == DialogResult.OK) await LoadDataAsync();
         };
 
         _editIncomeBtn.Click += async (_, _) =>
@@ -609,6 +623,7 @@ public sealed class FinancePage : UserControl
                 r.TypeLabel,
                 r.Category,
                 r.Description,
+                r.PayerName ?? "—",
                 $"{r.Amount:N2} ج.م",
                 r.Reference ?? "—",
                 r.RecordedBy ?? "—"

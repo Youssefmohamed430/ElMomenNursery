@@ -10,7 +10,7 @@ public sealed class EmployeeService(IUnitOfWork unitOfWork, ILogger<EmployeeServ
         if (employee is null || HasMissingRequiredField(employee.FullName, employee.NationalIdNumber, employee.Address, employee.Phone, employee.JobDesignation))
             return EmployeeErrors.InvalidData;
         if (employee.Salary < 0) return EmployeeErrors.InvalidSalary;
-        if (employee.ShiftStartTime is not ("07:30" or "12:00")) return EmployeeErrors.InvalidData;
+        if (!ValidShiftStartTime(employee.ShiftStartTime)) return EmployeeErrors.InvalidData;
         if (!ValidNationalId(employee.NationalIdNumber)) return EmployeeErrors.InvalidNationalId;
         if (!PhoneNumberValidator.IsValidEgyptianMobile(employee.Phone)
             || !string.IsNullOrWhiteSpace(employee.AlternatePhone) && !PhoneNumberValidator.IsValidEgyptianMobile(employee.AlternatePhone)) return EmployeeErrors.InvalidPhone;
@@ -126,7 +126,7 @@ public sealed class EmployeeService(IUnitOfWork unitOfWork, ILogger<EmployeeServ
         if (new[] { employee.FullName, employee.NationalIdNumber, employee.Address, employee.Phone, employee.JobDesignation }
             .Any(value => value is not null && string.IsNullOrWhiteSpace(value))) return EmployeeErrors.InvalidData;
         if (employee.Salary < 0) return EmployeeErrors.InvalidSalary;
-        if (employee.ShiftStartTime is not null && employee.ShiftStartTime is not ("07:30" or "12:00")) return EmployeeErrors.InvalidData;
+        if (employee.ShiftStartTime is not null && !ValidShiftStartTime(employee.ShiftStartTime)) return EmployeeErrors.InvalidData;
         if (employee.NationalIdNumber is not null && !ValidNationalId(employee.NationalIdNumber)) return EmployeeErrors.InvalidNationalId;
         if (employee.Phone is not null && !PhoneNumberValidator.IsValidEgyptianMobile(employee.Phone)) return EmployeeErrors.InvalidPhone;
         if (!string.IsNullOrWhiteSpace(employee.AlternatePhone) && !PhoneNumberValidator.IsValidEgyptianMobile(employee.AlternatePhone)) return EmployeeErrors.InvalidPhone;
@@ -156,4 +156,5 @@ public sealed class EmployeeService(IUnitOfWork unitOfWork, ILogger<EmployeeServ
 
     private static bool HasMissingRequiredField(params string?[] fields) => fields.Any(string.IsNullOrWhiteSpace);
     private static bool ValidNationalId(string value) => value.Length == 14 && value.All(char.IsDigit);
+    private static bool ValidShiftStartTime(string value) => TimeOnly.TryParseExact(value, "HH:mm", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out _);
 }

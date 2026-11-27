@@ -10,6 +10,7 @@ namespace ElMomenNursery.Forms;
 
 public sealed class EmployeeEditorForm : ResponsiveForm
 {
+    private sealed record ShiftTimeChoice(string Value, string Label) { public override string ToString() => Label; }
     private static readonly ILogger _log = Log.ForContext<EmployeeEditorForm>();
     private readonly IServiceScopeFactory _scopes;
     private readonly EmployeeDto? _employee;
@@ -41,7 +42,6 @@ public sealed class EmployeeEditorForm : ResponsiveForm
         RightToLeftLayout = true;
         Font = new Font("Segoe UI", 10F);
         BackColor = Color.WhiteSmoke;
-        _shiftStartTime.Items.AddRange(["07:30 صباحًا", "12:00 ظهرًا"]); _shiftStartTime.SelectedIndex = 0;
 
         var content = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(14), BackColor = BackColor };
         var sections = new FlowLayoutPanel
@@ -68,7 +68,7 @@ public sealed class EmployeeEditorForm : ResponsiveForm
         sections.Controls.Add(CreateSection("بيانات العمل", table =>
         {
             AddPair(table, "المسمى الوظيفي *", _jobDesignation, "موعد بداية الدوام *", _shiftStartTime);
-            AddPair(table, "تاريخ التعيين *", _hireDate, "الراتب *", _salary);
+            AddPair(table, "تاريخ التعيين *", _hireDate, "الراتب", _salary);
             AddPair(table, "الخبرة", _hasExperience, "", new Label());
         }));
         content.Controls.Add(sections);
@@ -96,7 +96,7 @@ public sealed class EmployeeEditorForm : ResponsiveForm
         CancelButton = cancelButton;
 
         if (employee is not null) Populate(employee);
-        Shown += async (_, _) => await LookupOptions.LoadAsync(_scopes, _jobDesignation, "JobDesignation", ["معلمة", "مساعدة معلمة", "مشرفة", "محاسب", "إدارية", "عامل خدمات"]);
+        Shown += async (_, _) => { await LookupOptions.LoadAsync(_scopes, _jobDesignation, "JobDesignation", ["معلمة", "مساعدة معلمة", "مشرفة", "محاسب", "إدارية", "عامل خدمات"]); await LoadShiftStartTimesAsync(); };
     }
 
     private void Populate(EmployeeDto employee)
@@ -111,9 +111,37 @@ public sealed class EmployeeEditorForm : ResponsiveForm
         _address.Text = employee.Address;
         _jobDesignation.Text = employee.JobDesignation;
         _hireDate.Value = employee.HireDate.ToDateTime(TimeOnly.MinValue);
-        _shiftStartTime.SelectedIndex = employee.ShiftStartTime == "12:00" ? 1 : 0;
+        SelectShift(employee.ShiftStartTime);
         _salary.Text = employee.Salary.ToString("0.00", CultureInfo.CurrentCulture);
         _hasExperience.Checked = employee.HasExperience;
+    }
+
+    private async Task LoadShiftStartTimesAsync()
+    {
+        IReadOnlyList<string> values = ["07:30", "12:00"];
+        try
+        {
+            await using var scope = _scopes.CreateAsyncScope();
+            var result = await scope.ServiceProvider.GetRequiredService<ILookupService>().GetAsync("EmployeeShiftStartTime");
+            if (result.IsSuccess && result.Value.Count > 0) values = result.Value.Select(x => x.Name).Distinct().ToArray();
+        }
+        catch (Exception ex) { _log.Warning(ex, "Could not load employee shift times; using defaults"); }
+
+        _shiftStartTime.Items.Clear();
+        foreach (var value in values)
+            if (TimeOnly.TryParseExact(value, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var time))
+                _shiftStartTime.Items.Add(new ShiftTimeChoice(value, $"{time:hh\\:mm} {(time.Hour < 12 ? "صباحًا" : "مساءً")}"));
+        if (_employee is not null && !_shiftStartTime.Items.Cast<ShiftTimeChoice>().Any(x => x.Value == _employee.ShiftStartTime)
+            && TimeOnly.TryParseExact(_employee.ShiftStartTime, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var current))
+            _shiftStartTime.Items.Add(new ShiftTimeChoice(_employee.ShiftStartTime, $"{current:hh\\:mm} (الموعد الحالي)"));
+        if (_shiftStartTime.Items.Count == 0) _shiftStartTime.Items.Add(new ShiftTimeChoice("07:30", "07:30 صباحًا"));
+        if (_employee is not null) SelectShift(_employee.ShiftStartTime); else _shiftStartTime.SelectedIndex = 0;
+    }
+
+    private void SelectShift(string value)
+    {
+        var match = _shiftStartTime.Items.Cast<object>().OfType<ShiftTimeChoice>().FirstOrDefault(x => x.Value == value);
+        if (match is not null) _shiftStartTime.SelectedItem = match;
     }
 
     private async Task SaveAsync()
@@ -126,10 +154,11 @@ public sealed class EmployeeEditorForm : ResponsiveForm
             return;
         }
 
-        if (!decimal.TryParse(NormalizeNumericInput(_salary.Text), NumberStyles.Number, CultureInfo.CurrentCulture, out var salary) || salary < 0)
+        var salary = 0m;
+        if (!string.IsNullOrWhiteSpace(_salary.Text) && (!decimal.TryParse(NormalizeNumericInput(_salary.Text), NumberStyles.Number, CultureInfo.CurrentCulture, out salary) || salary < 0))
         {
             _log.Warning("Employee salary input rejected; errorCode={ErrorCode}", "InvalidNumericInput");
-            ShowError("أدخل راتبًا صحيحًا يساوي صفرًا أو أكثر.");
+            ShowError("أدخل راتبًا صحيحًا يساوي صفرًا أو اتركه فارغًا.");
             _salary.Focus();
             return;
         }
@@ -168,7 +197,7 @@ public sealed class EmployeeEditorForm : ResponsiveForm
                     AlternatePhone = OptionalText(_alternatePhone.Text),
                     JobDesignation = _jobDesignation.Text.Trim(),
                     HireDate = DateOnly.FromDateTime(_hireDate.Value),
-                    ShiftStartTime = _shiftStartTime.SelectedIndex == 1 ? "12:00" : "07:30",
+                    ShiftStartTime = (_shiftStartTime.SelectedItem as ShiftTimeChoice)?.Value ?? "07:30",
                     Salary = salary
                 });
                 if (!ResultPresenter.Present(this, "الموظفون", result)) return;
@@ -188,7 +217,7 @@ public sealed class EmployeeEditorForm : ResponsiveForm
                     AlternatePhone = OptionalText(_alternatePhone.Text),
                     JobDesignation = _jobDesignation.Text.Trim(),
                     HireDate = DateOnly.FromDateTime(_hireDate.Value),
-                    ShiftStartTime = _shiftStartTime.SelectedIndex == 1 ? "12:00" : "07:30",
+                    ShiftStartTime = (_shiftStartTime.SelectedItem as ShiftTimeChoice)?.Value ?? "07:30",
                     Salary = salary
                 });
                 if (!ResultPresenter.Present(this, "الموظفون", result)) return;

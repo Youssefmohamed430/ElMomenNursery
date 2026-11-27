@@ -74,6 +74,12 @@ public sealed class SubscriptionsPage : UserControl
             _grid.SetBounds(margin, _summary.Bottom + 4, width, Math.Max(140, ClientSize.Height - _summary.Bottom - margin));
         }
         apply.Click += (_, _) => _ = UiGuard.RunAsync(this, "Subscriptions.Load", LoadAsync);
+        clear.Click += (_, _) =>
+        {
+            _search.Clear(); _status.SelectedIndex = 0; _classroom.SelectedIndex = 0;
+            _from.Checked = false; _to.Checked = false; _balance.Checked = false;
+            _ = UiGuard.RunAsync(this, "Subscriptions.ClearFilters", LoadAsync);
+        };
         refresh.Click += (_, _) => _ = UiGuard.RunAsync(this, "Subscriptions.Load", LoadAsync);
         _add.Click += (_, _) => _ = UiGuard.RunAsync(this, "Subscriptions.Add", () => EditAsync(null));
         _edit.Click += (_, _) => { if (Selected() is { } row) _ = UiGuard.RunAsync(this, "Subscriptions.Edit", () => EditAsync(row)); };

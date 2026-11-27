@@ -49,6 +49,8 @@ public sealed class InvoicePdfService(string dataDirectory) : IInvoicePdfService
                         column.Item().Text($"طريقة الدفع: {invoice.PaymentMethod switch { Domain.Enums.PaymentMethod.Cash => "نقدًا", Domain.Enums.PaymentMethod.BankTransfer => "تحويل بنكي", _ => "أخرى" }}");
                         if (!string.IsNullOrWhiteSpace(invoice.Reference)) column.Item().Text($"المرجع: {invoice.Reference}");
                     });
+                    if (!string.IsNullOrWhiteSpace(invoice.IssuedByName))
+                        page.Footer().AlignLeft().Text($"مُصدر الفاتورة: {invoice.IssuedByName}").FontSize(9);
                 })).GeneratePdf(path);
                 Log.ForContext<InvoicePdfService>().Information("Invoice PDF generated; operation={Operation}; durationMs={DurationMs}; targetFolder={TargetFolder}", "CreateInvoiceFile", timer.ElapsedMilliseconds, folder);
                 return Result.Success<string>(path);

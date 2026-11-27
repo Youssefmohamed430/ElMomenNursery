@@ -11,10 +11,12 @@ public sealed class ManualIncomeEditorForm : ResponsiveForm
 {
     private readonly IServiceScopeFactory? _scopes;
     private readonly FinanceTransactionDto? _transaction;
+    private readonly bool _hostingMode;
 
     private readonly DateTimePicker _date = new() { Format = DateTimePickerFormat.Short, RightToLeft = RightToLeft.Yes };
     private readonly ComboBox _source = new() { DropDownStyle = ComboBoxStyle.DropDown, RightToLeft = RightToLeft.Yes };
     private readonly TextBox _description = new() { MaxLength = 200, RightToLeft = RightToLeft.Yes };
+    private readonly TextBox _payerName = new() { MaxLength = 120, RightToLeft = RightToLeft.Yes };
     private readonly NumericUpDown _amount = new() { DecimalPlaces = 2, ThousandsSeparator = true, Minimum = 0.01m, Maximum = 10_000_000m, RightToLeft = RightToLeft.Yes };
     private readonly TextBox _reference = new() { MaxLength = 100, RightToLeft = RightToLeft.Yes };
     private readonly TextBox _notes = new() { MaxLength = 500, Multiline = true, Height = 60, RightToLeft = RightToLeft.Yes };
@@ -23,15 +25,16 @@ public sealed class ManualIncomeEditorForm : ResponsiveForm
 
     public ManualIncomeEditorForm() : this(null, null) { }
 
-    public ManualIncomeEditorForm(IServiceScopeFactory? scopes, FinanceTransactionDto? transaction = null)
+    public ManualIncomeEditorForm(IServiceScopeFactory? scopes, FinanceTransactionDto? transaction = null, bool hostingMode = false)
     {
         _scopes = scopes;
         _transaction = transaction;
+        _hostingMode = hostingMode;
 
-        Text = transaction is null ? "تسجيل إيراد يدوي" : "تعديل إيراد يدوي";
+        Text = hostingMode ? "تسجيل استضافة طفل" : transaction is null ? "تسجيل إيراد يدوي" : "تعديل إيراد يدوي";
         StartPosition = FormStartPosition.CenterParent;
-        MinimumSize = new Size(520, 520);
-        Size = new Size(580, 560);
+        MinimumSize = new Size(520, 560);
+        Size = new Size(580, 620);
         RightToLeft = RightToLeft.Yes;
         RightToLeftLayout = true;
         Font = new Font("Segoe UI", 10F);
@@ -39,7 +42,7 @@ public sealed class ManualIncomeEditorForm : ResponsiveForm
 
         _source.Items.AddRange(["تبرع", "منحة", "دعم خارجي", "نشاط ترفيهي إضافي", "رحلة", "إيراد متنوع", "أخرى"]);
         _source.SelectedIndex = 0;
-        Shown += async (_, _) => await LookupOptions.LoadAsync(_scopes, _source, "IncomeSource", ["تبرع", "منحة", "دعم خارجي", "نشاط ترفيهي إضافي", "رحلة", "إيراد متنوع", "أخرى"]);
+        if (!hostingMode) Shown += async (_, _) => await LookupOptions.LoadAsync(_scopes, _source, "IncomeSource", ["تبرع", "منحة", "دعم خارجي", "نشاط ترفيهي إضافي", "رحلة", "إيراد متنوع", "أخرى"]);
         _date.Value = DateTime.Today;
 
         var fields = new TableLayoutPanel
@@ -47,7 +50,7 @@ public sealed class ManualIncomeEditorForm : ResponsiveForm
             Dock = DockStyle.Fill,
             Padding = new Padding(24),
             ColumnCount = 2,
-            RowCount = 6,
+            RowCount = 7,
             RightToLeft = RightToLeft.Yes,
             BackColor = BrandPalette.Surface
         };
@@ -57,9 +60,11 @@ public sealed class ManualIncomeEditorForm : ResponsiveForm
         AddField(fields, "تاريخ الإيراد *", _date, 0, 50);
         AddField(fields, "مصدر الإيراد *", _source, 1, 50);
         AddField(fields, "البيان / الوصف *", _description, 2, 50);
-        AddField(fields, "المبلغ (ج.م) *", _amount, 3, 50);
-        AddField(fields, "المرجع / رقم الإيصال", _reference, 4, 50);
-        AddField(fields, "ملاحظات", _notes, 5, 80);
+        AddField(fields, hostingMode ? "اسم الطفل *" : "اسم من دفع", _payerName, 3, 50);
+        AddField(fields, "المبلغ (ج.م) *", _amount, 4, 50);
+        AddField(fields, "المرجع / رقم الإيصال", _reference, 5, 50);
+        AddField(fields, "ملاحظات", _notes, 6, 80);
+        if (hostingMode) { _source.Text = "استضافة طفل"; _source.Enabled = false; _description.Text = "استضافة طفل"; _description.Enabled = false; }
 
         var footer = new FlowLayoutPanel
         {
@@ -88,6 +93,7 @@ public sealed class ManualIncomeEditorForm : ResponsiveForm
             _date.Value = transaction.Date.ToDateTime(TimeOnly.MinValue);
             _source.Text = transaction.Category;
             _description.Text = transaction.Description;
+            _payerName.Text = transaction.PayerName ?? string.Empty;
             _amount.Value = Math.Max(0.01m, transaction.Amount);
             _reference.Text = transaction.Reference ?? string.Empty;
         }
@@ -104,6 +110,10 @@ public sealed class ManualIncomeEditorForm : ResponsiveForm
 
     private async Task SaveAsync()
     {
+        if (_hostingMode && string.IsNullOrWhiteSpace(_payerName.Text))
+        {
+            AppDialog.ShowInformation(this, "تنبيه", "اكتب اسم الطفل المستضاف."); _payerName.Focus(); return;
+        }
         if (string.IsNullOrWhiteSpace(_description.Text))
         {
             AppDialog.ShowInformation(this, "تنبيه", "يرجى كتابة بيان الإيراد.");
@@ -143,9 +153,10 @@ public sealed class ManualIncomeEditorForm : ResponsiveForm
                 var dto = new CreateManualIncomeDto
                 {
                     IncomeDate = DateOnly.FromDateTime(_date.Value),
-                    Source = _source.Text.Trim(),
+                    Source = _hostingMode ? "استضافة طفل" : _source.Text.Trim(),
                     Amount = _amount.Value,
-                    Description = _description.Text.Trim(),
+                    Description = _hostingMode ? $"استضافة طفل: {_payerName.Text.Trim()}" : _description.Text.Trim(),
+                    PayerName = string.IsNullOrWhiteSpace(_payerName.Text) ? null : _payerName.Text.Trim(),
                     Reference = string.IsNullOrWhiteSpace(_reference.Text) ? null : _reference.Text.Trim(),
                     Notes = string.IsNullOrWhiteSpace(_notes.Text) ? null : _notes.Text.Trim()
                 };
@@ -165,6 +176,7 @@ public sealed class ManualIncomeEditorForm : ResponsiveForm
                     Source = _source.Text.Trim(),
                     Amount = _amount.Value,
                     Description = _description.Text.Trim(),
+                    PayerName = string.IsNullOrWhiteSpace(_payerName.Text) ? null : _payerName.Text.Trim(),
                     Reference = string.IsNullOrWhiteSpace(_reference.Text) ? null : _reference.Text.Trim(),
                     Notes = string.IsNullOrWhiteSpace(_notes.Text) ? null : _notes.Text.Trim()
                 };

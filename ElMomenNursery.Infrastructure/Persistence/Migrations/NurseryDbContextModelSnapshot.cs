@@ -1121,6 +1121,9 @@ namespace ElMomenNursery.Infrastructure.Persistence.Migrations
                     b.Property<string>("Notes")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("PayerName")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("RecordedByUserId")
                         .HasColumnType("TEXT");
 

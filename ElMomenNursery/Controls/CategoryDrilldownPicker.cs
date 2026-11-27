@@ -6,6 +6,8 @@ namespace ElMomenNursery.Controls;
 internal sealed class CategoryDrilldownPicker : UserControl
 {
     public event Action<InventoryItemDto>? ItemPicked;
+    public decimal PickedUnitPrice { get; private set; }
+    public int PickedQuantity { get; private set; } = 1;
     private readonly TextBox _search = new() { Dock = DockStyle.Top, PlaceholderText = "بحث في هذه الفئة" };
     private readonly FlowLayoutPanel _breadcrumb = new() { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, RightToLeft = RightToLeft.Yes, Padding = new Padding(4) };
     private readonly FlowLayoutPanel _list = new() { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true, RightToLeft = RightToLeft.Yes, Padding = new Padding(4) };
@@ -17,6 +19,7 @@ internal sealed class CategoryDrilldownPicker : UserControl
         BackColor = Color.White; RightToLeft = RightToLeft.Yes;
         Controls.Add(_list); Controls.Add(_breadcrumb); Controls.Add(_search);
         _search.TextChanged += (_, _) => RenderCurrentLevel();
+        Resize += (_, _) => RenderCurrentLevel();
     }
 
     public void LoadTree(IReadOnlyList<InventoryCategoryNodeDto> tree) { _root = tree; _path.Clear(); RenderCurrentLevel(); }
@@ -48,11 +51,19 @@ internal sealed class CategoryDrilldownPicker : UserControl
 
     private Control BuildItemRow(InventoryItemDto item)
     {
-        var row = new TableLayoutPanel { Width = Math.Max(400, ClientSize.Width - 36), Height = 48, ColumnCount = 3, RowCount = 1, Margin = new Padding(3), Padding = new Padding(5), BackColor = Color.White };
-        row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 100)); row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 105));
-        row.Controls.Add(new Label { Text = item.Name, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight }, 0, 0);
-        row.Controls.Add(new Label { Text = $"{item.UnitPrice:N2} ج.م  (المتاح: {item.Quantity})", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter }, 1, 0);
-        var add = BrandControls.ActionButton("إضافة", true); add.Dock = DockStyle.Fill; add.Height = 34; add.Click += (_, _) => ItemPicked?.Invoke(item); row.Controls.Add(add, 2, 0);
+        var row = new TableLayoutPanel { Width = Math.Max(600, ClientSize.Width - 36), Height = 62, ColumnCount = 6, RowCount = 1, Margin = new Padding(3), Padding = new Padding(5), BackColor = Color.White };
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 76));
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 112)); row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 62));
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 78)); row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 100));
+        row.Controls.Add(new Label { Text = $"{item.Name}  (المتاح: {item.Quantity})", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight, AutoEllipsis = true }, 0, 0);
+        row.Controls.Add(new Label { Text = "سعر البيع", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter }, 1, 0);
+        var price = new NumericUpDown { Minimum = 0, Maximum = 10_000_000, DecimalPlaces = 2, ThousandsSeparator = true, Value = Math.Clamp(item.UnitPrice, 0m, 10_000_000m), Dock = DockStyle.Fill, TextAlign = HorizontalAlignment.Center };
+        price.BackColor = BrandPalette.SoftBlue; price.AccessibleName = $"سعر بيع {item.Name}"; row.Controls.Add(price, 2, 0);
+        row.Controls.Add(new Label { Text = "الكمية", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter }, 3, 0);
+        var quantity = new NumericUpDown { Minimum = 1, Maximum = Math.Max(1, Math.Min(9999, item.Quantity)), Value = 1, Dock = DockStyle.Fill, TextAlign = HorizontalAlignment.Center };
+        quantity.AccessibleName = $"الكمية المضافة من {item.Name}"; row.Controls.Add(quantity, 4, 0);
+        var add = BrandControls.ActionButton("إضافة", true); add.Dock = DockStyle.Fill; add.Height = 38;
+        add.Click += (_, _) => { PickedUnitPrice = price.Value; PickedQuantity = (int)quantity.Value; ItemPicked?.Invoke(item); }; row.Controls.Add(add, 5, 0);
         return row;
     }
 

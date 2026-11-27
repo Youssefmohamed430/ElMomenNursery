@@ -132,6 +132,41 @@ public sealed class InventoryTests
         Assert.Empty(await db.Invoices.ToListAsync());
     }
 
+    [Fact]
+    public async Task Invoice_item_sale_price_is_a_snapshot_and_does_not_change_inventory_price()
+    {
+        await using var db = await CreateDb();
+        var category = new InventoryCategory { Name = "لوازم", IsActive = true };
+        var item = new InventoryItem { Name = "دفتر", Category = category, CategoryId = category.Id, UnitPrice = 20m, Quantity = 5, IsActive = true };
+        db.AddRange(category, item); await db.SaveChangesAsync();
+        var service = new InvoiceService(new TestUnitOfWork(db), NullLogger<InvoiceService>.Instance,
+            new TestPermissionService(), new TestSessionManager(null));
+        var result = await service.CreateInvoiceAsync(new CreateInvoiceDto("عميل", null,
+            [new CreateInvoiceLineDto(item.Id, item.Name, 15m, 2)], ElMomenNursery.Domain.Enums.PaymentMethod.Cash, null, null));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(15m, (await db.InvoiceLines.SingleAsync()).UnitPriceSnapshot);
+        Assert.Equal(20m, (await db.InventoryItems.SingleAsync()).UnitPrice);
+        Assert.Equal(3, (await db.InventoryItems.SingleAsync()).Quantity);
+    }
+
+    [Fact]
+    public async Task Manual_income_can_store_an_optional_payer_name()
+    {
+        await using var db = await CreateDb();
+        var service = new FinanceService(new TestUnitOfWork(db), NullLogger<FinanceService>.Instance,
+            new TestPermissionService(), new TestSessionManager(null));
+        var result = await service.CreateManualIncomeAsync(new CreateManualIncomeDto
+        {
+            IncomeDate = DateOnly.FromDateTime(DateTime.Today), Source = "استضافة طفل", Amount = 100m,
+            Description = "استضافة طفل: ليلى", PayerName = "ليلى"
+        });
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("ليلى", (await db.ManualIncomes.SingleAsync()).PayerName);
+        Assert.Equal("ليلى", result.Value.PayerName);
+    }
+
     private static async Task<NurseryDbContext> CreateDb()
     {
         var connection = new SqliteConnection("Data Source=:memory:"); await connection.OpenAsync();

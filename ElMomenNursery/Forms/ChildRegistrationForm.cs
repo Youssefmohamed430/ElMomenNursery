@@ -16,6 +16,8 @@ internal sealed class ChildRegistrationForm : ResponsiveForm
     private readonly DateTimePicker _end = new() { Format = DateTimePickerFormat.Short, Dock = DockStyle.Fill };
     private readonly NumericUpDown _due = new() { Minimum = 0, Maximum = 10000000, DecimalPlaces = 2, ThousandsSeparator = true, Dock = DockStyle.Fill };
     private readonly NumericUpDown _paid = new() { Minimum = 0, Maximum = 10000000, DecimalPlaces = 2, ThousandsSeparator = true, Dock = DockStyle.Fill };
+    private bool _paidManuallySet;
+    private bool _syncingPaid;
     private readonly ComboBox _method = new() { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
     private readonly CheckBox _addSubscription = new() { Text = "إنشاء اشتراك وتسجيل دفعة الآن", AutoSize = true, Checked = true };
     private readonly CheckBox _addStoreInvoice = new() { Text = "إضافة فاتورة أصناف من المخزن بعد حفظ التسجيل", AutoSize = true, Checked = true };
@@ -28,6 +30,12 @@ internal sealed class ChildRegistrationForm : ResponsiveForm
         var today = DateTime.Today; _start.Value = today; _end.Value = new DateTime(today.Year, today.Month, DateTime.DaysInMonth(today.Year, today.Month));
         _method.Items.AddRange(["نقدًا", "تحويل بنكي", "أخرى"]); _method.SelectedIndex = 0;
         _paid.Enabled = session.HasPermission("Payments.Create");
+        _due.ValueChanged += (_, _) =>
+        {
+            if (_paidManuallySet || !_paid.Enabled) return;
+            _syncingPaid = true; _paid.Value = Math.Min(_paid.Maximum, _due.Value); _syncingPaid = false;
+        };
+        _paid.ValueChanged += (_, _) => { if (!_syncingPaid) _paidManuallySet = true; };
         var canCreateSubscription = session.HasPermission("Subscriptions.Manage");
         var canCreateStoreInvoice = session.HasPermission("Payments.Create");
         _addSubscription.Visible = canCreateSubscription;
@@ -39,7 +47,7 @@ internal sealed class ChildRegistrationForm : ResponsiveForm
         if (canCreateSubscription)
         {
             Add("", _addSubscription); Add("بداية الاشتراك", _start); Add("نهاية الاشتراك", _end);
-            Add("قيمة الاشتراك", _due); Add("المبلغ المدفوع", _paid); Add("طريقة الدفع", _method);
+            Add("قيمة الاشتراك", _due); Add("المبلغ المدفوع (افتراضيًا كامل الاشتراك)", _paid); Add("طريقة الدفع", _method);
         }
         if (canCreateStoreInvoice) Add("", _addStoreInvoice);
         var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, WrapContents = false };

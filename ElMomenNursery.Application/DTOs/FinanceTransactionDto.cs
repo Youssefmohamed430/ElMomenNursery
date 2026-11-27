@@ -10,6 +10,7 @@ public sealed class FinanceTransactionDto
     public string TypeLabel { get; init; } = string.Empty;
     public string Category { get; init; } = string.Empty;
     public string Description { get; init; } = string.Empty;
+    public string? PayerName { get; init; }
     public decimal Amount { get; init; }
     public string? Reference { get; init; }
     public string? RecordedBy { get; init; }
