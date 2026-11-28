@@ -17,4 +17,6 @@ public class CreateEmployeeDto
     public required DateOnly HireDate { get; set; }
     public string ShiftStartTime { get; set; } = "07:30";
     public required decimal Salary { get; set; }
+    public decimal InsuranceFunds { get; set; }
+
 }

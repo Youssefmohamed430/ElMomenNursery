@@ -27,6 +27,7 @@ public sealed class EmployeeEditorForm : ResponsiveForm
     private readonly DateTimePicker _hireDate = CreateDatePicker();
     private readonly ComboBox _shiftStartTime = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220, RightToLeft = RightToLeft.Yes };
     private readonly TextBox _salary = CreateTextBox(30);
+    private readonly TextBox _insuranceFunds = CreateTextBox(30);
     private readonly CheckBox _hasExperience = new() { Text = "لديه خبرة", AutoSize = true, RightToLeft = RightToLeft.Yes };
     private readonly Button _saveButton = CreateButton("حفظ", primary: true);
 
@@ -69,7 +70,7 @@ public sealed class EmployeeEditorForm : ResponsiveForm
         {
             AddPair(table, "المسمى الوظيفي *", _jobDesignation, "موعد بداية الدوام *", _shiftStartTime);
             AddPair(table, "تاريخ التعيين *", _hireDate, "الراتب", _salary);
-            AddPair(table, "الخبرة", _hasExperience, "", new Label());
+            AddPair(table, "مبلغ التأمين", _insuranceFunds, "الخبرة", _hasExperience);
         }));
         content.Controls.Add(sections);
 
@@ -113,6 +114,7 @@ public sealed class EmployeeEditorForm : ResponsiveForm
         _hireDate.Value = employee.HireDate.ToDateTime(TimeOnly.MinValue);
         SelectShift(employee.ShiftStartTime);
         _salary.Text = employee.Salary.ToString("0.00", CultureInfo.CurrentCulture);
+        _insuranceFunds.Text = employee.InsuranceFunds.ToString("0.00", CultureInfo.CurrentCulture);
         _hasExperience.Checked = employee.HasExperience;
     }
 
@@ -164,6 +166,13 @@ public sealed class EmployeeEditorForm : ResponsiveForm
         }
 
         int? graduationYear = null;
+        var insuranceFunds = 0m;
+        if (!string.IsNullOrWhiteSpace(_insuranceFunds.Text) && (!decimal.TryParse(NormalizeNumericInput(_insuranceFunds.Text), NumberStyles.Number, CultureInfo.CurrentCulture, out insuranceFunds) || insuranceFunds < 0))
+        {
+            ShowError("أدخل مبلغ تأمين صحيحًا يساوي صفرًا أو اتركه فارغًا.");
+            _insuranceFunds.Focus();
+            return;
+        }
         if (!string.IsNullOrWhiteSpace(_graduationYear.Text))
         {
             if (!int.TryParse(NormalizeNumericInput(_graduationYear.Text), NumberStyles.Integer, CultureInfo.CurrentCulture, out var year))
@@ -198,7 +207,8 @@ public sealed class EmployeeEditorForm : ResponsiveForm
                     JobDesignation = _jobDesignation.Text.Trim(),
                     HireDate = DateOnly.FromDateTime(_hireDate.Value),
                     ShiftStartTime = (_shiftStartTime.SelectedItem as ShiftTimeChoice)?.Value ?? "07:30",
-                    Salary = salary
+                    Salary = salary,
+                    InsuranceFunds = insuranceFunds
                 });
                 if (!ResultPresenter.Present(this, "الموظفون", result)) return;
             }
@@ -218,7 +228,8 @@ public sealed class EmployeeEditorForm : ResponsiveForm
                     JobDesignation = _jobDesignation.Text.Trim(),
                     HireDate = DateOnly.FromDateTime(_hireDate.Value),
                     ShiftStartTime = (_shiftStartTime.SelectedItem as ShiftTimeChoice)?.Value ?? "07:30",
-                    Salary = salary
+                    Salary = salary,
+                    InsuranceFunds = insuranceFunds
                 });
                 if (!ResultPresenter.Present(this, "الموظفون", result)) return;
             }

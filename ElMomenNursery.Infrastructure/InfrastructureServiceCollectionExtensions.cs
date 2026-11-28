@@ -86,7 +86,7 @@ public static class InfrastructureServiceCollectionExtensions
         QuestPDF.Settings.License = LicenseType.Community;
         var printerOptions = configuration.GetSection(PrinterOptions.SectionName).Get<PrinterOptions>() ?? new PrinterOptions();
         services.AddSingleton<IReceiptPdfService>(_ => new ReceiptPdfService(dataDirectory, printerOptions));
-        services.AddSingleton<IInvoicePdfService>(_ => new InvoicePdfService(dataDirectory));
+        services.AddSingleton<IInvoicePdfService>(sp => new InvoicePdfService(dataDirectory, sp.GetRequiredService<IServiceScopeFactory>()));
         if (OperatingSystem.IsWindows())
         {
 #pragma warning disable CA1416

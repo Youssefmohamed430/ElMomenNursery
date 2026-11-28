@@ -54,6 +54,7 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         b.Property(x => x.JobDesignation).IsRequired();
         b.Property(x => x.ShiftStartTime).HasMaxLength(5).HasDefaultValue("07:30").IsRequired();
         b.Property(x => x.Salary).HasPrecision(18, 2);
+        b.Property(x => x.InsuranceFunds).HasPrecision(18, 2);
         b.HasIndex(x => x.NationalIdNumber).IsUnique().HasFilter("\"IsDeleted\" = 0").HasDatabaseName("UX_Employees_NationalIdNumber");
         b.HasIndex(x => x.FullName).HasDatabaseName("IX_Employees_FullName");
         b.HasMany(x => x.TeachingAssignments).WithOne(x => x.Employee).HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Restrict);

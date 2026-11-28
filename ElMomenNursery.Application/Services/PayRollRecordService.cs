@@ -120,7 +120,7 @@ public sealed class PayRollRecordService(IUnitOfWork unitOfWork, ILogger<PayRoll
                 var newRecord = new PayrollRecord
                 {
                     EmployeeId = employee.Id, Employee = employee, PeriodStart = startDate, PeriodEnd = endDate,
-                    AgreedSalary = employee.Salary
+                    AgreedSalary = employee.Salary, InsuranceFunds = employee.InsuranceFunds
                 };
                 await unitOfWork.Repository<PayrollRecord>().AddAsync(newRecord, cancellationToken);
                 await unitOfWork.Repository<AuditLog>().AddAsync(new AuditLog

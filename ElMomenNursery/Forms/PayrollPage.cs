@@ -113,7 +113,11 @@ internal sealed class PayrollPage : UserControl
         _grid.SelectionChanged += (_, _) => SetEmployeeForSelected();
         _employee.SelectedIndexChanged += (_, _) =>
         {
-            if (!_isCustomizing && _editingPayrollId is null && _employee.SelectedItem is EmployeeDto employee) _salary.Value = Math.Min(_salary.Maximum, employee.Salary);
+            if (!_isCustomizing && _editingPayrollId is null && _employee.SelectedItem is EmployeeDto employee)
+            {
+                _salary.Value = Math.Min(_salary.Maximum, employee.Salary);
+                _insurance.Value = Math.Min(_insurance.Maximum, employee.InsuranceFunds);
+            }
         };
 
         _canvas.Controls.AddRange([customize, resetLayout, layoutStatus]);
@@ -425,7 +429,9 @@ internal sealed class PayrollPage : UserControl
         _employee.Enabled = false;
         _from.Value = record.PeriodStart.ToDateTime(TimeOnly.MinValue); _to.Value = record.PeriodEnd.ToDateTime(TimeOnly.MinValue);
         _salary.Value = Math.Min(_salary.Maximum, record.AgreedSalary); _additions.Value = Math.Min(_additions.Maximum, record.Additions);
-        _deductions.Value = Math.Min(_deductions.Maximum, record.Deductions); _insurance.Value = Math.Min(_insurance.Maximum, record.InsuranceFunds);
+        _deductions.Value = Math.Min(_deductions.Maximum, record.Deductions);
+        var employeeInsurance = _employee.Items.Cast<EmployeeDto>().FirstOrDefault(x => x.Id == record.EmployeeId)?.InsuranceFunds ?? 0m;
+        _insurance.Value = Math.Min(_insurance.Maximum, record.InsuranceFunds > 0 ? record.InsuranceFunds : employeeInsurance);
         _paymentDate.Value = (record.PaymentDate ?? DateOnly.FromDateTime(DateTime.Today)).ToDateTime(TimeOnly.MinValue);
         _notes.Text = record.Notes ?? string.Empty; _savePayroll.Text = "حفظ التعديل وإعادة الحساب";
     }
@@ -436,8 +442,12 @@ internal sealed class PayrollPage : UserControl
         _employee.Visible = true;
         _employee.Enabled = true;
         _editingEmployeeName.Visible = false;
-        if (_employee.SelectedItem is EmployeeDto employee) _salary.Value = Math.Min(_salary.Maximum, employee.Salary);
-        _additions.Value = 0; _deductions.Value = 0; _insurance.Value = 0; _notes.Clear();
+        if (_employee.SelectedItem is EmployeeDto employee)
+        {
+            _salary.Value = Math.Min(_salary.Maximum, employee.Salary);
+            _insurance.Value = Math.Min(_insurance.Maximum, employee.InsuranceFunds);
+        }
+        _additions.Value = 0; _deductions.Value = 0; _notes.Clear();
         var today = DateTime.Today; _from.Value = new DateTime(today.Year, today.Month, 1);
         _to.Value = new DateTime(today.Year, today.Month, DateTime.DaysInMonth(today.Year, today.Month));
         _paymentDate.Value = today;

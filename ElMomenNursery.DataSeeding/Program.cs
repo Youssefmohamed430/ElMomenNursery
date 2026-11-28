@@ -5,9 +5,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.AspNetCore.Identity;
 
-if (args.Length == 0 || args[0] is not ("clear" or "seed"))
+if (args.Length == 0 || args[0] is not ("clear" or "seed" or "seed-payroll-demo"))
 {
-    Console.WriteLine("Usage: dotnet run --project ElMomenNursery.DataSeeding -- [clear|seed] [database-path]");
+    Console.WriteLine("Usage: dotnet run --project ElMomenNursery.DataSeeding -- [clear|seed|seed-payroll-demo] [database-path]");
     return 2;
 }
 
@@ -20,6 +20,12 @@ var options = new DbContextOptionsBuilder<NurseryDbContext>()
     .Options;
 await using var db = new NurseryDbContext(options);
 await db.Database.MigrateAsync();
+
+if (args[0] == "seed-payroll-demo")
+{
+    await SeedPayrollDemoAsync(db);
+    return 0;
+}
 
 if (args[0] == "clear")
 {
@@ -79,6 +85,16 @@ static async Task SeedMockupAsync(NurseryDbContext db)
         Qualification = new[] { "بكالوريوس تربية", "دبلوم", "بكالوريوس تجارة", "ثانوية عامة" }[i % 4], GraduationYear = 2012 + i % 12,
         MaritalStatus = (ElMomenNursery.Domain.Enums.MaritalStatus)(i % 4), IsDeleted = i == 11, DeletedAt = i == 11 ? now.AddDays(-8) : null
     }).ToList();
+    var payrollDemoEmployee = new Employee
+    {
+        FullName = "محمود سامي (تجريبي الرواتب)", NationalIdNumber = "MOCK-PAYROLL-001",
+        Address = "مدينة نصر، القاهرة", Phone = "01029990001", JobDesignation = "مشرف",
+        HireDate = new DateOnly(today.Year, today.Month, 1), ShiftStartTime = "07:30",
+        Salary = 6000m, InsuranceFunds = 350m, HasExperience = true,
+        Qualification = "بكالوريوس تجارة", GraduationYear = 2018,
+        MaritalStatus = ElMomenNursery.Domain.Enums.MaritalStatus.Married
+    };
+    employees.Add(payrollDemoEmployee);
     var children = Enumerable.Range(0, 60).Select(i => new Child
     {
         FullName = $"{new[] { "آدم", "ليلى", "يوسف", "مريم", "عمر", "جنى", "سليم", "ملك", "ياسين", "نور" }[i % 10]} {new[] { "محمد علي", "أحمد حسن", "محمود إبراهيم", "كريم السيد", "حسام عادل", "طارق منصور" }[i % 6]}",
@@ -142,9 +158,40 @@ static async Task SeedMockupAsync(NurseryDbContext db)
     for (var i = 0; i < employees.Count; i++)
     for (var day = 0; day < 20; day++)
     {
+        if (ReferenceEquals(employees[i], payrollDemoEmployee)) continue;
         var date = today.AddDays(-day);
         var status = (ElMomenNursery.Domain.Enums.AttendanceStatus)((i + day) % 4);
         employeeAttendances.Add(new EmployeeAttendance { Employee = employees[i], AttendanceDate = date, Status = status, EntryMethod = (ElMomenNursery.Domain.Enums.AttendanceEntryMethod)((i + day) % 3), CheckInTime = status is ElMomenNursery.Domain.Enums.AttendanceStatus.Present or ElMomenNursery.Domain.Enums.AttendanceStatus.Late ? date.ToDateTime(new TimeOnly(7, 15)).ToUniversalTime() : null, CheckOutTime = status == ElMomenNursery.Domain.Enums.AttendanceStatus.Present ? date.ToDateTime(new TimeOnly(15, 0)).ToUniversalTime() : null, RecordedByUserId = manager.Id });
+    }
+    var demoAttendanceDate = new DateOnly(today.Year, today.Month, 1);
+    var demoWorkingDay = 0;
+    for (; demoAttendanceDate <= today; demoAttendanceDate = demoAttendanceDate.AddDays(1))
+    {
+        if (demoAttendanceDate.DayOfWeek == DayOfWeek.Friday) continue;
+        var status = demoWorkingDay switch
+        {
+            0 or 1 => ElMomenNursery.Domain.Enums.AttendanceStatus.Absent,
+            2 or 3 => ElMomenNursery.Domain.Enums.AttendanceStatus.Late,
+            _ => ElMomenNursery.Domain.Enums.AttendanceStatus.Present
+        };
+        var checkIn = status is ElMomenNursery.Domain.Enums.AttendanceStatus.Present or ElMomenNursery.Domain.Enums.AttendanceStatus.Late
+            ? demoAttendanceDate.ToDateTime(status == ElMomenNursery.Domain.Enums.AttendanceStatus.Late ? new TimeOnly(8, 30) : new TimeOnly(7, 30)).ToUniversalTime()
+            : (DateTimeOffset?)null;
+        employeeAttendances.Add(new EmployeeAttendance
+        {
+            Employee = payrollDemoEmployee, AttendanceDate = demoAttendanceDate, Status = status,
+            EntryMethod = ElMomenNursery.Domain.Enums.AttendanceEntryMethod.Manual,
+            CheckInTime = checkIn,
+            CheckOutTime = checkIn is null ? null : demoAttendanceDate.ToDateTime(new TimeOnly(15, 0)).ToUniversalTime(),
+            RecordedByUserId = manager.Id,
+            Notes = status switch
+            {
+                ElMomenNursery.Domain.Enums.AttendanceStatus.Absent => "غياب تجريبي لاختبار حساب الراتب",
+                ElMomenNursery.Domain.Enums.AttendanceStatus.Late => "تأخير تجريبي ساعة واحدة",
+                _ => "حضور تجريبي"
+            }
+        });
+        demoWorkingDay++;
     }
     db.AddRange(childAttendances); db.AddRange(employeeAttendances);
 
@@ -153,7 +200,21 @@ static async Task SeedMockupAsync(NurseryDbContext db)
     for (var month = 0; month < 3; month++)
     {
         var start = new DateOnly(today.Year, today.Month, 1).AddMonths(-month);
-        payroll.Add(new PayrollRecord { Employee = employees[i], PeriodStart = start, PeriodEnd = start.AddMonths(1).AddDays(-1), AgreedSalary = employees[i].Salary, Additions = i % 3 == 0 ? 150 : 0, Deductions = i % 4 == 0 ? 100 : 0, AdvanceDeduction = i % 5 == 0 ? 300 : 0, InsuranceFunds = i % 2 == 0 ? 50 : 0, AmountPaid = month == 0 && i % 4 == 0 ? 0 : employees[i].Salary, IsPaid = !(month == 0 && i % 4 == 0), IsCalculated = true, PaymentDate = month == 0 && i % 4 == 0 ? null : start.AddDays(27), Notes = i % 4 == 0 ? "خصم تجريبي" : null });
+        var isDemoPayroll = ReferenceEquals(employees[i], payrollDemoEmployee) && month == 0;
+        payroll.Add(new PayrollRecord
+        {
+            Employee = employees[i], PeriodStart = start, PeriodEnd = start.AddMonths(1).AddDays(-1),
+            AgreedSalary = employees[i].Salary,
+            Additions = !isDemoPayroll && i % 3 == 0 ? 150 : 0,
+            Deductions = isDemoPayroll ? 100 : i % 4 == 0 ? 100 : 0,
+            AdvanceDeduction = !isDemoPayroll && i % 5 == 0 ? 300 : 0,
+            InsuranceFunds = isDemoPayroll ? payrollDemoEmployee.InsuranceFunds : i % 2 == 0 ? 50 : 0,
+            AmountPaid = isDemoPayroll || month == 0 && i % 4 == 0 ? 0 : employees[i].Salary,
+            IsPaid = !isDemoPayroll && !(month == 0 && i % 4 == 0),
+            IsCalculated = !isDemoPayroll,
+            PaymentDate = isDemoPayroll || month == 0 && i % 4 == 0 ? null : start.AddDays(27),
+            Notes = isDemoPayroll ? "سجل تجريبي: غياب يومين، تأخير ساعتين، خصم 100 جنيه" : i % 4 == 0 ? "خصم تجريبي" : null
+        });
     }
     db.AddRange(payroll);
     var advances = employees.Take(8).Select((e, i) => new EmployeeAdvance { Employee = e, OriginalAmount = 9000, RemainingAmount = 5000, AdvanceDate = today.AddDays(-20 - i * 4), Notes = "سلفة تجريبية مع رصيد متبقٍ" }).ToList();
@@ -175,6 +236,74 @@ static async Task SeedMockupAsync(NurseryDbContext db)
     db.AddRange(Enumerable.Range(0, 24).Select(i => new AuthenticationAuditLog { UserId = i % 4 == 0 ? null : manager.Id, Username = i % 4 == 0 ? "unknown-test" : manager.Username, Action = i % 3 == 0 ? "LoginFailed" : "LoginSucceeded", Description = "محاولة دخول تجريبية", Success = i % 3 != 0, FailureReason = i % 3 == 0 ? "بيانات دخول غير صحيحة (مثال)" : null, Timestamp = now.AddDays(-i) }));
     db.AppSettings.Add(new AppSetting { Key = "MockupData.Enabled", Value = "true", Description = "قاعدة بيانات تطوير ببيانات وهمية فقط" });
     await db.SaveChangesAsync();
+}
+
+static async Task SeedPayrollDemoAsync(NurseryDbContext db)
+{
+    const string nationalId = "MOCK-PAYROLL-001";
+    if (await db.Employees.IgnoreQueryFilters().AnyAsync(x => x.NationalIdNumber == nationalId))
+    {
+        Console.WriteLine("Payroll demo employee already exists; no data was changed.");
+        return;
+    }
+
+    var today = DateOnly.FromDateTime(DateTime.Today);
+    var periodStart = new DateOnly(today.Year, today.Month, 1);
+    var periodEnd = periodStart.AddMonths(1).AddDays(-1);
+    var employee = new Employee
+    {
+        FullName = "محمود سامي (تجريبي الرواتب)", NationalIdNumber = nationalId,
+        Address = "مدينة نصر، القاهرة", Phone = "01029990001", JobDesignation = "مشرف",
+        HireDate = periodStart, ShiftStartTime = "07:30", Salary = 6000m, InsuranceFunds = 350m,
+        HasExperience = true, Qualification = "بكالوريوس تجارة", GraduationYear = 2018,
+        MaritalStatus = ElMomenNursery.Domain.Enums.MaritalStatus.Married
+    };
+
+    var attendance = new List<EmployeeAttendance>();
+    var workingDay = 0;
+    for (var date = periodStart; date <= today; date = date.AddDays(1))
+    {
+        if (date.DayOfWeek == DayOfWeek.Friday) continue;
+        var status = workingDay switch
+        {
+            0 or 1 => ElMomenNursery.Domain.Enums.AttendanceStatus.Absent,
+            2 or 3 => ElMomenNursery.Domain.Enums.AttendanceStatus.Late,
+            _ => ElMomenNursery.Domain.Enums.AttendanceStatus.Present
+        };
+        DateTimeOffset? checkIn = status switch
+        {
+            ElMomenNursery.Domain.Enums.AttendanceStatus.Late => date.ToDateTime(new TimeOnly(8, 30)).ToUniversalTime(),
+            ElMomenNursery.Domain.Enums.AttendanceStatus.Present => date.ToDateTime(new TimeOnly(7, 30)).ToUniversalTime(),
+            _ => null
+        };
+        attendance.Add(new EmployeeAttendance
+        {
+            Employee = employee, AttendanceDate = date, Status = status,
+            EntryMethod = ElMomenNursery.Domain.Enums.AttendanceEntryMethod.Manual,
+            CheckInTime = checkIn,
+            CheckOutTime = checkIn is null ? null : date.ToDateTime(new TimeOnly(15, 0)).ToUniversalTime(),
+            Notes = status switch
+            {
+                ElMomenNursery.Domain.Enums.AttendanceStatus.Absent => "غياب تجريبي لاختبار حساب الراتب",
+                ElMomenNursery.Domain.Enums.AttendanceStatus.Late => "تأخير تجريبي ساعة واحدة",
+                _ => "حضور تجريبي"
+            }
+        });
+        workingDay++;
+    }
+
+    var payroll = new PayrollRecord
+    {
+        Employee = employee, PeriodStart = periodStart, PeriodEnd = periodEnd,
+        AgreedSalary = employee.Salary, InsuranceFunds = employee.InsuranceFunds,
+        Deductions = 100m, IsPaid = false, IsCalculated = false,
+        Notes = "اختبار حساب الراتب: غياب يومين، تأخير ساعتين، خصم 100 جنيه"
+    };
+    db.Add(employee);
+    db.AddRange(attendance);
+    db.Add(payroll);
+    await db.SaveChangesAsync();
+    Console.WriteLine($"Seeded {employee.FullName}: salary={employee.Salary}; insurance={employee.InsuranceFunds}; absences=2; lateMinutes=120; deductions={payroll.Deductions}; period={periodStart:yyyy-MM-dd}..{periodEnd:yyyy-MM-dd}");
 }
 
 

@@ -7,11 +7,16 @@ public sealed class EmployeeService(IUnitOfWork unitOfWork, ILogger<EmployeeServ
     {
         var permissionError = PermissionGuard.Check(permissions, "Employees.Manage", EmployeeErrors.PermissionDenied);
         if (permissionError is not null) return permissionError;
+
         if (employee is null || HasMissingRequiredField(employee.FullName, employee.NationalIdNumber, employee.Address, employee.Phone, employee.JobDesignation))
             return EmployeeErrors.InvalidData;
-        if (employee.Salary < 0) return EmployeeErrors.InvalidSalary;
+
+        if (employee.Salary < 0 || employee.InsuranceFunds < 0) return EmployeeErrors.InvalidSalary;
+
         if (!ValidShiftStartTime(employee.ShiftStartTime)) return EmployeeErrors.InvalidData;
+
         if (!ValidNationalId(employee.NationalIdNumber)) return EmployeeErrors.InvalidNationalId;
+
         if (!PhoneNumberValidator.IsValidEgyptianMobile(employee.Phone)
             || !string.IsNullOrWhiteSpace(employee.AlternatePhone) && !PhoneNumberValidator.IsValidEgyptianMobile(employee.AlternatePhone)) return EmployeeErrors.InvalidPhone;
         if (employee.GraduationYear is int graduationYear && (graduationYear < 1900 || graduationYear > DateTime.Today.Year)) return EmployeeErrors.InvalidGraduationYear;
@@ -125,7 +130,7 @@ public sealed class EmployeeService(IUnitOfWork unitOfWork, ILogger<EmployeeServ
 
         if (new[] { employee.FullName, employee.NationalIdNumber, employee.Address, employee.Phone, employee.JobDesignation }
             .Any(value => value is not null && string.IsNullOrWhiteSpace(value))) return EmployeeErrors.InvalidData;
-        if (employee.Salary < 0) return EmployeeErrors.InvalidSalary;
+        if (employee.Salary < 0 || employee.InsuranceFunds < 0) return EmployeeErrors.InvalidSalary;
         if (employee.ShiftStartTime is not null && !ValidShiftStartTime(employee.ShiftStartTime)) return EmployeeErrors.InvalidData;
         if (employee.NationalIdNumber is not null && !ValidNationalId(employee.NationalIdNumber)) return EmployeeErrors.InvalidNationalId;
         if (employee.Phone is not null && !PhoneNumberValidator.IsValidEgyptianMobile(employee.Phone)) return EmployeeErrors.InvalidPhone;

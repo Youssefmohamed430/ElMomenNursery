@@ -7,10 +7,14 @@ using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using Serilog;
 using System.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
+using ElMomenNursery.Application.Abstractions.Persistence;
+using ElMomenNursery.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace ElMomenNursery.Infrastructure.Documents;
 
-public sealed class InvoicePdfService(string dataDirectory) : IInvoicePdfService
+public sealed class InvoicePdfService(string dataDirectory, IServiceScopeFactory scopeFactory) : IInvoicePdfService
 {
     static InvoicePdfService()
     {
@@ -18,9 +22,16 @@ public sealed class InvoicePdfService(string dataDirectory) : IInvoicePdfService
         FontManager.RegisterFontFromEmbeddedResource(typeof(InvoicePdfService).Assembly, "ElMomenNursery.Infrastructure.Resources.Fonts.NotoNaskhArabic.ttf");
     }
 
-    public Task<Result<string>> CreateInvoiceFileAsync(InvoiceReceiptDto invoice, CancellationToken cancellationToken = default)
+    public async Task<Result<string>> CreateInvoiceFileAsync(InvoiceReceiptDto invoice, CancellationToken cancellationToken = default)
     {
-        return Task.Run(() =>
+        var fontSize = 11;
+        await using (var scope = scopeFactory.CreateAsyncScope())
+        {
+            var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+            var setting = await uow.Repository<AppSetting>().FirstOrDefaultAsync(x => x.Key == "Invoices.FontSize", cancellationToken: cancellationToken);
+            if (setting is not null && int.TryParse(setting.Value, out var configured) && configured is >= 8 and <= 18) fontSize = configured;
+        }
+        return await Task.Run(() =>
         {
             cancellationToken.ThrowIfCancellationRequested();
             var folder = Path.Combine(dataDirectory, "Invoices", invoice.CreatedAt.LocalDateTime.Year.ToString(System.Globalization.CultureInfo.InvariantCulture));
@@ -31,7 +42,7 @@ public sealed class InvoicePdfService(string dataDirectory) : IInvoicePdfService
                 Directory.CreateDirectory(folder);
                 Document.Create(document => document.Page(page =>
                 {
-                    page.Size(PageSizes.A5); page.Margin(24); page.DefaultTextStyle(style => style.FontFamily("Noto Naskh Arabic").FontSize(11));
+                    page.Size(PageSizes.A5); page.Margin(24); page.DefaultTextStyle(style => style.FontFamily("Noto Naskh Arabic").FontSize(fontSize));
                     page.Content().ContentFromRightToLeft().Column(column =>
                     {
                         column.Item().AlignCenter().Text("حضانة المؤمن").FontSize(20).Bold();

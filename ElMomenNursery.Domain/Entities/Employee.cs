@@ -20,6 +20,7 @@ public sealed class Employee : ISoftDeletable
     public DateOnly HireDate { get; set; }
     public string ShiftStartTime { get; set; } = "07:30";
     public decimal Salary { get; set; }
+    public decimal InsuranceFunds { get; set; }
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? UpdatedAt { get; set; }
     public UserAccount? UserAccount { get; set; }

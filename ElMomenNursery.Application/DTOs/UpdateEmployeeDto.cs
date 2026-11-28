@@ -17,4 +17,5 @@ public class UpdateEmployeeDto
     public DateOnly? HireDate { get; set; }
     public string? ShiftStartTime { get; set; }
     public decimal? Salary { get; set; }
+    public decimal? InsuranceFunds { get; set; }
 }

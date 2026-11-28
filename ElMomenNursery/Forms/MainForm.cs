@@ -227,6 +227,7 @@ public sealed class MainForm : ResponsiveForm
             "المخزن",
             "الماليات",
             "إدارة المستخدمين"
+            , "الإعدادات"
         };
 
         foreach (var section in sections)
@@ -297,6 +298,7 @@ public sealed class MainForm : ResponsiveForm
                 "الماليات" => new FinancePage(_scopeFactory, _session, _excelExportService),
                 "الفصول" => new ClassesPage(_scopeFactory, _session, _excelExportService),
                 "إدارة المستخدمين" => new UserManagementForm(_scopeFactory, _session, _excelExportService),
+                "الإعدادات" => new SettingsPage(_scopeFactory),
                 _ => BuildSectionPage(section)
             };
             if (page is ScrollableControl scrollablePage)
@@ -326,6 +328,7 @@ public sealed class MainForm : ResponsiveForm
         "المخزن" => _session.HasPermission("Inventory.View"),
         "الماليات" => _session.HasPermission("Finance.View") || _session.HasPermission("Payments.View") || _session.HasPermission("Expenses.View") || _session.HasPermission("Finance.ManageIncome") || _session.HasPermission("Finance.ManageExpenses"),
         "إدارة المستخدمين" => _session.HasPermission("Users.View"),
+        "الإعدادات" => _session.HasPermission("Settings.View") || _session.HasPermission("Settings.Manage") || _session.Roles.Contains("Admin") || _session.Roles.Contains("Manager"),
         _ => true
     };
 

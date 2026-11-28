@@ -31,9 +31,6 @@ internal sealed class UserManagementForm : UserControl
         var assignments = Button("تعيين أدوار");
         var resetPassword = Button("إعادة كلمة المرور");
         var export = Button("تصدير Excel");
-        var lookups = Button("إدارة القوائم");
-        lookups.Visible = session.HasPermission("Lookups.Manage");
-        lookups.Click += (_, _) => { using var form = new LookupsManagementForm(_scopes); form.ShowDialog(FindForm()); };
         var addRole = Button("إضافة دور"); var deleteRole = Button("حذف دور");
         addRole.Visible = deleteRole.Visible = session.HasPermission("Roles.Manage");
         addRole.Click += (_, _) => RunSafeEvent(CreateRoleAsync, "Create role");
@@ -48,7 +45,7 @@ internal sealed class UserManagementForm : UserControl
         resetPassword.Click += (_, _) => RunSafeEvent(() => ResetPasswordAsync(), "Reset account password");
         export.Click += async (_, _) => await GridExcelExport.SaveAsync((IWin32Window?)FindForm() ?? this, _grid,
             _excelExportService, "تصدير الحسابات", "الحسابات");
-        toolbar.Controls.AddRange([add, toggle, assignments, resetPassword, roles, addRole, deleteRole, lookups, export, _status]);
+        toolbar.Controls.AddRange([add, toggle, assignments, resetPassword, roles, addRole, deleteRole, export, _status]);
         Controls.Add(_grid); Controls.Add(toolbar);
         Load += (_, _) => RunSafeEvent(() => ReloadAsync(), "Load user accounts");
     }
