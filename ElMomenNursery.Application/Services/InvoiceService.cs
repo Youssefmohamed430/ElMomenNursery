@@ -121,10 +121,18 @@ public sealed class InvoiceService(IUnitOfWork uow, ILogger<InvoiceService> logg
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { await uow.RollbackTransactionAsync(CancellationToken.None); throw; }
         catch (Exception ex) { await uow.RollbackTransactionAsync(CancellationToken.None); logger.LogError(ex,"Invoice posting failed; invoiceId={InvoiceId}",invoice.Id); return PersistenceErrorMapper.FromException(ex); }
-        return Result.Success(ToReceipt(invoice, child, now, dto.PaymentMethod, sessions.CurrentUser?.FullName), "تم حفظ الفاتورة وتحديث كميات المخزن.");
+        var nurserySettings = await uow.Repository<AppSetting>().Query()
+            .Where(x => x.Key == "Nursery.Name" || x.Key == "Nursery.Address" || x.Key == "Nursery.Phone")
+            .ToListAsync(ct);
+        return Result.Success(ToReceipt(invoice, child, now, dto.PaymentMethod, sessions.CurrentUser?.FullName, nurserySettings), "تم حفظ الفاتورة وتحديث كميات المخزن.");
     }
 
-    private static InvoiceReceiptDto ToReceipt(Invoice invoice, Child? child, DateTimeOffset now, PaymentMethod method, string? issuedByName) => new(invoice.Id, invoice.InvoiceNumber, now, invoice.CustomerName, child?.FullName,
-        invoice.Lines.Select(x => new InvoiceReceiptLineDto(x.ItemNameSnapshot,x.UnitPriceSnapshot,x.Quantity,x.LineTotal)).ToArray(),invoice.TotalAmount,method,invoice.PaymentReference, issuedByName);
+    private static InvoiceReceiptDto ToReceipt(Invoice invoice, Child? child, DateTimeOffset now, PaymentMethod method, string? issuedByName, IReadOnlyCollection<AppSetting> settings) => new(
+        invoice.Id, invoice.InvoiceNumber, now, invoice.CustomerName, child?.FullName,
+        invoice.Lines.Select(x => new InvoiceReceiptLineDto(x.ItemNameSnapshot, x.UnitPriceSnapshot, x.Quantity, x.LineTotal)).ToArray(),
+        invoice.TotalAmount, method, invoice.PaymentReference, issuedByName, invoice.Notes,
+        settings.FirstOrDefault(x => x.Key == "Nursery.Name")?.Value ?? "حضانة المؤمن",
+        settings.FirstOrDefault(x => x.Key == "Nursery.Address")?.Value,
+        settings.FirstOrDefault(x => x.Key == "Nursery.Phone")?.Value);
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

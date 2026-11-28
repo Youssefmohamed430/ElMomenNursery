@@ -38,7 +38,7 @@ public sealed class ChildEditorForm : ResponsiveForm
     private readonly CheckBox _previouslyAttended = CreateCheckBox("سبق له الالتحاق بحضانة");
     private readonly Button _saveButton = CreateButton("حفظ", primary: true);
     private Guid? _createdChildId;
-    private readonly Dictionary<AttachmentType, (Label Label, string? Source, string? Destination)> _documents = new();
+    private readonly Dictionary<AttachmentType, (Label Label, string? Source)> _documents = new();
 
     public ChildEditorForm(IServiceScopeFactory scopes, ChildDto? child = null, bool canManageClasses = false)
     {
@@ -249,14 +249,12 @@ public sealed class ChildEditorForm : ResponsiveForm
 
             foreach (var (type, document) in _documents)
             {
-                if (string.IsNullOrWhiteSpace(document.Source) || string.IsNullOrWhiteSpace(document.Destination)) continue;
-                var destination = Path.Combine(document.Destination, "AlMoumenNursery", "Children", childId.ToString("N"), $"{type}_{Path.GetFileName(document.Source)}");
-                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-                File.Copy(document.Source, destination, overwrite: true);
+                if (string.IsNullOrWhiteSpace(document.Source)) continue;
+                var sourcePath = Path.GetFullPath(document.Source);
                 var saveAttachment = await childService.AddChildAttachmentAsync(childId, new ChildAttachmentDto(
-                    Guid.NewGuid(), type, Path.GetFileName(document.Source), destination,
-                    Path.GetExtension(document.Source).Equals(".pdf", StringComparison.OrdinalIgnoreCase) ? "application/pdf" : $"image/{Path.GetExtension(document.Source).TrimStart('.').ToLowerInvariant()}",
-                    new FileInfo(destination).Length));
+                    Guid.NewGuid(), type, Path.GetFileName(sourcePath), sourcePath,
+                    Path.GetExtension(sourcePath).Equals(".pdf", StringComparison.OrdinalIgnoreCase) ? "application/pdf" : $"image/{Path.GetExtension(sourcePath).TrimStart('.').ToLowerInvariant()}",
+                    new FileInfo(sourcePath).Length));
                 if (saveAttachment.IsFailure)
                 {
                     ShowValidationError(saveAttachment.Error.Description);
@@ -399,11 +397,10 @@ public sealed class ChildEditorForm : ResponsiveForm
         {
             using var picker = new OpenFileDialog { Title = $"اختيار {title}", Filter = "ملفات PDF وصور|*.pdf;*.png;*.jpg;*.jpeg;*.bmp;*.webp|كل الملفات|*.*", CheckFileExists = true };
             if (picker.ShowDialog(this) != DialogResult.OK) return;
-            using var folder = new FolderBrowserDialog { Description = "اختر مجلد حفظ وثائق الطفل" };
-            if (folder.ShowDialog(this) != DialogResult.OK) return;
-            _documents[type] = (label, picker.FileName, folder.SelectedPath);
-            label.Text = Path.GetFileName(picker.FileName);
-            label.Tag = folder.SelectedPath;
+            _documents[type] = (label, Path.GetFullPath(picker.FileName));
+            label.Text = picker.FileName;
+            label.Tag = picker.FileName;
+            label.AccessibleDescription = picker.FileName;
             await Task.CompletedTask;
         }, "Select child document");
         AddPair(table, title, label, "", button);
